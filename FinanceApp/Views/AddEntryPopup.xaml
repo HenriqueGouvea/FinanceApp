@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+               xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+               xmlns:toolkit="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
+               xmlns:vm="clr-namespace:FinanceApp.ViewModels"
+               x:Class="FinanceApp.Views.AddEntryPopup"
+               x:DataType="vm:AddEntryViewModel">
+
+    <Border BackgroundColor="White" 
+            StrokeShape="RoundRectangle 12" 
+            Padding="20" 
+            WidthRequest="350" 
+            VerticalOptions="Center">
+
+        <VerticalStackLayout Spacing="15">
+            <Label Text="Nova Despesa" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
+
+            <Entry Placeholder="Descrição" Text="{Binding Description}" />
+            <Entry Placeholder="Valor" Text="{Binding Amount}" Keyboard="Numeric" />
+
+            <Picker Title="Categoria" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" />
+
+            <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,10,0,0">
+                <Button Grid.Column="0" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />
+                <Button Grid.Column="1" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="Purple" />
+            </Grid>
+        </VerticalStackLayout>
+    </Border>
+</toolkit:Popup>

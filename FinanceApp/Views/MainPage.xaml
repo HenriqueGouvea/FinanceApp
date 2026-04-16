@@ -1,0 +1,74 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:FinanceApp.ViewModels"
+             xmlns:models="clr-namespace:FinanceApp.Models"
+             x:Class="FinanceApp.Views.MainPage"
+             x:DataType="vm:MainViewModel" 
+             Shell.NavBarIsVisible="False">
+    <Grid>
+        <CarouselView ItemsSource="{Binding Months}"
+                      Position="{Binding CurrentPosition, Mode=TwoWay}"
+                      Loop="False">
+            <CarouselView.ItemTemplate>
+                <DataTemplate x:DataType="vm:MonthViewModel">
+                    <Grid RowDefinitions="Auto, Auto, Auto, *" Padding="20" RowSpacing="15">
+
+                        <Label Grid.Row="0" 
+                           Text="{Binding MonthName}" 
+                           FontSize="32" 
+                           HorizontalOptions="Center" 
+                           FontAttributes="Bold" />
+
+                        <Frame Grid.Row="1" BackgroundColor="#F0F0F0" CornerRadius="10" Padding="15">
+                            <HorizontalStackLayout HorizontalOptions="Center" Spacing="30">
+                                <VerticalStackLayout>
+                                    <Label Text="Receitas" FontSize="12" TextColor="Gray"/>
+                                    <Label Text="{Binding TotalIncomes, StringFormat='R$ {0:F2}'}" TextColor="Green" FontAttributes="Bold"/>
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout>
+                                    <Label Text="Despesas" FontSize="12" TextColor="Gray"/>
+                                    <Label Text="{Binding TotalOutcomes, StringFormat='R$ {0:F2}'}" TextColor="Red" FontAttributes="Bold"/>
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout>
+                                    <Label Text="Balanço" FontSize="12" TextColor="Gray"/>
+                                    <Label Text="{Binding Balance, StringFormat='R$ {0:F2}'}" FontAttributes="Bold"/>
+                                </VerticalStackLayout>
+                            </HorizontalStackLayout>
+                        </Frame>
+
+                        <VerticalStackLayout Grid.Row="2" Spacing="5">
+                            <Label Text="Despesas do Mês" FontAttributes="Bold" />
+                            <BoxView HeightRequest="1" Color="Silver" />
+                        </VerticalStackLayout>
+
+                        <CollectionView Grid.Row="3" ItemsSource="{Binding Entries}">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="models:FinancialEntry">
+                                    <Grid ColumnDefinitions="*, Auto" Padding="10">
+                                        <Label Text="{Binding Description}" Grid.Column="0" FontAttributes="Bold"/>
+                                        <Label Text="{Binding Amount, StringFormat='R$ {0:F2}'}" Grid.Column="1" TextColor="Red"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+
+                    </Grid>
+                </DataTemplate>
+            </CarouselView.ItemTemplate>
+        </CarouselView>
+        <Button Text="+" 
+            FontSize="24"
+            BackgroundColor="Purple"
+            TextColor="White"
+            CornerRadius="28"
+            HeightRequest="56"
+            WidthRequest="56"
+            HorizontalOptions="End"
+            VerticalOptions="End"
+            Margin="20"
+            Clicked="OnAddClicked" />
+    </Grid>
+</ContentPage>
