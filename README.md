@@ -28,12 +28,12 @@ The development follows strict guidelines documented in our `CLAUDE.md` to ensur
 ## 📱 Project Roadmap & Features
 
 ### Phase 1: Foundation & Core Logic
-- [x] **Dynamic Month Navigation:** Currently limited to a 3-month sliding window for stability.
+- [x] **Dynamic Month Navigation:** Sliding window navigation moving back and forth within a fixed range of 24 months.
 - [x] **Single Entry Management:** Ability to add and track one-time expenses.
+- [x] **Recurrence Engine:** Implement the 3 recurrence types (OneTime, Installments, Recurrent) with automated distribution.
+- [ ] **Current month button:** A quick navigation button to jump back to the current month.
 - [ ] **Full CRUD:** Implement Update and Delete functionality for all entries.
-- [ ] **Incomes Integration:** Support for positive cash flow entries.
-- [ ] **Unlimited Navigation:** Transition from fixed months to an infinite timeline scrolling.
-- [ ] **Recurrence Engine:** Implement the 3 recurrence types (OneTime, Installments, Recurrent) with automated distribution.
+- [ ] **Incomes separation:** Separate Incomes from Outcomes in the UI.
 - [ ] **Category Management:** Move from hardcoded categories to a dynamic CRUD with custom icons/colors.
 
 ### Phase 2: Advanced Features & Scaling

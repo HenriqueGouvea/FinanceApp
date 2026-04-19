@@ -7,10 +7,16 @@ namespace FinanceApp.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
-    public ObservableCollection<MonthViewModel> Months { get; set; } = [];
+    private const int MaxMonthsFromToday = 24;
+
+    private static readonly DateTime FirstOfToday =
+        new(DateTime.Today.Year, DateTime.Today.Month, 1, 0, 0, 0, DateTimeKind.Local);
 
     [ObservableProperty]
-    private int currentPosition;
+    ObservableCollection<MonthViewModel> months = [];
+
+    [ObservableProperty]
+    int currentPosition;
 
     public MonthViewModel? SelectedMonth => Months.ElementAtOrDefault(CurrentPosition);
 
@@ -24,31 +30,73 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public async Task InitializeAsync()
     {
-        var today = DateTime.Today;
-        var monthsToLoad = new[] { today.AddMonths(-1), today, today.AddMonths(1) };
-
         if (Months.Count == 0)
         {
-            foreach (var date in monthsToLoad)
+            for (int offset = -MaxMonthsFromToday; offset <= MaxMonthsFromToday; offset++)
             {
-                Months.Add(new MonthViewModel
-                {
-                    MonthName = date.ToString("MMMM yyyy"),
-                    Date = new DateTime(date.Year, date.Month, 1)
-                });
+                Months.Add(CreateMonthViewModel(FirstOfToday.AddMonths(offset)));
             }
 
-            CurrentPosition = 1;
+            CurrentPosition = MaxMonthsFromToday;
         }
 
-        for (int i = 0; i < Months.Count; i++)
+        await LoadNearbyMonthsAsync(CurrentPosition);
+    }
+
+    [RelayCommand]
+    public async Task RefreshAllAsync()
+    {
+        foreach (var month in Months)
         {
-            var entries = await _financeService.GetEntriesByMonthAsync(Months[i].Date);
+            month.IsLoaded = false;
+        }
 
-            Months[i].Entries.Clear();
+        await LoadNearbyMonthsAsync(CurrentPosition);
+    }
 
+    [RelayCommand]
+    public async Task ClearDatabaseAsync()
+    {
+        await _financeService.ClearAllDataAsync();
+
+        foreach (var month in Months)
+        {
+            month.Entries.Clear();
+            month.IsLoaded = false;
+        }
+
+        await LoadNearbyMonthsAsync(CurrentPosition);
+    }
+
+    partial void OnCurrentPositionChanged(int value)
+    {
+        _ = LoadNearbyMonthsAsync(value);
+    }
+
+    private async Task LoadNearbyMonthsAsync(int position)
+    {
+        var from = Math.Max(0, position - 2);
+        var to = Math.Min(Months.Count - 1, position + 2);
+
+        for (int i = from; i <= to; i++)
+        {
+            var month = Months[i];
+            if (month.IsLoaded)
+                continue;
+
+            var entries = await _financeService.GetMergedEntriesForMonthAsync(month.Date.Year, month.Date.Month);
+
+            month.Entries.Clear();
             foreach (var entry in entries)
-                Months[i].Entries.Add(entry);
+                month.Entries.Add(entry);
+
+            month.IsLoaded = true;
         }
     }
+
+    private static MonthViewModel CreateMonthViewModel(DateTime date) => new()
+    {
+        MonthName = date.ToString("MMMM yyyy"),
+        Date = new DateTime(date.Year, date.Month, 1)
+    };
 }

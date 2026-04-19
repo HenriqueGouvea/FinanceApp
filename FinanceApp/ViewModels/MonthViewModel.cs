@@ -6,15 +6,24 @@ namespace FinanceApp.ViewModels;
 
 public partial class MonthViewModel : ObservableObject
 {
-    public ObservableCollection<FinancialEntry> Entries { get; } = [];
+    public ObservableCollection<MonthlyEntryProjection> Entries { get; } = [];
 
     [ObservableProperty]
-    private string monthName = string.Empty;
+    string monthName = string.Empty;
+
+    [ObservableProperty]
+    bool isLoaded;
 
     public DateTime Date { get; set; }
 
-    public decimal TotalIncomes => 0m;
-    public decimal TotalOutcomes => Entries.Sum(e => e.Amount);
+    public decimal TotalIncomes => Entries
+        .Where(e => e.EntryType == FinancialEntryType.Income)
+        .Sum(e => e.EffectiveAmount);
+
+    public decimal TotalOutcomes => Entries
+        .Where(e => e.EntryType == FinancialEntryType.Outcome)
+        .Sum(e => e.EffectiveAmount);
+
     public decimal Balance => TotalIncomes - TotalOutcomes;
 
     public MonthViewModel()

@@ -1,10 +1,11 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:FinanceApp.ViewModels"
              xmlns:models="clr-namespace:FinanceApp.Models"
+             xmlns:converters="clr-namespace:FinanceApp.Converters"
              x:Class="FinanceApp.Views.MainPage"
-             x:DataType="vm:MainViewModel" 
+             x:DataType="vm:MainViewModel"
              Shell.NavBarIsVisible="False">
     <Grid>
         <CarouselView ItemsSource="{Binding Months}"
@@ -14,11 +15,11 @@
                 <DataTemplate x:DataType="vm:MonthViewModel">
                     <Grid RowDefinitions="Auto, Auto, Auto, *" Padding="20" RowSpacing="15">
 
-                        <Label Grid.Row="0" 
-                           Text="{Binding MonthName}" 
-                           FontSize="32" 
-                           HorizontalOptions="Center" 
-                           FontAttributes="Bold" />
+                        <Label Grid.Row="0"
+                               Text="{Binding MonthName}"
+                               FontSize="32"
+                               HorizontalOptions="Center"
+                               FontAttributes="Bold" />
 
                         <Frame Grid.Row="1" BackgroundColor="#F0F0F0" CornerRadius="10" Padding="15">
                             <HorizontalStackLayout HorizontalOptions="Center" Spacing="30">
@@ -40,16 +41,32 @@
                         </Frame>
 
                         <VerticalStackLayout Grid.Row="2" Spacing="5">
-                            <Label Text="Despesas do Mês" FontAttributes="Bold" />
+                            <Label Text="Lançamentos do Mês" FontAttributes="Bold" />
                             <BoxView HeightRequest="1" Color="Silver" />
                         </VerticalStackLayout>
 
                         <CollectionView Grid.Row="3" ItemsSource="{Binding Entries}">
                             <CollectionView.ItemTemplate>
-                                <DataTemplate x:DataType="models:FinancialEntry">
-                                    <Grid ColumnDefinitions="*, Auto" Padding="10">
-                                        <Label Text="{Binding Description}" Grid.Column="0" FontAttributes="Bold"/>
-                                        <Label Text="{Binding Amount, StringFormat='R$ {0:F2}'}" Grid.Column="1" TextColor="Red"/>
+                                <DataTemplate x:DataType="models:MonthlyEntryProjection">
+                                    <Grid ColumnDefinitions="*, Auto, Auto" Padding="10">
+                                        <VerticalStackLayout Grid.Column="0">
+                                            <Label Text="{Binding Description}" FontAttributes="Bold"/>
+                                            <Label Text="{Binding InstallmentLabel}"
+                                                   FontSize="11"
+                                                   TextColor="Gray"
+                                                   IsVisible="{Binding InstallmentLabel, Converter={x:Static converters:IsNotNullConverter.Instance}}"/>
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="1"
+                                               Text="{Binding Status}"
+                                               FontSize="11"
+                                               TextColor="Gray"
+                                               VerticalOptions="Center"
+                                               Margin="0,0,8,0"/>
+                                        <Label Grid.Column="2"
+                                               Text="{Binding EffectiveAmount, StringFormat='R$ {0:F2}'}"
+                                               TextColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
+                                               FontAttributes="Bold"
+                                               VerticalOptions="Center"/>
                                     </Grid>
                                 </DataTemplate>
                             </CollectionView.ItemTemplate>
@@ -59,16 +76,26 @@
                 </DataTemplate>
             </CarouselView.ItemTemplate>
         </CarouselView>
-        <Button Text="+" 
-            FontSize="24"
-            BackgroundColor="Purple"
-            TextColor="White"
-            CornerRadius="28"
-            HeightRequest="56"
-            WidthRequest="56"
-            HorizontalOptions="End"
-            VerticalOptions="End"
-            Margin="20"
-            Clicked="OnAddClicked" />
+        <Button Text="Nuke DB"
+                Command="{Binding ClearDatabaseCommand}"
+                FontSize="10"
+                HeightRequest="30"
+                WidthRequest="70"
+                BackgroundColor="#33FF0000"
+                TextColor="Red"
+                HorizontalOptions="End"
+                VerticalOptions="Start"
+                Margin="10" />
+        <Button Text="+"
+                FontSize="24"
+                BackgroundColor="Purple"
+                TextColor="White"
+                CornerRadius="28"
+                HeightRequest="56"
+                WidthRequest="56"
+                HorizontalOptions="End"
+                VerticalOptions="End"
+                Margin="20"
+                Clicked="OnAddClicked" />
     </Grid>
 </ContentPage>

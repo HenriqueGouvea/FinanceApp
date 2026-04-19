@@ -6,19 +6,34 @@
                x:Class="FinanceApp.Views.AddEntryPopup"
                x:DataType="vm:AddEntryViewModel">
 
-    <Border BackgroundColor="White" 
-            StrokeShape="RoundRectangle 12" 
-            Padding="20" 
-            WidthRequest="350" 
+    <Border BackgroundColor="White"
+            StrokeShape="RoundRectangle 12"
+            Padding="20"
+            WidthRequest="350"
             VerticalOptions="Center">
 
         <VerticalStackLayout Spacing="15">
-            <Label Text="Nova Despesa" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
+            <Label Text="Novo Lançamento" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
 
             <Entry Placeholder="Descrição" Text="{Binding Description}" />
             <Entry Placeholder="Valor" Text="{Binding Amount}" Keyboard="Numeric" />
 
-            <Picker Title="Categoria" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" />
+            <Picker Title="Categoria"
+                    ItemsSource="{Binding Categories}"
+                    SelectedItem="{Binding SelectedCategory}" />
+
+            <Picker Title="Tipo"
+                    ItemsSource="{Binding EntryTypes}"
+                    SelectedItem="{Binding EntryType}" />
+
+            <Picker Title="Recorrência"
+                    ItemsSource="{Binding RecurrenceTypes}"
+                    SelectedItem="{Binding SelectedRecurrence}" />
+
+            <Entry Placeholder="Nº de parcelas"
+                   Text="{Binding TotalInstallments}"
+                   Keyboard="Numeric"
+                   IsVisible="{Binding IsInstallments}" />
 
             <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,10,0,0">
                 <Button Grid.Column="0" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />

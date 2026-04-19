@@ -1,8 +1,3 @@
-﻿namespace FinanceApp.Models;
+namespace FinanceApp.Models;
 
-public enum RecurrenceType
-{
-    OneTime,
-    Monthly,
-    Installments
-}
+public enum RecurrenceType { OneTime = 0, Recurrent = 1, Installments = 2 }

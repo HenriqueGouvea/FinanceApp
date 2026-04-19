@@ -34,7 +34,8 @@ public partial class MainPage : ContentPage
         vm.SetSaveCallback(async (entry) =>
         {
             await popup.CloseAsync();
-            await mainVm.InitializeCommand.ExecuteAsync(null);
+            if (mainVm.RefreshAllCommand.CanExecute(null))
+                await mainVm.RefreshAllCommand.ExecuteAsync(null);
         });
 
         await this.ShowPopupAsync(popup);
