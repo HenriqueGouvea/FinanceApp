@@ -22,7 +22,7 @@ public static class MauiProgram
 #if DEBUG
         builder.Logging.AddDebug();
 #endif
-        builder.Services.AddSingleton<DatabaseContext>();
+        builder.Services.AddSingleton<IDatabaseContext, DatabaseContext>();
         builder.Services.AddSingleton<IFinanceService, FinanceService>();
 
         builder.Services.AddTransient<MainViewModel>();

@@ -3,14 +3,18 @@ using SQLite;
 
 namespace FinanceApp.Data;
 
-public class DatabaseContext
+public class DatabaseContext : IDatabaseContext
 {
     private SQLiteAsyncConnection? _connection;
     private readonly string _databasePath;
 
     public DatabaseContext()
     {
+#if ANDROID || IOS || MACCATALYST || WINDOWS
         _databasePath = Path.Combine(FileSystem.AppDataDirectory, "FinanceDataV3.db3");
+#else
+        _databasePath = Path.Combine(Path.GetTempPath(), "FinanceDataV3.db3");
+#endif
     }
 
     public async Task<SQLiteAsyncConnection> GetConnectionAsync()

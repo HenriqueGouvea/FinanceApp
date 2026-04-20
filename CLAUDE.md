@@ -22,7 +22,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## DI Registration
 All registrations are in `MauiProgram.cs`:
-- `DatabaseContext` → Singleton
+- `IDatabaseContext` → Singleton (resolved by `DatabaseContext`)
 - `IFinanceService` → Singleton
 - `MainViewModel`, `AddEntryViewModel`, `MainPage`, `AddEntryPopup` → Transient
 
@@ -97,6 +97,25 @@ The system will evolve into a projection-based model:
 - **Payment & Tracking:**
   - `FinancialEntryStatus`: Lifecycle of the parent (InProgress, Cancelled, Finished).
   - `FinancialMonthlyEntryStatus`: Immediate state of the month's obligation.
+
+## Testing
+
+**Project:** `FinanceApp.Tests/` — xUnit + FluentAssertions + sqlite-net-pcl, targets `net10.0`.
+
+**Run tests:** `dotnet test FinanceApp.Tests/FinanceApp.Tests.csproj`
+
+**Infrastructure:**
+- `IDatabaseContext` — interface extracted from `DatabaseContext` so tests can supply their own implementation.
+- `TestDatabaseContext` (`FinanceApp.Tests/Infrastructure/`) — implements `IDatabaseContext` using a GUID-named SQLite in-memory database (`file:{guid}?mode=memory&cache=shared`). The connection is opened once in the constructor and kept alive for the test lifetime to prevent the in-memory DB from being destroyed.
+- `FinanceApp.csproj` includes `net10.0` as an additional TFM (alongside the MAUI platform targets) so the test project can reference it. `OutputType` and `UseMaui` are conditional on non-`net10.0` builds.
+
+**Isolation:** xUnit instantiates a new test class per test method. Each test declares `TestDatabaseContext` and `FinanceService` as constructor-injected fields, so every test automatically gets a fresh, isolated DB with zero setup boilerplate.
+
+**Naming convention:** `MethodName_Scenario_ExpectedResult` (e.g., `SaveEntryAsync_RecurrentEntry_AppearsFromStartDateOnwards`).
+
+**Date normalization:** Always use `new DateTime(year, month, day, 0, 0, 0, DateTimeKind.Local)` for `StartDate` in tests to match the `DateTimeKind.Local` comparisons inside `IsActiveForMonth`.
+
+**Member ordering inside test classes:** private fields → constructor → `[Fact]` methods (grouped by the service method under test).
 
 ## Merge Logic (Projection Engine)
 When loading a month, the service must merge two sources:

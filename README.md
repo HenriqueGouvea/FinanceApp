@@ -35,6 +35,7 @@ The development follows strict guidelines documented in our `CLAUDE.md` to ensur
 - [ ] **Full CRUD:** Implement Update and Delete functionality for all entries.
 - [ ] **Incomes separation:** Separate Incomes from Outcomes in the UI.
 - [ ] **Category Management:** Move from hardcoded categories to a dynamic CRUD with custom icons/colors.
+- [ ] **Improve total amount for Installment entries:** Show the total amount of the installment in the dashboard, not just the current month amount.
 
 ### Phase 2: Advanced Features & Scaling
 - [ ] **Credit Card Engine:** Logic for billing cycles and closing dates.
