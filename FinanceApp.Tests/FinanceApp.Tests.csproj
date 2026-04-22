@@ -1,10 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <UseMaui>true</UseMaui>
+    <OutputType>Library</OutputType>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
+    <SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,11 +17,13 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="FluentAssertions" Version="8.3.0" />
+    <PackageReference Include="NSubstitute" Version="5.3.0" />
     <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
+    <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.10" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.41" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\FinanceApp\FinanceApp.csproj" />
   </ItemGroup>
-
 </Project>

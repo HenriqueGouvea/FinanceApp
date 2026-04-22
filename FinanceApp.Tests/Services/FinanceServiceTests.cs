@@ -18,76 +18,6 @@ public class FinanceServiceTests
     }
 
     [Fact]
-    public async Task SaveEntryAsync_OneTimeEntry_AppearsOnlyInItsMonth()
-    {
-        var entry = new FinancialEntry
-        {
-            Description = "One-time bonus",
-            Amount = 500m,
-            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
-            Recurrence = RecurrenceType.OneTime,
-            EntryType = FinancialEntryType.Income
-        };
-
-        await _service.SaveEntryAsync(entry);
-
-        var inApril = await _service.GetMergedEntriesForMonthAsync(2026, 4);
-        var inMarch = await _service.GetMergedEntriesForMonthAsync(2026, 3);
-        var inMay = await _service.GetMergedEntriesForMonthAsync(2026, 5);
-
-        inApril.Should().HaveCount(1);
-        inMarch.Should().BeEmpty();
-        inMay.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task SaveEntryAsync_RecurrentEntry_AppearsFromStartDateOnwards()
-    {
-        var entry = new FinancialEntry
-        {
-            Description = "Monthly salary",
-            Amount = 3000m,
-            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
-            Recurrence = RecurrenceType.Recurrent,
-            EntryType = FinancialEntryType.Income
-        };
-
-        await _service.SaveEntryAsync(entry);
-
-        var beforeStart = await _service.GetMergedEntriesForMonthAsync(2026, 3);
-        var atStart = await _service.GetMergedEntriesForMonthAsync(2026, 4);
-        var farFuture = await _service.GetMergedEntriesForMonthAsync(2030, 12);
-
-        beforeStart.Should().BeEmpty();
-        atStart.Should().HaveCount(1);
-        farFuture.Should().HaveCount(1);
-    }
-
-    [Fact]
-    public async Task SaveEntryAsync_InstallmentsEntry_ProjectsExactlyNMonths()
-    {
-        var entry = new FinancialEntry
-        {
-            Description = "Laptop installments",
-            Amount = 400m,
-            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
-            Recurrence = RecurrenceType.Installments,
-            TotalInstallments = 3,
-            EntryType = FinancialEntryType.Outcome
-        };
-
-        await _service.SaveEntryAsync(entry);
-
-        var april = await _service.GetMergedEntriesForMonthAsync(2026, 4);
-        var june = await _service.GetMergedEntriesForMonthAsync(2026, 6);
-        var july = await _service.GetMergedEntriesForMonthAsync(2026, 7);
-
-        april.Should().HaveCount(1);
-        june.Should().HaveCount(1);
-        july.Should().BeEmpty();
-    }
-
-    [Fact]
     public async Task GetMergedEntries_MultipleTemplates_ReturnsAllActiveProjections()
     {
         await _service.SaveEntryAsync(new FinancialEntry
@@ -176,6 +106,76 @@ public class FinanceServiceTests
         var results = await _service.GetMergedEntriesForMonthAsync(2026, 4);
 
         results.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_OneTimeEntry_AppearsOnlyInItsMonth()
+    {
+        var entry = new FinancialEntry
+        {
+            Description = "One-time bonus",
+            Amount = 500m,
+            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
+            Recurrence = RecurrenceType.OneTime,
+            EntryType = FinancialEntryType.Income
+        };
+
+        await _service.SaveEntryAsync(entry);
+
+        var inApril = await _service.GetMergedEntriesForMonthAsync(2026, 4);
+        var inMarch = await _service.GetMergedEntriesForMonthAsync(2026, 3);
+        var inMay = await _service.GetMergedEntriesForMonthAsync(2026, 5);
+
+        inApril.Should().HaveCount(1);
+        inMarch.Should().BeEmpty();
+        inMay.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_RecurrentEntry_AppearsFromStartDateOnwards()
+    {
+        var entry = new FinancialEntry
+        {
+            Description = "Monthly salary",
+            Amount = 3000m,
+            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
+            Recurrence = RecurrenceType.Recurrent,
+            EntryType = FinancialEntryType.Income
+        };
+
+        await _service.SaveEntryAsync(entry);
+
+        var beforeStart = await _service.GetMergedEntriesForMonthAsync(2026, 3);
+        var atStart = await _service.GetMergedEntriesForMonthAsync(2026, 4);
+        var farFuture = await _service.GetMergedEntriesForMonthAsync(2030, 12);
+
+        beforeStart.Should().BeEmpty();
+        atStart.Should().HaveCount(1);
+        farFuture.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_InstallmentsEntry_ProjectsExactlyNMonths()
+    {
+        var entry = new FinancialEntry
+        {
+            Description = "Laptop installments",
+            Amount = 400m,
+            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
+            Recurrence = RecurrenceType.Installments,
+            TotalInstallments = 3,
+            EntryType = FinancialEntryType.Outcome
+        };
+
+        await _service.SaveEntryAsync(entry);
+
+        var april = await _service.GetMergedEntriesForMonthAsync(2026, 4);
+        var june = await _service.GetMergedEntriesForMonthAsync(2026, 6);
+        var july = await _service.GetMergedEntriesForMonthAsync(2026, 7);
+
+        april.Should().HaveCount(1);
+        june.Should().HaveCount(1);
+        july.Should().BeEmpty();
     }
 
     [Fact]
