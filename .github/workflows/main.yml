@@ -24,8 +24,8 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
 
-    - name: Build App (Net10 Target)
-      run: dotnet build FinanceApp/FinanceApp.csproj -c Release -f net10.0
+    - name: Build Solution
+      run: dotnet build FinanceApp.slnx -c Release
 
     - name: Run Tests
-      run: dotnet test FinanceApp.Tests/FinanceApp.Tests.csproj -c Release --no-build --verbosity normal
+      run: dotnet test FinanceApp.Tests/FinanceApp.Tests.csproj -c Release --verbosity normal
