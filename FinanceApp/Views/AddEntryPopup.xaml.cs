@@ -9,6 +9,7 @@ public partial class AddEntryPopup : Popup
     {
         InitializeComponent();
         BindingContext = viewModel;
+        Opened += (_, _) => DescriptionEntry.Focus();
     }
 
     private async void OnCancelClicked(object sender, EventArgs e)

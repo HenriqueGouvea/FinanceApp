@@ -73,7 +73,9 @@
 
                             <!-- Outcomes List -->
                             <CollectionView ItemsSource="{Binding OutcomeEntries}"
-                                            IsVisible="{Binding IsOutcomesExpanded}">
+                                            IsVisible="{Binding IsOutcomesExpanded}"
+                                            SelectionMode="Single"
+                                            SelectionChanged="OnEntrySelectionChanged">
                                 <CollectionView.ItemTemplate>
                                     <DataTemplate x:DataType="models:MonthlyEntryProjection">
                                         <Grid ColumnDefinitions="*, Auto, Auto" Padding="10">
@@ -133,7 +135,9 @@
 
                             <!-- Incomes List -->
                             <CollectionView ItemsSource="{Binding IncomeEntries}"
-                                            IsVisible="{Binding IsIncomesExpanded}">
+                                            IsVisible="{Binding IsIncomesExpanded}"
+                                            SelectionMode="Single"
+                                            SelectionChanged="OnEntrySelectionChanged">
                                 <CollectionView.ItemTemplate>
                                     <DataTemplate x:DataType="models:MonthlyEntryProjection">
                                         <Grid ColumnDefinitions="*, Auto, Auto" Padding="10">

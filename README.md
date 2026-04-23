@@ -38,16 +38,15 @@ The development follows strict guidelines documented in our `CLAUDE.md` to ensur
 - [x] **Single Entry Management:** Ability to add and track one-time expenses.
 - [x] **Recurrence Engine:** Implement the 3 recurrence types (OneTime, Installments, Recurrent) with automated distribution.
 - [x] **Separation between income and outcome entries:** Differentiate visually and functionally between incomes and expenses.
-- [ ] **Edit modal:** Implement and edit modal to be open when the user clicks on an entry. There it should be possible to edit an entry.
+- [x] **Edit modal:** Opens when the user taps an entry. Edits Description, Amount, and Category on the template. EntryType and Recurrence are intentionally locked — see architectural constraint below.
 - [ ] **Delete entry:** Implement the entry deletion option when the user swipes an entry.
 - [ ] **Category Management:** Move from hardcoded categories to a dynamic CRUD with custom icons/colors. The category management screen should be accessed via hamburger menu.
 - [ ] **Improve total amount for Installment entries:** Show the total amount of the installment in the list, not just the current month amount.
 - [ ] **Status control:** Add the possibility to change the status of an entry
-- [ ] **UX improvements:** 
-	- [ ] When user opens the add entry modal, the description textbox should be already focused
-	- [ ] The income/outcome selection should be a swipe button where the default one is outcome and the user should just swipe right to change to income.
+- [x] **UX improvements:** Description field auto-focused on popup open; income/outcome selection is a swipe/tap pill toggle defaulting to Outcome.
 
 ### Phase 2: Advanced Features & Scaling
+- [ ] **Create a splash screen:** Check how to design a new one.
 - [ ] **Current month button:** A quick navigation button to jump back to the current month.
 - [ ] **Partial payment:** Add the option to add the partial payment of an entry like supermarket or restaurants. This value should be shown in the list and the user can set it open the entry edit window.
 - [ ] **Payment source engine:** Add a new page accessed via the hamburger menu with a CRUD for the payment sources. When adding a new entry there should have the option to link to a payment source which can be a bank account or a credit card.
@@ -55,6 +54,23 @@ The development follows strict guidelines documented in our `CLAUDE.md` to ensur
 - [ ] **Advanced Reporting:** Charts and insights by category and period.
 - [ ] **Add translation and locale resourse strings**: PT-BR, PT-PT, EN-US
 - [ ] **And much more...**
+
+## ⚠️ Architectural Constraint: Template vs. Monthly Edits
+
+The current edit flow modifies the `FinancialEntry` **template** — the parent record that drives all month projections. This is safe for display fields (`Description`, `Amount`, `Category`) because the projection engine already handles per-month overrides via `FinancialMonthlyEntry`.
+
+However, **structural fields must not be edited on the template once entries exist in the database:**
+
+- **EntryType (Income/Outcome):** Stored only on the template. Changing it retroactively flips the type for every month, including past months where a user already recorded a "Paid" state. Historical balances silently corrupt.
+- **Recurrence / TotalInstallments:** Controls which months the entry is active in. Reducing `TotalInstallments` orphans physical `FinancialMonthlyEntry` records in the now-excluded months — those paid states disappear from projections even though they exist in the DB. Changing recurrence type (e.g. `Installments` → `Recurrent`) reshuffles the entire spread.
+
+**Current mitigation:** The edit popup disables the EntryType toggle and Recurrence picker when editing an existing entry.
+
+**Future solution:** Implement a two-scope edit:
+1. **Edit this month only** → Creates/updates a `FinancialMonthlyEntry` override for that specific period (status, partial amount, cancellation). This is the planned "custom monthly entry" system.
+2. **Edit the template (all future months)** → For structural changes, soft-delete the old template (mark as cancelled from the changed month forward) and create a new template, preserving the physical records of the old one for past months.
+
+Until scope-aware editing is implemented, structural fields on the template must be treated as immutable after creation.
 
 ## 🛠 How to Run
 

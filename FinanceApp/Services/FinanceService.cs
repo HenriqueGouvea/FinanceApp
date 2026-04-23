@@ -66,6 +66,12 @@ public class FinanceService : IFinanceService
         return projections;
     }
 
+    public async Task<FinancialEntry?> GetEntryByIdAsync(int id)
+    {
+        var db = await _context.GetConnectionAsync();
+        return await db.Table<FinancialEntry>().Where(e => e.Id == id).FirstOrDefaultAsync();
+    }
+
     public async Task SaveEntryAsync(FinancialEntry entry)
     {
         try

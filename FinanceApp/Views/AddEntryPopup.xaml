@@ -3,6 +3,7 @@
                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                xmlns:toolkit="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
                xmlns:vm="clr-namespace:FinanceApp.ViewModels"
+               xmlns:converters="clr-namespace:FinanceApp.Converters"
                x:Class="FinanceApp.Views.AddEntryPopup"
                x:DataType="vm:AddEntryViewModel">
 
@@ -10,27 +11,84 @@
             StrokeShape="RoundRectangle 12"
             Padding="20"
             WidthRequest="350"
+            MaximumHeightRequest="560"
             VerticalOptions="Center">
 
+        <ScrollView>
         <VerticalStackLayout Spacing="15">
-            <Label Text="Novo Lançamento" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
+            <Label Text="{Binding PopupTitle}" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
 
-            <Entry Placeholder="Descrição" Text="{Binding Description}" />
+            <Entry x:Name="DescriptionEntry" Placeholder="Descrição" Text="{Binding Description}" />
             <Entry Placeholder="Valor" Text="{Binding Amount}" Keyboard="Numeric" />
 
             <Picker Title="Categoria"
                     ItemsSource="{Binding Categories}"
                     SelectedItem="{Binding SelectedCategory}" />
 
-            <Picker Title="Tipo"
-                    ItemsSource="{Binding EntryTypes}"
-                    SelectedItem="{Binding EntryType}" />
+            <!-- Entry type swipe/tap toggle — disabled when editing (structural field) -->
+            <Frame CornerRadius="22" Padding="3" BorderColor="LightGray"
+                   BackgroundColor="#F0F0F0" HasShadow="False"
+                   IsEnabled="{Binding IsEditing, Converter={x:Static converters:InverseBoolConverter.Instance}}"
+                   Opacity="{Binding StructuralFieldsOpacity}">
+                <Frame.GestureRecognizers>
+                    <SwipeGestureRecognizer Direction="Right" Command="{Binding SelectIncomeCommand}" />
+                    <SwipeGestureRecognizer Direction="Left"  Command="{Binding SelectOutcomeCommand}" />
+                </Frame.GestureRecognizers>
+                <Grid ColumnDefinitions="*, *" ColumnSpacing="3">
 
+                    <!-- Outcome (Despesa) column -->
+                    <Grid Grid.Column="0">
+                        <!-- Active state -->
+                        <Frame CornerRadius="19" BackgroundColor="Crimson" Padding="10,8"
+                               HasShadow="False" BorderColor="Transparent"
+                               IsVisible="{Binding IsIncome, Converter={x:Static converters:InverseBoolConverter.Instance}}">
+                            <Label Text="Despesa" TextColor="White" FontAttributes="Bold"
+                                   HorizontalOptions="Center" FontSize="13" />
+                        </Frame>
+                        <!-- Inactive state — tappable -->
+                        <Frame CornerRadius="19" BackgroundColor="Transparent" Padding="10,8"
+                               HasShadow="False" BorderColor="Transparent"
+                               IsVisible="{Binding IsIncome}">
+                            <Frame.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding SelectOutcomeCommand}" />
+                            </Frame.GestureRecognizers>
+                            <Label Text="Despesa" TextColor="Gray"
+                                   HorizontalOptions="Center" FontSize="13" />
+                        </Frame>
+                    </Grid>
+
+                    <!-- Income (Receita) column -->
+                    <Grid Grid.Column="1">
+                        <!-- Active state -->
+                        <Frame CornerRadius="19" BackgroundColor="SeaGreen" Padding="10,8"
+                               HasShadow="False" BorderColor="Transparent"
+                               IsVisible="{Binding IsIncome}">
+                            <Label Text="Receita" TextColor="White" FontAttributes="Bold"
+                                   HorizontalOptions="Center" FontSize="13" />
+                        </Frame>
+                        <!-- Inactive state — tappable -->
+                        <Frame CornerRadius="19" BackgroundColor="Transparent" Padding="10,8"
+                               HasShadow="False" BorderColor="Transparent"
+                               IsVisible="{Binding IsIncome, Converter={x:Static converters:InverseBoolConverter.Instance}}">
+                            <Frame.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding SelectIncomeCommand}" />
+                            </Frame.GestureRecognizers>
+                            <Label Text="Receita" TextColor="Gray"
+                                   HorizontalOptions="Center" FontSize="13" />
+                        </Frame>
+                    </Grid>
+
+                </Grid>
+            </Frame>
+
+            <!-- Recurrence — disabled when editing (structural field) -->
             <Picker Title="Recorrência"
                     ItemsSource="{Binding RecurrenceTypes}"
-                    SelectedItem="{Binding SelectedRecurrence}" />
+                    SelectedItem="{Binding SelectedRecurrence}"
+                    IsEnabled="{Binding IsEditing, Converter={x:Static converters:InverseBoolConverter.Instance}}"
+                    Opacity="{Binding StructuralFieldsOpacity}" />
 
-            <Entry Placeholder="Nº de parcelas"
+<Entry Placeholder="Nº de parcelas"
                    Text="{Binding TotalInstallments}"
                    Keyboard="Numeric"
                    IsVisible="{Binding IsInstallments}" />
@@ -40,5 +98,6 @@
                 <Button Grid.Column="1" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="Purple" />
             </Grid>
         </VerticalStackLayout>
+        </ScrollView>
     </Border>
 </toolkit:Popup>

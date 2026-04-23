@@ -272,4 +272,59 @@ public class FinanceServiceTests
         results.Should().ContainSingle(r => r.EntryType == FinancialEntryType.Income && r.Description == "Salary");
         results.Should().ContainSingle(r => r.EntryType == FinancialEntryType.Outcome && r.Description == "Rent");
     }
+
+    [Fact]
+    public async Task GetEntryByIdAsync_ExistingEntry_ReturnsCorrectEntry()
+    {
+        var entry = new FinancialEntry
+        {
+            Description = "Salary",
+            Amount = 3000m,
+            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
+            Recurrence = RecurrenceType.Recurrent,
+            EntryType = FinancialEntryType.Income
+        };
+        await _service.SaveEntryAsync(entry);
+
+        var result = await _service.GetEntryByIdAsync(entry.Id);
+
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(entry.Id);
+        result.Description.Should().Be("Salary");
+        result.Amount.Should().Be(3000m);
+    }
+
+    [Fact]
+    public async Task GetEntryByIdAsync_NonExistentId_ReturnsNull()
+    {
+        var result = await _service.GetEntryByIdAsync(9999);
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_ExistingEntry_UpdatesInsteadOfInserting()
+    {
+        var entry = new FinancialEntry
+        {
+            Description = "Original",
+            Amount = 100m,
+            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
+            Recurrence = RecurrenceType.OneTime,
+            EntryType = FinancialEntryType.Outcome
+        };
+        await _service.SaveEntryAsync(entry);
+        var originalId = entry.Id;
+
+        entry.Description = "Updated";
+        entry.Amount = 200m;
+        await _service.SaveEntryAsync(entry);
+
+        var db = await _context.GetConnectionAsync();
+        var allEntries = await db.Table<FinancialEntry>().ToListAsync();
+        allEntries.Should().HaveCount(1);
+        allEntries.Single().Id.Should().Be(originalId);
+        allEntries.Single().Description.Should().Be("Updated");
+        allEntries.Single().Amount.Should().Be(200m);
+    }
 }
