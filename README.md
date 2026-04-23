@@ -37,16 +37,23 @@ The development follows strict guidelines documented in our `CLAUDE.md` to ensur
 - [x] **Dynamic Month Navigation:** Sliding window navigation moving back and forth within a fixed range of 24 months.
 - [x] **Single Entry Management:** Ability to add and track one-time expenses.
 - [x] **Recurrence Engine:** Implement the 3 recurrence types (OneTime, Installments, Recurrent) with automated distribution.
-- [x] **Current month button:** A quick navigation button to jump back to the current month.
-- [ ] **Full CRUD:** Implement Update and Delete functionality for all entries.
-- [ ] **Incomes separation:** Separate Incomes from Outcomes in the UI.
-- [ ] **Category Management:** Move from hardcoded categories to a dynamic CRUD with custom icons/colors.
-- [ ] **Improve total amount for Installment entries:** Show the total amount of the installment in the dashboard, not just the current month amount.
+- [x] **Separation between income and outcome entries:** Differentiate visually and functionally between incomes and expenses.
+- [ ] **Edit modal:** Implement and edit modal to be open when the user clicks on an entry. There it should be possible to edit an entry.
+- [ ] **Delete entry:** Implement the entry deletion option when the user swipes an entry.
+- [ ] **Category Management:** Move from hardcoded categories to a dynamic CRUD with custom icons/colors. The category management screen should be accessed via hamburger menu.
+- [ ] **Improve total amount for Installment entries:** Show the total amount of the installment in the list, not just the current month amount.
+- [ ] **Status control:** Add the possibility to change the status of an entry
+- [ ] **UX improvements:** 
+	- [ ] When user opens the add entry modal, the description textbox should be already focused
+	- [ ] The income/outcome selection should be a swipe button where the default one is outcome and the user should just swipe right to change to income.
 
 ### Phase 2: Advanced Features & Scaling
-- [ ] **Credit Card Engine:** Logic for billing cycles and closing dates.
-- [ ] **Advanced Reporting:** Charts and insights by category and period.
+- [ ] **Current month button:** A quick navigation button to jump back to the current month.
+- [ ] **Partial payment:** Add the option to add the partial payment of an entry like supermarket or restaurants. This value should be shown in the list and the user can set it open the entry edit window.
+- [ ] **Payment source engine:** Add a new page accessed via the hamburger menu with a CRUD for the payment sources. When adding a new entry there should have the option to link to a payment source which can be a bank account or a credit card.
 - [ ] **Multi-Platform Sync:** Future transition to a centralized Web API.
+- [ ] **Advanced Reporting:** Charts and insights by category and period.
+- [ ] **Add translation and locale resourse strings**: PT-BR, PT-PT, EN-US
 - [ ] **And much more...**
 
 ## 🛠 How to Run

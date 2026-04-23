@@ -2,12 +2,15 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FinanceApp.Services;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 namespace FinanceApp.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
     private const int MaxMonthsFromToday = 24;
+    private const string IncomesExpandedKey = "incomes_expanded";
+    private const string OutcomesExpandedKey = "outcomes_expanded";
 
     private static readonly DateTime FirstOfToday =
         new(DateTime.Today.Year, DateTime.Today.Month, 1, 0, 0, 0, DateTimeKind.Local);
@@ -21,10 +24,13 @@ public partial class MainViewModel : ObservableObject
     public MonthViewModel? SelectedMonth => Months.ElementAtOrDefault(CurrentPosition);
 
     private readonly IFinanceService _financeService;
+    private readonly IPreferencesService _preferencesService;
+    private bool _isSyncing;
 
-    public MainViewModel(IFinanceService financeService)
+    public MainViewModel(IFinanceService financeService, IPreferencesService preferencesService)
     {
         _financeService = financeService;
+        _preferencesService = preferencesService;
     }
 
     [RelayCommand]
@@ -94,9 +100,43 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    private static MonthViewModel CreateMonthViewModel(DateTime date) => new()
+    private MonthViewModel CreateMonthViewModel(DateTime date)
     {
-        MonthName = date.ToString("MMMM yyyy"),
-        Date = new DateTime(date.Year, date.Month, 1)
-    };
+        var vm = new MonthViewModel
+        {
+            MonthName = date.ToString("MMMM yyyy"),
+            Date = new DateTime(date.Year, date.Month, 1),
+            IsIncomesExpanded = _preferencesService.Get(IncomesExpandedKey, true),
+            IsOutcomesExpanded = _preferencesService.Get(OutcomesExpandedKey, true)
+        };
+
+        vm.PropertyChanged += OnMonthViewModelPropertyChanged;
+        return vm;
+    }
+
+    private void OnMonthViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_isSyncing || sender is not MonthViewModel changedVm) return;
+
+        _isSyncing = true;
+        try
+        {
+            if (e.PropertyName == nameof(MonthViewModel.IsIncomesExpanded))
+            {
+                _preferencesService.Set(IncomesExpandedKey, changedVm.IsIncomesExpanded);
+                foreach (var m in Months.Where(m => m != changedVm))
+                    m.IsIncomesExpanded = changedVm.IsIncomesExpanded;
+            }
+            else if (e.PropertyName == nameof(MonthViewModel.IsOutcomesExpanded))
+            {
+                _preferencesService.Set(OutcomesExpandedKey, changedVm.IsOutcomesExpanded);
+                foreach (var m in Months.Where(m => m != changedVm))
+                    m.IsOutcomesExpanded = changedVm.IsOutcomesExpanded;
+            }
+        }
+        finally
+        {
+            _isSyncing = false;
+        }
+    }
 }

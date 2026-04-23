@@ -13,12 +13,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Primary Target: `net10.0-android`
 - Deploy to emulator: `dotnet build -t:Run -f net10.0-android`
 
+## Testing
+**Run all tests:** `dotnet test FinanceApp.Tests/FinanceApp.Tests.csproj`
+
+**Run a single test:** `dotnet test FinanceApp.Tests/FinanceApp.Tests.csproj --filter "FullyQualifiedName~MethodName_Scenario_ExpectedResult"`
+
+**Two-tier strategy:**
+- **Service tests** (`FinanceApp.Tests/Services/`) — hit a real in-memory SQLite via `TestDatabaseContext`. No mocks.
+- **ViewModel tests** (`FinanceApp.Tests/ViewModels/`) — mock `IFinanceService` with NSubstitute. No DB.
+
+**Infrastructure:**
+- `TestDatabaseContext` (`FinanceApp.Tests/Infrastructure/`) — implements `IDatabaseContext` using a GUID-named SQLite in-memory database (`file:{guid}?mode=memory&cache=shared`). The connection is opened once in the constructor and kept alive for the test lifetime.
+- `FinanceApp.csproj` includes `net10.0` as an additional TFM alongside the MAUI platform targets so the test project can reference it. `OutputType` and `UseMaui` are conditional on non-`net10.0` builds.
+
+**Isolation:** xUnit instantiates a new test class per test method. Each test declares `TestDatabaseContext` and `FinanceService` (or `NSubstitute` mocks) as constructor-injected fields, giving a fresh isolated environment per test with zero setup boilerplate.
+
+**Naming convention:** `MethodName_Scenario_ExpectedResult` (e.g., `SaveEntryAsync_RecurrentEntry_AppearsFromStartDateOnwards`).
+
+**Date normalization:** Always use `new DateTime(year, month, day, 0, 0, 0, DateTimeKind.Local)` for `StartDate` in tests to match the `DateTimeKind.Local` comparisons inside `IsActiveForMonth`.
+
+**Member ordering inside test classes:** private fields → constructor → `[Fact]` methods (grouped by the service method under test).
+
 ## Project Structure
-- **Data/:** `DatabaseContext.cs` — SQLite singleton connection + table creation via `GetConnectionAsync()`.
-- **Models/:** Clean POCOs (no persistence attributes). `FinancialEntry` is the current domain entity.
+- **Data/:** `DatabaseContext.cs` — SQLite singleton connection + table creation via `GetConnectionAsync()`. `IDatabaseContext` is the interface used for DI and test substitution.
+- **Models/:** Clean POCOs (no persistence attributes). `FinancialEntry` is the template/parent; `FinancialMonthlyEntry` is the physical override; `MonthlyEntryProjection` is the non-persisted read model returned to ViewModels.
 - **Services/:** All DB access is mediated by `IFinanceService` / `FinanceService`. Business logic lives here, not in ViewModels.
 - **ViewModels/:** UI state only. Depend on `IFinanceService` via constructor injection.
 - **Views/:** XAML pages and `CommunityToolkit.Maui.Views.Popup` subclasses.
+- **Converters/:** Value converters use a `static readonly Instance` singleton pattern (e.g., `EntryTypeToColorConverter.Instance`). They are not registered in DI — reference them directly in XAML via `{x:Static}`.
 
 ## DI Registration
 All registrations are in `MauiProgram.cs`:
@@ -43,11 +65,13 @@ SQLite (FinanceDataV3.db3)
 
 **Popup → ViewModel Communication:** `AddEntryPopup` receives `AddEntryViewModel` via DI. After a save, the ViewModel invokes a callback delegate (`SetSaveCallback`) that the parent ViewModel registered, so `MainViewModel` refreshes the active `MonthViewModel` without coupling Views to ViewModels.
 
+**Popup Resolution at Runtime:** Popups are resolved from the DI container in code-behind via `Handler?.MauiContext?.Services.GetService<T>()`, not via constructor injection into the page. This is the required pattern because `MainPage` is Transient and the popup must be a fresh instance each open.
+
 **Table Creation:** Use `CreateFlags.ImplicitPK | CreateFlags.AutoIncPK` in `DatabaseContext.GetConnectionAsync()` so domain models stay free of SQLite attributes.
 
 **Async DB Access:** All DB operations are async. `GetConnectionAsync()` uses a lazy-init pattern — call it at the start of every service method.
 
-**Fixed Timeline:** The dashboard uses a fixed range of ±24 months from the current date, pre-populated during InitializeAsync. Do not use dynamic scroll extension (lazy loading of months) to maintain CarouselView stability.
+**Fixed Timeline:** The dashboard uses a fixed range of ±24 months from the current date, pre-populated during `InitializeAsync`. Do not use dynamic scroll extension (lazy loading of months) to maintain CarouselView stability.
 
 ## Coding Standards (SOLID & DRY)
 - **Null Safety:** Initialize strings with `string.Empty` (e.g., `public string Name { get; set; } = string.Empty;`).
@@ -97,25 +121,6 @@ The system will evolve into a projection-based model:
 - **Payment & Tracking:**
   - `FinancialEntryStatus`: Lifecycle of the parent (InProgress, Cancelled, Finished).
   - `FinancialMonthlyEntryStatus`: Immediate state of the month's obligation.
-
-## Testing
-
-**Project:** `FinanceApp.Tests/` — xUnit + FluentAssertions + sqlite-net-pcl, targets `net10.0`.
-
-**Run tests:** `dotnet test FinanceApp.Tests/FinanceApp.Tests.csproj`
-
-**Infrastructure:**
-- `IDatabaseContext` — interface extracted from `DatabaseContext` so tests can supply their own implementation.
-- `TestDatabaseContext` (`FinanceApp.Tests/Infrastructure/`) — implements `IDatabaseContext` using a GUID-named SQLite in-memory database (`file:{guid}?mode=memory&cache=shared`). The connection is opened once in the constructor and kept alive for the test lifetime to prevent the in-memory DB from being destroyed.
-- `FinanceApp.csproj` includes `net10.0` as an additional TFM (alongside the MAUI platform targets) so the test project can reference it. `OutputType` and `UseMaui` are conditional on non-`net10.0` builds.
-
-**Isolation:** xUnit instantiates a new test class per test method. Each test declares `TestDatabaseContext` and `FinanceService` as constructor-injected fields, so every test automatically gets a fresh, isolated DB with zero setup boilerplate.
-
-**Naming convention:** `MethodName_Scenario_ExpectedResult` (e.g., `SaveEntryAsync_RecurrentEntry_AppearsFromStartDateOnwards`).
-
-**Date normalization:** Always use `new DateTime(year, month, day, 0, 0, 0, DateTimeKind.Local)` for `StartDate` in tests to match the `DateTimeKind.Local` comparisons inside `IsActiveForMonth`.
-
-**Member ordering inside test classes:** private fields → constructor → `[Fact]` methods (grouped by the service method under test).
 
 ## Merge Logic (Projection Engine)
 When loading a month, the service must merge two sources:

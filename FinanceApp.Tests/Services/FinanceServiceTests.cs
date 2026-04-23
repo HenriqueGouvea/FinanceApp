@@ -209,4 +209,67 @@ public class FinanceServiceTests
         persisted!.Status.Should().Be(FinancialMonthlyEntryStatus.Paid);
         persisted.OverrideAmount.Should().Be(750m);
     }
+
+    [Fact]
+    public async Task GetMergedEntries_IncomeEntry_ReturnsProjectionWithIncomeType()
+    {
+        await _service.SaveEntryAsync(new FinancialEntry
+        {
+            Description = "Salary",
+            Amount = 3000m,
+            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
+            Recurrence = RecurrenceType.Recurrent,
+            EntryType = FinancialEntryType.Income
+        });
+
+        var results = await _service.GetMergedEntriesForMonthAsync(2026, 4);
+
+        results.Should().HaveCount(1);
+        results.Single().EntryType.Should().Be(FinancialEntryType.Income);
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_OutcomeEntry_ReturnsProjectionWithOutcomeType()
+    {
+        await _service.SaveEntryAsync(new FinancialEntry
+        {
+            Description = "Rent",
+            Amount = 1200m,
+            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
+            Recurrence = RecurrenceType.Recurrent,
+            EntryType = FinancialEntryType.Outcome
+        });
+
+        var results = await _service.GetMergedEntriesForMonthAsync(2026, 4);
+
+        results.Should().HaveCount(1);
+        results.Single().EntryType.Should().Be(FinancialEntryType.Outcome);
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_MixedTypes_BothAppearWithCorrectType()
+    {
+        await _service.SaveEntryAsync(new FinancialEntry
+        {
+            Description = "Salary",
+            Amount = 3000m,
+            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
+            Recurrence = RecurrenceType.Recurrent,
+            EntryType = FinancialEntryType.Income
+        });
+        await _service.SaveEntryAsync(new FinancialEntry
+        {
+            Description = "Rent",
+            Amount = 1200m,
+            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
+            Recurrence = RecurrenceType.Recurrent,
+            EntryType = FinancialEntryType.Outcome
+        });
+
+        var results = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).ToList();
+
+        results.Should().HaveCount(2);
+        results.Should().ContainSingle(r => r.EntryType == FinancialEntryType.Income && r.Description == "Salary");
+        results.Should().ContainSingle(r => r.EntryType == FinancialEntryType.Outcome && r.Description == "Rent");
+    }
 }

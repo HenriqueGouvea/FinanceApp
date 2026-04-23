@@ -24,6 +24,7 @@ public static class MauiProgram
 #endif
         builder.Services.AddSingleton<IDatabaseContext, DatabaseContext>();
         builder.Services.AddSingleton<IFinanceService, FinanceService>();
+        builder.Services.AddSingleton<IPreferencesService, PreferencesService>();
 
         builder.Services.AddTransient<MainViewModel>();
         builder.Services.AddTransient<AddEntryViewModel>();

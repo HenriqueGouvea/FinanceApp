@@ -10,6 +10,7 @@ namespace FinanceApp.Tests.ViewModels;
 public class MainViewModelTests
 {
     private readonly IFinanceService _service;
+    private readonly IPreferencesService _preferencesService;
     private readonly MainViewModel _vm;
 
     public MainViewModelTests()
@@ -17,8 +18,14 @@ public class MainViewModelTests
         _service = Substitute.For<IFinanceService>();
         _service.GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>())
             .Returns(Task.FromResult<IEnumerable<MonthlyEntryProjection>>([]));
-        _vm = new MainViewModel(_service);
+
+        _preferencesService = Substitute.For<IPreferencesService>();
+        _preferencesService.Get(Arg.Any<string>(), Arg.Any<bool>()).Returns(true);
+
+        _vm = new MainViewModel(_service, _preferencesService);
     }
+
+    // --- Initialization ---
 
     [Fact]
     public async Task InitializeAsync_FirstCall_Creates49Months()
@@ -52,6 +59,76 @@ public class MainViewModelTests
 
         await _service.Received(5).GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>());
     }
+
+    // --- Preferences: initial expanded state ---
+
+    [Fact]
+    public async Task InitializeAsync_SetsIsIncomesExpandedFromPreferences()
+    {
+        _preferencesService.Get("incomes_expanded", true).Returns(false);
+        var vm = new MainViewModel(_service, _preferencesService);
+
+        await vm.InitializeAsync();
+
+        vm.Months.Should().AllSatisfy(m => m.IsIncomesExpanded.Should().BeFalse());
+    }
+
+    [Fact]
+    public async Task InitializeAsync_SetsIsOutcomesExpandedFromPreferences()
+    {
+        _preferencesService.Get("outcomes_expanded", true).Returns(false);
+        var vm = new MainViewModel(_service, _preferencesService);
+
+        await vm.InitializeAsync();
+
+        vm.Months.Should().AllSatisfy(m => m.IsOutcomesExpanded.Should().BeFalse());
+    }
+
+    // --- Preferences: persistence on toggle ---
+
+    [Fact]
+    public async Task MonthViewModel_WhenIsIncomesExpandedChanges_PersistsPreference()
+    {
+        await _vm.InitializeAsync();
+
+        _vm.Months[0].ToggleIncomesCommand.Execute(null);
+
+        _preferencesService.Received().Set("incomes_expanded", false);
+    }
+
+    [Fact]
+    public async Task MonthViewModel_WhenIsOutcomesExpandedChanges_PersistsPreference()
+    {
+        await _vm.InitializeAsync();
+
+        _vm.Months[0].ToggleOutcomesCommand.Execute(null);
+
+        _preferencesService.Received().Set("outcomes_expanded", false);
+    }
+
+    // --- Preferences: sync across all months ---
+
+    [Fact]
+    public async Task MonthViewModel_WhenIsIncomesExpandedChanges_SyncsAllOtherMonths()
+    {
+        await _vm.InitializeAsync();
+
+        _vm.Months[0].ToggleIncomesCommand.Execute(null);
+
+        _vm.Months.Should().AllSatisfy(m => m.IsIncomesExpanded.Should().BeFalse());
+    }
+
+    [Fact]
+    public async Task MonthViewModel_WhenIsOutcomesExpandedChanges_SyncsAllOtherMonths()
+    {
+        await _vm.InitializeAsync();
+
+        _vm.Months[0].ToggleOutcomesCommand.Execute(null);
+
+        _vm.Months.Should().AllSatisfy(m => m.IsOutcomesExpanded.Should().BeFalse());
+    }
+
+    // --- Refresh / Clear ---
 
     [Fact]
     public async Task RefreshAllAsync_MarksDistantMonthsAsUnloaded()
