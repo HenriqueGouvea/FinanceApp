@@ -4,6 +4,7 @@ using FinanceApp.ViewModels;
 using FinanceApp.Views;
 using Microsoft.Extensions.Logging;
 using CommunityToolkit.Maui;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace FinanceApp;
 
@@ -11,6 +12,8 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+        AppCulture.Apply();
+
         var builder = MauiApp.CreateBuilder();
         builder.UseMauiApp<App>()
             .UseMauiCommunityToolkit()
@@ -25,12 +28,18 @@ public static class MauiProgram
         builder.Services.AddSingleton<IDatabaseContext, DatabaseContext>();
         builder.Services.AddSingleton<IFinanceService, FinanceService>();
         builder.Services.AddSingleton<IPreferencesService, PreferencesService>();
+        builder.Services.AddSingleton<ICategoryService, CategoryService>();
+        builder.Services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
 
         builder.Services.AddTransient<MainViewModel>();
         builder.Services.AddTransient<AddEntryViewModel>();
+        builder.Services.AddTransient<CategoriesViewModel>();
+        builder.Services.AddTransient<CategoryEditViewModel>();
 
         builder.Services.AddTransient<MainPage>();
         builder.Services.AddTransient<AddEntryPopup>();
+        builder.Services.AddTransient<CategoriesPage>();
+        builder.Services.AddTransient<CategoryEditPopup>();
 
         return builder.Build();
     }

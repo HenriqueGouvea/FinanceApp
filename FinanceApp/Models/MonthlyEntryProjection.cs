@@ -9,7 +9,7 @@ namespace FinanceApp.Models;
 /// <param name="Description">The display description of the entry.</param>
 /// <param name="EffectiveAmount">The final value to be displayed (either the template amount or the monthly override).</param>
 /// <param name="EntryType">Income or Outcome.</param>
-/// <param name="Category">The assigned financial category.</param>
+/// <param name="Category">The assigned financial category, or null when uncategorized.</param>
 /// <param name="Status">The current payment status (Pending, Paid, etc.).</param>
 /// <param name="IsProjected">True if this occurrence exists only in memory; False if it has been persisted/modified in the DB.</param>
 /// <param name="InstallmentLabel">Formatted string for installments (e.g., '02/10') or null for other types.</param>
@@ -19,7 +19,7 @@ public record MonthlyEntryProjection(
     string Description,
     decimal EffectiveAmount,
     FinancialEntryType EntryType,
-    string Category,
+    FinancialCategory? Category,
     FinancialMonthlyEntryStatus Status,
     bool IsProjected,
     string? InstallmentLabel

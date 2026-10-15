@@ -13,7 +13,7 @@ public class FinancialEntry
     public RecurrenceType Recurrence { get; set; }
     public FinancialEntryType EntryType { get; set; }
     public int? TotalInstallments { get; set; }
-    public string Category { get; set; } = string.Empty;
+    public int? CategoryId { get; set; }
     public string Person { get; set; } = string.Empty;
     public bool IsPJ { get; set; }
 }

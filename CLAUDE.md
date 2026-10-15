@@ -46,8 +46,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## DI Registration
 All registrations are in `MauiProgram.cs`:
 - `IDatabaseContext` → Singleton (resolved by `DatabaseContext`)
-- `IFinanceService` → Singleton
-- `MainViewModel`, `AddEntryViewModel`, `MainPage`, `AddEntryPopup` → Transient
+- `IFinanceService`, `ICategoryService`, `IPreferencesService` → Singleton
+- `IMessenger` → Singleton (`WeakReferenceMessenger.Default`), used to broadcast `CategoriesChangedMessage` so `MainViewModel` refreshes
+- `MainViewModel`, `AddEntryViewModel`, `CategoriesViewModel`, `CategoryEditViewModel`, `MainPage`, `AddEntryPopup`, `CategoriesPage`, `CategoryEditPopup` → Transient
 
 Never manually instantiate services or ViewModels. If a new service or VM is added, register it in `MauiProgram.cs`.
 

@@ -10,58 +10,81 @@ namespace FinanceApp.Tests.ViewModels;
 public class AddEntryViewModelTests
 {
     private readonly IFinanceService _service;
+    private readonly ICategoryService _categoryService;
     private readonly AddEntryViewModel _vm;
+
+    private static readonly FinancialCategory Housing = new() { Id = 1, Name = "Moradia", Icon = "🏠", Color = "#1E88E5" };
+    private static readonly FinancialCategory Education = new() { Id = 2, Name = "Educação", Icon = "🎓", Color = "#8E24AA" };
 
     public AddEntryViewModelTests()
     {
         _service = Substitute.For<IFinanceService>();
-        _vm = new AddEntryViewModel(_service);
-        _vm.Prepare(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local));
+        _categoryService = Substitute.For<ICategoryService>();
+        _categoryService.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<FinancialCategory>>([Housing, Education]));
+        _vm = new AddEntryViewModel(_service, _categoryService);
+        _vm.PrepareAsync(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local)).GetAwaiter().GetResult();
     }
 
     // --- Prepare ---
 
     [Fact]
-    public void Prepare_ResetsFormFieldsToDefaults()
+    public async Task Prepare_ResetsFormFieldsToDefaults()
     {
         _vm.Description = "Old description";
         _vm.Amount = 999m;
-        _vm.SelectedCategory = "Lazer";
+        _vm.SelectedCategory = Housing;
 
-        _vm.Prepare(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+        await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
 
         _vm.Description.Should().BeEmpty();
         _vm.Amount.Should().Be(0m);
-        _vm.SelectedCategory.Should().BeEmpty();
+        _vm.SelectedCategory.Should().BeNull();
     }
 
     [Fact]
-    public void Prepare_ResetsRecurrenceAndEntryType()
+    public async Task Prepare_LoadsCategoriesFromService()
+    {
+        await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+
+        _vm.Categories.Should().Equal(Housing, Education);
+    }
+
+    [Fact]
+    public async Task Prepare_CalledTwice_DoesNotDuplicateCategories()
+    {
+        await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+        await _vm.PrepareAsync(new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Local));
+
+        _vm.Categories.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Prepare_ResetsRecurrenceAndEntryType()
     {
         _vm.EntryType = FinancialEntryType.Income;
         _vm.SelectedRecurrence = RecurrenceType.Recurrent;
 
-        _vm.Prepare(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+        await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
 
         _vm.EntryType.Should().Be(FinancialEntryType.Outcome);
         _vm.SelectedRecurrence.Should().Be(RecurrenceType.OneTime);
     }
 
     [Fact]
-    public void Prepare_SetsTotalInstallmentsToNull()
+    public async Task Prepare_SetsTotalInstallmentsToNull()
     {
         _vm.SelectedRecurrence = RecurrenceType.Installments;
         _vm.TotalInstallments = 5;
 
-        _vm.Prepare(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+        await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
 
         _vm.TotalInstallments.Should().BeNull();
     }
 
     [Fact]
-    public void Prepare_ResetsTitleToNovo()
+    public async Task Prepare_ResetsTitleToNovo()
     {
-        _vm.Prepare(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+        await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
 
         _vm.PopupTitle.Should().Be("Novo Lançamento");
     }
@@ -70,9 +93,9 @@ public class AddEntryViewModelTests
     public async Task Prepare_ResetsEditingId()
     {
         var entry = MakeEntry();
-        _vm.PrepareForEdit(entry);
+        await _vm.PrepareForEditAsync(entry);
 
-        _vm.Prepare(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+        await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
 
         await _vm.SaveCommand.ExecuteAsync(null);
         await _service.Received().SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Id == 0));
@@ -81,34 +104,34 @@ public class AddEntryViewModelTests
     // --- PrepareForEdit ---
 
     [Fact]
-    public void PrepareForEdit_SetsAllFieldsFromEntry()
+    public async Task PrepareForEdit_SetsAllFieldsFromEntry()
     {
         var entry = new FinancialEntry
         {
             Id = 7,
             Description = "Laptop",
             Amount = 1500m,
-            Category = "Educação",
+            CategoryId = Education.Id,
             StartDate = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Local),
             EntryType = FinancialEntryType.Outcome,
             Recurrence = RecurrenceType.Installments,
             TotalInstallments = 10
         };
 
-        _vm.PrepareForEdit(entry);
+        await _vm.PrepareForEditAsync(entry);
 
         _vm.Description.Should().Be("Laptop");
         _vm.Amount.Should().Be(1500m);
-        _vm.SelectedCategory.Should().Be("Educação");
+        _vm.SelectedCategory.Should().BeSameAs(Education);
         _vm.EntryType.Should().Be(FinancialEntryType.Outcome);
         _vm.SelectedRecurrence.Should().Be(RecurrenceType.Installments);
         _vm.TotalInstallments.Should().Be(10);
     }
 
     [Fact]
-    public void PrepareForEdit_SetsTitleToEditar()
+    public async Task PrepareForEdit_SetsTitleToEditar()
     {
-        _vm.PrepareForEdit(MakeEntry());
+        await _vm.PrepareForEditAsync(MakeEntry());
 
         _vm.PopupTitle.Should().Be("Editar Lançamento");
     }
@@ -117,7 +140,7 @@ public class AddEntryViewModelTests
     public async Task PrepareForEdit_SetsEditingId_SoSaveCallsUpdate()
     {
         var entry = MakeEntry();
-        _vm.PrepareForEdit(entry);
+        await _vm.PrepareForEditAsync(entry);
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
@@ -129,7 +152,7 @@ public class AddEntryViewModelTests
     {
         var entry = MakeEntry();
         entry.EndDate = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Local);
-        _vm.PrepareForEdit(entry);
+        await _vm.PrepareForEditAsync(entry);
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
@@ -141,8 +164,8 @@ public class AddEntryViewModelTests
     {
         var entry = MakeEntry();
         entry.EndDate = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Local);
-        _vm.PrepareForEdit(entry);
-        _vm.Prepare(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+        await _vm.PrepareForEditAsync(entry);
+        await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
@@ -249,7 +272,7 @@ public class AddEntryViewModelTests
     [Fact]
     public async Task SaveCommand_SetsStartDateToFirstOfTargetMonth()
     {
-        _vm.Prepare(new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Local));
+        await _vm.PrepareAsync(new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Local));
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
@@ -257,6 +280,24 @@ public class AddEntryViewModelTests
             e.StartDate.Year == 2026 &&
             e.StartDate.Month == 4 &&
             e.StartDate.Day == 1));
+    }
+
+    [Fact]
+    public async Task SaveCommand_WithSelectedCategory_PassesCategoryId()
+    {
+        _vm.SelectedCategory = Education;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.CategoryId == Education.Id));
+    }
+
+    [Fact]
+    public async Task SaveCommand_WithoutCategory_PassesNullCategoryId()
+    {
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.CategoryId == null));
     }
 
     [Fact]
@@ -287,7 +328,7 @@ public class AddEntryViewModelTests
     public async Task SaveCommand_WithEditingEntry_PassesNonZeroIdToService()
     {
         var entry = MakeEntry();
-        _vm.PrepareForEdit(entry);
+        await _vm.PrepareForEditAsync(entry);
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
@@ -299,7 +340,7 @@ public class AddEntryViewModelTests
         Id = 42,
         Description = "Rent",
         Amount = 800m,
-        Category = "Moradia",
+        CategoryId = Housing.Id,
         StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
         EntryType = FinancialEntryType.Outcome,
         Recurrence = RecurrenceType.Recurrent
