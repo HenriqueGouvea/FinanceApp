@@ -2,12 +2,14 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FinanceApp.Models;
 using FinanceApp.Services;
+using System.Collections.ObjectModel;
 
 namespace FinanceApp.ViewModels;
 
 public partial class AddEntryViewModel : ObservableObject
 {
     private readonly IFinanceService _financeService;
+    private readonly ICategoryService _categoryService;
     private Action<FinancialEntry>? _onSaved;
     private DateTime _targetMonth;
     private int _editingEntryId;
@@ -16,7 +18,7 @@ public partial class AddEntryViewModel : ObservableObject
     [ObservableProperty] string popupTitle = "Novo Lançamento";
     [ObservableProperty] string description = string.Empty;
     [ObservableProperty] decimal amount;
-    [ObservableProperty] string selectedCategory = string.Empty;
+    [ObservableProperty] FinancialCategory? selectedCategory;
     [ObservableProperty] FinancialEntryType entryType = FinancialEntryType.Outcome;
     [ObservableProperty] RecurrenceType selectedRecurrence = RecurrenceType.OneTime;
     [ObservableProperty] int? totalInstallments;
@@ -26,12 +28,13 @@ public partial class AddEntryViewModel : ObservableObject
     public bool IsEditing => _editingEntryId != 0;
     public double StructuralFieldsOpacity => IsEditing ? 0.4 : 1.0;
 
-    public List<string> Categories { get; } = ["Moradia", "Educação", "Contas", "Lazer"];
+    public ObservableCollection<FinancialCategory> Categories { get; } = [];
     public List<RecurrenceType> RecurrenceTypes { get; } = [RecurrenceType.OneTime, RecurrenceType.Recurrent, RecurrenceType.Installments];
 
-    public AddEntryViewModel(IFinanceService financeService)
+    public AddEntryViewModel(IFinanceService financeService, ICategoryService categoryService)
     {
         _financeService = financeService;
+        _categoryService = categoryService;
     }
 
     partial void OnSelectedRecurrenceChanged(RecurrenceType value)
@@ -46,8 +49,10 @@ public partial class AddEntryViewModel : ObservableObject
         OnPropertyChanged(nameof(IsIncome));
     }
 
-    public void Prepare(DateTime targetMonth)
+    public async Task PrepareAsync(DateTime targetMonth)
     {
+        await LoadCategoriesAsync();
+
         _editingEntryId = 0;
         _editingEndDate = null;
         OnPropertyChanged(nameof(IsEditing));
@@ -56,14 +61,16 @@ public partial class AddEntryViewModel : ObservableObject
         PopupTitle = "Novo Lançamento";
         Description = string.Empty;
         Amount = 0;
-        SelectedCategory = string.Empty;
+        SelectedCategory = null;
         EntryType = FinancialEntryType.Outcome;
         SelectedRecurrence = RecurrenceType.OneTime;
         TotalInstallments = null;
     }
 
-    public void PrepareForEdit(FinancialEntry entry)
+    public async Task PrepareForEditAsync(FinancialEntry entry)
     {
+        await LoadCategoriesAsync();
+
         _editingEntryId = entry.Id;
         _editingEndDate = entry.EndDate;
         OnPropertyChanged(nameof(IsEditing));
@@ -72,7 +79,7 @@ public partial class AddEntryViewModel : ObservableObject
         PopupTitle = "Editar Lançamento";
         Description = entry.Description;
         Amount = entry.Amount;
-        SelectedCategory = entry.Category;
+        SelectedCategory = Categories.FirstOrDefault(c => c.Id == entry.CategoryId);
         EntryType = entry.EntryType;
         SelectedRecurrence = entry.Recurrence;
         TotalInstallments = entry.TotalInstallments;
@@ -92,7 +99,7 @@ public partial class AddEntryViewModel : ObservableObject
             Id = _editingEntryId,
             Description = Description,
             Amount = Amount,
-            Category = SelectedCategory,
+            CategoryId = SelectedCategory?.Id,
             StartDate = new DateTime(_targetMonth.Year, _targetMonth.Month, 1),
             EndDate = _editingEndDate,
             EntryType = EntryType,
@@ -107,5 +114,14 @@ public partial class AddEntryViewModel : ObservableObject
     public void SetSaveCallback(Action<FinancialEntry> onSaved)
     {
         _onSaved = onSaved;
+    }
+
+    private async Task LoadCategoriesAsync()
+    {
+        var categories = await _categoryService.GetAllAsync();
+
+        Categories.Clear();
+        foreach (var category in categories)
+            Categories.Add(category);
     }
 }

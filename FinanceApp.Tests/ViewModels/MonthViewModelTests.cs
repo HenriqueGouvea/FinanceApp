@@ -233,7 +233,7 @@ public class MonthViewModelTests
             Description: "Test",
             EffectiveAmount: amount,
             EntryType: type,
-            Category: string.Empty,
+            Category: null,
             Status: FinancialMonthlyEntryStatus.Pending,
             IsProjected: true,
             InstallmentLabel: null

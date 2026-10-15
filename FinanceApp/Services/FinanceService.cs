@@ -26,10 +26,15 @@ public class FinanceService : IFinanceService
 
         var physicalLookup = physicalRecords.ToDictionary(r => r.FinancialEntryId);
 
+        var categories = await db.Table<FinancialCategory>().ToListAsync();
+        var categoryLookup = categories.ToDictionary(c => c.Id);
+
         var projections = new List<MonthlyEntryProjection>();
 
         foreach (var template in activeTemplates)
         {
+            var category = template.CategoryId is { } categoryId ? categoryLookup.GetValueOrDefault(categoryId) : null;
+
             if (physicalLookup.TryGetValue(template.Id, out var record))
             {
                 if (record.IsCancelled)
@@ -41,7 +46,7 @@ public class FinanceService : IFinanceService
                     Description: template.Description,
                     EffectiveAmount: record.OverrideAmount ?? template.Amount,
                     EntryType: template.EntryType,
-                    Category: template.Category,
+                    Category: category,
                     Status: record.Status,
                     IsProjected: false,
                     InstallmentLabel: BuildInstallmentLabel(template, year, month)
@@ -55,7 +60,7 @@ public class FinanceService : IFinanceService
                     Description: template.Description,
                     EffectiveAmount: template.Amount,
                     EntryType: template.EntryType,
-                    Category: template.Category,
+                    Category: category,
                     Status: FinancialMonthlyEntryStatus.Pending,
                     IsProjected: true,
                     InstallmentLabel: BuildInstallmentLabel(template, year, month)

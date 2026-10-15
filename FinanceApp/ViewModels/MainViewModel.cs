@@ -1,13 +1,16 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
+using FinanceApp.Messages;
 using FinanceApp.Models;
 using FinanceApp.Services;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 
 namespace FinanceApp.ViewModels;
 
-public partial class MainViewModel : ObservableObject
+public partial class MainViewModel : ObservableObject, IRecipient<CategoriesChangedMessage>
 {
     private const int MaxMonthsFromToday = 24;
     private const string IncomesExpandedKey = "incomes_expanded";
@@ -28,11 +31,14 @@ public partial class MainViewModel : ObservableObject
     private readonly IPreferencesService _preferencesService;
     private bool _isSyncing;
 
-    public MainViewModel(IFinanceService financeService, IPreferencesService preferencesService)
+    public MainViewModel(IFinanceService financeService, IPreferencesService preferencesService, IMessenger messenger)
     {
         _financeService = financeService;
         _preferencesService = preferencesService;
+        messenger.Register(this);
     }
+
+    public async void Receive(CategoriesChangedMessage message) => await RefreshAllAsync();
 
     [RelayCommand]
     public async Task InitializeAsync()
@@ -117,7 +123,7 @@ public partial class MainViewModel : ObservableObject
     {
         var vm = new MonthViewModel
         {
-            MonthName = date.ToString("MMMM yyyy"),
+            MonthName = FormatMonthName(date),
             Date = new DateTime(date.Year, date.Month, 1),
             IsIncomesExpanded = _preferencesService.Get(IncomesExpandedKey, true),
             IsOutcomesExpanded = _preferencesService.Get(OutcomesExpandedKey, true)
@@ -125,6 +131,13 @@ public partial class MainViewModel : ObservableObject
 
         vm.PropertyChanged += OnMonthViewModelPropertyChanged;
         return vm;
+    }
+
+    // Some cultures (e.g. pt-BR) write month names in lowercase.
+    private static string FormatMonthName(DateTime date)
+    {
+        var name = date.ToString("MMMM yyyy", CultureInfo.CurrentCulture);
+        return CultureInfo.CurrentCulture.TextInfo.ToUpper(name[0]) + name[1..];
     }
 
     private void OnMonthViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)

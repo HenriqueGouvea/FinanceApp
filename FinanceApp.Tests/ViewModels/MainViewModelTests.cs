@@ -1,8 +1,11 @@
+using CommunityToolkit.Mvvm.Messaging;
+using FinanceApp.Messages;
 using FinanceApp.Models;
 using FinanceApp.Services;
 using FinanceApp.ViewModels;
 using FluentAssertions;
 using NSubstitute;
+using System.Globalization;
 using Xunit;
 
 namespace FinanceApp.Tests.ViewModels;
@@ -11,6 +14,7 @@ public class MainViewModelTests
 {
     private readonly IFinanceService _service;
     private readonly IPreferencesService _preferencesService;
+    private readonly IMessenger _messenger = new WeakReferenceMessenger();
     private readonly MainViewModel _vm;
 
     public MainViewModelTests()
@@ -22,7 +26,7 @@ public class MainViewModelTests
         _preferencesService = Substitute.For<IPreferencesService>();
         _preferencesService.Get(Arg.Any<string>(), Arg.Any<bool>()).Returns(true);
 
-        _vm = new MainViewModel(_service, _preferencesService);
+        _vm = new MainViewModel(_service, _preferencesService, _messenger);
     }
 
     // --- Initialization ---
@@ -60,13 +64,31 @@ public class MainViewModelTests
         await _service.Received(5).GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>());
     }
 
+    [Fact]
+    public async Task InitializeAsync_PtBrCulture_MonthNameIsLocalizedAndCapitalized()
+    {
+        var original = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("pt-BR");
+        try
+        {
+            await _vm.InitializeAsync();
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+
+        _vm.Months.Should().Contain(m => m.MonthName.StartsWith("Outubro "));
+        _vm.Months.Should().OnlyContain(m => char.IsUpper(m.MonthName[0]));
+    }
+
     // --- Preferences: initial expanded state ---
 
     [Fact]
     public async Task InitializeAsync_SetsIsIncomesExpandedFromPreferences()
     {
         _preferencesService.Get("incomes_expanded", true).Returns(false);
-        var vm = new MainViewModel(_service, _preferencesService);
+        var vm = new MainViewModel(_service, _preferencesService, _messenger);
 
         await vm.InitializeAsync();
 
@@ -77,7 +99,7 @@ public class MainViewModelTests
     public async Task InitializeAsync_SetsIsOutcomesExpandedFromPreferences()
     {
         _preferencesService.Get("outcomes_expanded", true).Returns(false);
-        var vm = new MainViewModel(_service, _preferencesService);
+        var vm = new MainViewModel(_service, _preferencesService, _messenger);
 
         await vm.InitializeAsync();
 
@@ -155,6 +177,17 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task CategoriesChangedMessage_ReloadsNearbyMonths()
+    {
+        await _vm.InitializeAsync();
+        _service.ClearReceivedCalls();
+
+        _messenger.Send(new CategoriesChangedMessage());
+
+        await _service.Received(5).GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>());
+    }
+
+    [Fact]
     public async Task ClearDatabaseAsync_CallsClearAllData()
     {
         await _vm.InitializeAsync();
@@ -174,7 +207,7 @@ public class MainViewModelTests
             Description: "Test",
             EffectiveAmount: 100m,
             EntryType: FinancialEntryType.Income,
-            Category: string.Empty,
+            Category: null,
             Status: FinancialMonthlyEntryStatus.Pending,
             IsProjected: true,
             InstallmentLabel: null));
@@ -243,7 +276,7 @@ public class MainViewModelTests
         Description: "Test",
         EffectiveAmount: 100m,
         EntryType: FinancialEntryType.Outcome,
-        Category: string.Empty,
+        Category: null,
         Status: FinancialMonthlyEntryStatus.Pending,
         IsProjected: true,
         InstallmentLabel: null);

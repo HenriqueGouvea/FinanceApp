@@ -8,7 +8,7 @@
              xmlns:controls="clr-namespace:FinanceApp.Controls"
              x:Class="FinanceApp.Views.MainPage"
              x:DataType="vm:MainViewModel"
-             Shell.NavBarIsVisible="False">
+             Title="Lançamentos">
     <Grid>
         <CarouselView ItemsSource="{Binding Months}"
                       Position="{Binding CurrentPosition, Mode=TwoWay}"
@@ -93,6 +93,13 @@
                                                 </Grid.Behaviors>
                                                 <VerticalStackLayout Grid.Column="0">
                                                     <Label Text="{Binding Description}" FontAttributes="Bold"/>
+                                                    <HorizontalStackLayout Spacing="4"
+                                                                           IsVisible="{Binding Category, Converter={x:Static converters:IsNotNullConverter.Instance}}">
+                                                        <Label Text="{Binding Category.Icon}" FontSize="11"/>
+                                                        <Label Text="{Binding Category.Name}"
+                                                               FontSize="11"
+                                                               TextColor="{Binding Category.Color, Converter={x:Static converters:HexToColorConverter.Instance}}"/>
+                                                    </HorizontalStackLayout>
                                                     <Label Text="{Binding InstallmentLabel}"
                                                            FontSize="11"
                                                            TextColor="Gray"
@@ -188,6 +195,13 @@
                                                 </Grid.Behaviors>
                                                 <VerticalStackLayout Grid.Column="0">
                                                     <Label Text="{Binding Description}" FontAttributes="Bold"/>
+                                                    <HorizontalStackLayout Spacing="4"
+                                                                           IsVisible="{Binding Category, Converter={x:Static converters:IsNotNullConverter.Instance}}">
+                                                        <Label Text="{Binding Category.Icon}" FontSize="11"/>
+                                                        <Label Text="{Binding Category.Name}"
+                                                               FontSize="11"
+                                                               TextColor="{Binding Category.Color, Converter={x:Static converters:HexToColorConverter.Instance}}"/>
+                                                    </HorizontalStackLayout>
                                                     <Label Text="{Binding InstallmentLabel}"
                                                            FontSize="11"
                                                            TextColor="Gray"
@@ -253,9 +267,9 @@
                 WidthRequest="70"
                 BackgroundColor="#33FF0000"
                 TextColor="Red"
-                HorizontalOptions="End"
-                VerticalOptions="Start"
-                Margin="10" />
+                HorizontalOptions="Start"
+                VerticalOptions="End"
+                Margin="20,0,0,33" />
         <Button Text="+"
                 FontSize="24"
                 BackgroundColor="Purple"

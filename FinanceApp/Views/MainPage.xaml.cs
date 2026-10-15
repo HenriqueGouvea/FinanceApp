@@ -40,7 +40,7 @@ public partial class MainPage : ContentPage
         if (BindingContext is not MainViewModel mainVm) return;
 
         mainVm.SelectedMonth?.HideEntryActions();
-        vm.Prepare(mainVm.SelectedMonth?.Date ?? DateTime.Today);
+        await vm.PrepareAsync(mainVm.SelectedMonth?.Date ?? DateTime.Today);
         vm.SetSaveCallback(async (_) =>
         {
             await popup.CloseAsync();
@@ -77,7 +77,7 @@ public partial class MainPage : ContentPage
         var popup = ResolvePopup();
         var vm = (AddEntryViewModel)popup.BindingContext;
 
-        vm.PrepareForEdit(entry);
+        await vm.PrepareForEditAsync(entry);
         vm.SetSaveCallback(async (_) =>
         {
             await popup.CloseAsync();

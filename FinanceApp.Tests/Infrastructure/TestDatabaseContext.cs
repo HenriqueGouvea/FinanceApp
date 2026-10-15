@@ -17,6 +17,7 @@ public class TestDatabaseContext : IDatabaseContext
         _connection = new SQLiteAsyncConnection(connStr);
         _connection.CreateTableAsync<FinancialEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK).Wait();
         _connection.CreateTableAsync<FinancialMonthlyEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK).Wait();
+        _connection.CreateTableAsync<FinancialCategory>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK).Wait();
     }
 
     public Task<SQLiteAsyncConnection> GetConnectionAsync() => Task.FromResult(_connection);

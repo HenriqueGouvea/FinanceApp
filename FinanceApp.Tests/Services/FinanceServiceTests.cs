@@ -274,6 +274,33 @@ public class FinanceServiceTests
     }
 
     [Fact]
+    public async Task GetMergedEntries_EntryWithCategory_ResolvesCategoryOnProjection()
+    {
+        var category = new FinancialCategory { Name = "Moradia", Icon = "🏠", Color = "#1E88E5" };
+        await new CategoryService(_context).SaveAsync(category);
+        var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        template.CategoryId = category.Id;
+        await _service.SaveEntryAsync(template);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.Category.Should().NotBeNull();
+        projection.Category!.Name.Should().Be("Moradia");
+        projection.Category.Icon.Should().Be("🏠");
+        projection.Category.Color.Should().Be("#1E88E5");
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_EntryWithoutCategory_ProjectionHasNullCategory()
+    {
+        await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.Category.Should().BeNull();
+    }
+
+    [Fact]
     public async Task GetEntryByIdAsync_ExistingEntry_ReturnsCorrectEntry()
     {
         var entry = new FinancialEntry
