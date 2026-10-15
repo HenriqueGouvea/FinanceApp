@@ -39,10 +39,11 @@ The development follows strict guidelines documented in our `CLAUDE.md` to ensur
 - [x] **Recurrence Engine:** Implement the 3 recurrence types (OneTime, Installments, Recurrent) with automated distribution.
 - [x] **Separation between income and outcome entries:** Differentiate visually and functionally between incomes and expenses.
 - [x] **Edit modal:** Opens when the user taps an entry. Edits Description, Amount, and Category on the template. EntryType and Recurrence are intentionally locked — see architectural constraint below.
-- [ ] **Delete entry:** Implement the entry deletion option when the user swipes an entry.
+- [x] **Delete entry:** Long-press (1s) an entry to slide in an actions menu from the right (currently a delete button; room for more actions). Tapping anywhere else slides it back out. OneTime entries are removed entirely; Recurrent/Installments entries offer three scopes: *this month only* (cancelled `FinancialMonthlyEntry`), *this and future months* (sets `EndDate` on the template), or *all months* (removes the template and its monthly records).
 - [ ] **Category Management:** Move from hardcoded categories to a dynamic CRUD with custom icons/colors. The category management screen should be accessed via hamburger menu.
 - [ ] **Improve total amount for Installment entries:** Show the total amount of the installment in the list, not just the current month amount.
 - [ ] **Status control:** Add the possibility to change the status of an entry
+- [ ] **E2E tests:** Investigate end-to-end UI testing options for the MAUI Android app (e.g. Appium + `UITest`, adb-driven scripts) and add an E2E suite covering the main flows: add, edit, and delete entries (all delete scopes), month navigation, and the long-press actions menu.
 - [x] **UX improvements:** Description field auto-focused on popup open; income/outcome selection is a swipe/tap pill toggle defaulting to Outcome.
 
 ### Phase 2: Advanced Features & Scaling

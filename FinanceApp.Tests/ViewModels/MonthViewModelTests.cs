@@ -194,6 +194,38 @@ public class MonthViewModelTests
         _vm.IsIncomesExpanded.Should().BeTrue();
     }
 
+    [Fact]
+    public void ToggleOutcomesCommand_WithRevealedEntry_HidesEntryActions()
+    {
+        _vm.RevealedEntryId = 7;
+
+        _vm.ToggleOutcomesCommand.Execute(null);
+
+        _vm.RevealedEntryId.Should().BeNull();
+    }
+
+    [Fact]
+    public void ToggleIncomesCommand_WithRevealedEntry_HidesEntryActions()
+    {
+        _vm.RevealedEntryId = 7;
+
+        _vm.ToggleIncomesCommand.Execute(null);
+
+        _vm.RevealedEntryId.Should().BeNull();
+    }
+
+    // --- Entry actions ---
+
+    [Fact]
+    public void HideEntryActionsCommand_WithRevealedEntry_ClearsRevealedEntry()
+    {
+        _vm.RevealedEntryId = 7;
+
+        _vm.HideEntryActionsCommand.Execute(null);
+
+        _vm.RevealedEntryId.Should().BeNull();
+    }
+
     private static MonthlyEntryProjection MakeProjection(decimal amount, FinancialEntryType type) =>
         new(
             FinancialEntryId: 1,

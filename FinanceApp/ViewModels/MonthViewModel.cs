@@ -21,6 +21,9 @@ public partial class MonthViewModel : ObservableObject
     [ObservableProperty]
     bool isIncomesExpanded = true;
 
+    [ObservableProperty]
+    int? revealedEntryId;
+
     public DateTime Date { get; set; }
 
     public IEnumerable<MonthlyEntryProjection> OutcomeEntries =>
@@ -57,8 +60,19 @@ public partial class MonthViewModel : ObservableObject
     }
 
     [RelayCommand]
-    void ToggleOutcomes() => IsOutcomesExpanded = !IsOutcomesExpanded;
+    void ToggleOutcomes()
+    {
+        HideEntryActions();
+        IsOutcomesExpanded = !IsOutcomesExpanded;
+    }
 
     [RelayCommand]
-    void ToggleIncomes() => IsIncomesExpanded = !IsIncomesExpanded;
+    void ToggleIncomes()
+    {
+        HideEntryActions();
+        IsIncomesExpanded = !IsIncomesExpanded;
+    }
+
+    [RelayCommand]
+    public void HideEntryActions() => RevealedEntryId = null;
 }

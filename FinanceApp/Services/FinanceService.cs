@@ -106,6 +106,62 @@ public class FinanceService : IFinanceService
         }
     }
 
+    public async Task DeleteEntryAsync(int entryId, int year, int month, EntryDeleteScope scope)
+    {
+        try
+        {
+            var db = await _context.GetConnectionAsync();
+
+            var template = await db.Table<FinancialEntry>().Where(e => e.Id == entryId).FirstOrDefaultAsync();
+            if (template is null)
+                return;
+
+            var targetDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Local);
+            var firstOfStart = new DateTime(template.StartDate.Year, template.StartDate.Month, 1, 0, 0, 0, DateTimeKind.Local);
+
+            if (template.Recurrence == RecurrenceType.OneTime ||
+                (scope == EntryDeleteScope.ThisAndFuture && targetDate <= firstOfStart))
+                scope = EntryDeleteScope.All;
+
+            var monthlyRecords = await db.Table<FinancialMonthlyEntry>()
+                .Where(r => r.FinancialEntryId == entryId)
+                .ToListAsync();
+
+            switch (scope)
+            {
+                case EntryDeleteScope.ThisMonth:
+                    var record = monthlyRecords.FirstOrDefault(r => r.Year == year && r.Month == month)
+                        ?? new FinancialMonthlyEntry { FinancialEntryId = entryId, Year = year, Month = month };
+                    record.IsCancelled = true;
+
+                    if (record.Id != 0)
+                        await db.UpdateAsync(record);
+                    else
+                        await db.InsertAsync(record);
+                    break;
+
+                case EntryDeleteScope.ThisAndFuture:
+                    template.EndDate = targetDate.AddMonths(-1);
+                    await db.UpdateAsync(template);
+
+                    foreach (var r in monthlyRecords.Where(r => r.Year * 12 + r.Month >= year * 12 + month))
+                        await db.DeleteAsync(r);
+                    break;
+
+                case EntryDeleteScope.All:
+                    foreach (var r in monthlyRecords)
+                        await db.DeleteAsync(r);
+
+                    await db.DeleteAsync(template);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting entry: {ex.Message}");
+        }
+    }
+
     public async Task ClearAllDataAsync()
     {
         try
@@ -124,6 +180,10 @@ public class FinanceService : IFinanceService
     private static bool IsActiveForMonth(FinancialEntry entry, DateTime targetDate)
     {
         var firstOfStart = new DateTime(entry.StartDate.Year, entry.StartDate.Month, 1, 0, 0, 0, DateTimeKind.Local);
+
+        if (entry.EndDate is { } end &&
+            targetDate > new DateTime(end.Year, end.Month, 1, 0, 0, 0, DateTimeKind.Local))
+            return false;
 
         return entry.Recurrence switch
         {

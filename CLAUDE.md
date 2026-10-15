@@ -40,6 +40,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Services/:** All DB access is mediated by `IFinanceService` / `FinanceService`. Business logic lives here, not in ViewModels.
 - **ViewModels/:** UI state only. Depend on `IFinanceService` via constructor injection.
 - **Views/:** XAML pages and `CommunityToolkit.Maui.Views.Popup` subclasses.
+- **Controls/:** Reusable code-only UI controls (e.g. `SlideOutPanel`, the animated entry actions menu revealed by long press).
 - **Converters/:** Value converters use a `static readonly Instance` singleton pattern (e.g., `EntryTypeToColorConverter.Instance`). They are not registered in DI — reference them directly in XAML via `{x:Static}`.
 
 ## DI Registration
@@ -131,5 +132,6 @@ A `FinancialEntry` template is "active" in a given month when:
 - `OneTime`: `StartDate` falls within that month.
 - `Installments`: month is between `StartDate` and `StartDate + TotalInstallments months`.
 - `Recurrent`: month is on or after `StartDate` (no end date).
+- For every type, when `EndDate` is set, the month must also be on or before `EndDate` (set by the "this and future months" delete scope).
 
 The merge result is a unified list consumed by `MonthViewModel`. Only physical `FinancialMonthlyEntry` records represent user-confirmed state; virtual projections are computed on-the-fly and not written to the DB unless the user acts on them.

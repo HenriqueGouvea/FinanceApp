@@ -11,6 +11,7 @@ public partial class AddEntryViewModel : ObservableObject
     private Action<FinancialEntry>? _onSaved;
     private DateTime _targetMonth;
     private int _editingEntryId;
+    private DateTime? _editingEndDate;
 
     [ObservableProperty] string popupTitle = "Novo Lançamento";
     [ObservableProperty] string description = string.Empty;
@@ -48,6 +49,7 @@ public partial class AddEntryViewModel : ObservableObject
     public void Prepare(DateTime targetMonth)
     {
         _editingEntryId = 0;
+        _editingEndDate = null;
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(StructuralFieldsOpacity));
         _targetMonth = new DateTime(targetMonth.Year, targetMonth.Month, 1);
@@ -63,6 +65,7 @@ public partial class AddEntryViewModel : ObservableObject
     public void PrepareForEdit(FinancialEntry entry)
     {
         _editingEntryId = entry.Id;
+        _editingEndDate = entry.EndDate;
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(StructuralFieldsOpacity));
         _targetMonth = new DateTime(entry.StartDate.Year, entry.StartDate.Month, 1);
@@ -91,6 +94,7 @@ public partial class AddEntryViewModel : ObservableObject
             Amount = Amount,
             Category = SelectedCategory,
             StartDate = new DateTime(_targetMonth.Year, _targetMonth.Month, 1),
+            EndDate = _editingEndDate,
             EntryType = EntryType,
             Recurrence = SelectedRecurrence,
             TotalInstallments = TotalInstallments

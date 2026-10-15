@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using FinanceApp.Models;
 using FinanceApp.Services;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -60,6 +61,15 @@ public partial class MainViewModel : ObservableObject
         await LoadNearbyMonthsAsync(CurrentPosition);
     }
 
+    public async Task DeleteEntryAsync(MonthlyEntryProjection projection, EntryDeleteScope scope)
+    {
+        if (SelectedMonth is not { } month)
+            return;
+
+        await _financeService.DeleteEntryAsync(projection.FinancialEntryId, month.Date.Year, month.Date.Month, scope);
+        await RefreshAllAsync();
+    }
+
     [RelayCommand]
     public async Task ClearDatabaseAsync()
     {
@@ -76,6 +86,9 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnCurrentPositionChanged(int value)
     {
+        foreach (var month in Months)
+            month.HideEntryActions();
+
         _ = LoadNearbyMonthsAsync(value);
     }
 
