@@ -327,4 +327,128 @@ public class FinanceServiceTests
         allEntries.Single().Description.Should().Be("Updated");
         allEntries.Single().Amount.Should().Be(200m);
     }
+
+    [Fact]
+    public async Task DeleteEntryAsync_OneTimeEntry_RemovesTemplate()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.OneTime);
+
+        await _service.DeleteEntryAsync(entry.Id, 2026, 4, EntryDeleteScope.ThisMonth);
+
+        (await _service.GetEntryByIdAsync(entry.Id)).Should().BeNull();
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DeleteEntryAsync_ThisMonth_HidesOnlyThatMonth()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        await _service.DeleteEntryAsync(entry.Id, 2026, 5, EntryDeleteScope.ThisMonth);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Should().ContainSingle();
+        (await _service.GetMergedEntriesForMonthAsync(2026, 5)).Should().BeEmpty();
+        (await _service.GetMergedEntriesForMonthAsync(2026, 6)).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task DeleteEntryAsync_ThisMonthWithExistingPhysicalRecord_MarksItCancelled()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveMonthlyEntryAsync(new FinancialMonthlyEntry
+        {
+            FinancialEntryId = entry.Id,
+            Year = 2026,
+            Month = 5,
+            Status = FinancialMonthlyEntryStatus.Paid
+        });
+
+        await _service.DeleteEntryAsync(entry.Id, 2026, 5, EntryDeleteScope.ThisMonth);
+
+        var db = await _context.GetConnectionAsync();
+        var records = await db.Table<FinancialMonthlyEntry>().ToListAsync();
+        records.Should().ContainSingle().Which.IsCancelled.Should().BeTrue();
+        (await _service.GetMergedEntriesForMonthAsync(2026, 5)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DeleteEntryAsync_ThisAndFuture_KeepsPastMonthsAndHidesFutureOnes()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveMonthlyEntryAsync(new FinancialMonthlyEntry { FinancialEntryId = entry.Id, Year = 2026, Month = 5 });
+        await _service.SaveMonthlyEntryAsync(new FinancialMonthlyEntry { FinancialEntryId = entry.Id, Year = 2026, Month = 7 });
+
+        await _service.DeleteEntryAsync(entry.Id, 2026, 6, EntryDeleteScope.ThisAndFuture);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Should().ContainSingle();
+        (await _service.GetMergedEntriesForMonthAsync(2026, 5)).Should().ContainSingle();
+        (await _service.GetMergedEntriesForMonthAsync(2026, 6)).Should().BeEmpty();
+        (await _service.GetMergedEntriesForMonthAsync(2027, 1)).Should().BeEmpty();
+
+        var db = await _context.GetConnectionAsync();
+        var records = await db.Table<FinancialMonthlyEntry>().ToListAsync();
+        records.Should().ContainSingle().Which.Month.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task DeleteEntryAsync_ThisAndFutureOnInstallments_TruncatesRemainingInstallments()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Installments, totalInstallments: 6);
+
+        await _service.DeleteEntryAsync(entry.Id, 2026, 7, EntryDeleteScope.ThisAndFuture);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 6)).Should().ContainSingle();
+        (await _service.GetMergedEntriesForMonthAsync(2026, 7)).Should().BeEmpty();
+        (await _service.GetMergedEntriesForMonthAsync(2026, 9)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DeleteEntryAsync_ThisAndFutureFromStartMonth_RemovesTemplate()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        await _service.DeleteEntryAsync(entry.Id, 2026, 4, EntryDeleteScope.ThisAndFuture);
+
+        (await _service.GetEntryByIdAsync(entry.Id)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteEntryAsync_All_RemovesTemplateAndMonthlyRecords()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveMonthlyEntryAsync(new FinancialMonthlyEntry { FinancialEntryId = entry.Id, Year = 2026, Month = 5 });
+
+        await _service.DeleteEntryAsync(entry.Id, 2026, 8, EntryDeleteScope.All);
+
+        (await _service.GetEntryByIdAsync(entry.Id)).Should().BeNull();
+        var db = await _context.GetConnectionAsync();
+        (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DeleteEntryAsync_All_KeepsOtherEntries()
+    {
+        var deleted = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        var kept = await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        await _service.DeleteEntryAsync(deleted.Id, 2026, 4, EntryDeleteScope.All);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4))
+            .Should().ContainSingle().Which.FinancialEntryId.Should().Be(kept.Id);
+    }
+
+    private async Task<FinancialEntry> SaveTemplateAsync(RecurrenceType recurrence, int? totalInstallments = null)
+    {
+        var entry = new FinancialEntry
+        {
+            Description = "Gym",
+            Amount = 100m,
+            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
+            Recurrence = recurrence,
+            TotalInstallments = totalInstallments,
+            EntryType = FinancialEntryType.Outcome
+        };
+        await _service.SaveEntryAsync(entry);
+        return entry;
+    }
 }

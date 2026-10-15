@@ -1,3 +1,4 @@
+using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Extensions;
 using FinanceApp.Models;
 using FinanceApp.Services;
@@ -7,7 +8,14 @@ namespace FinanceApp.Views;
 
 public partial class MainPage : ContentPage
 {
+    private const string CancelOption = "Cancelar";
+    private const string DeleteOption = "Excluir";
+    private const string ThisMonthOption = "Somente este mês";
+    private const string ThisAndFutureOption = "Este e os próximos meses";
+    private const string AllMonthsOption = "Todos os meses";
+
     private readonly IFinanceService _financeService;
+    private bool _isLongPressInProgress;
 
     public MainPage(MainViewModel viewModel, IFinanceService financeService)
     {
@@ -31,6 +39,7 @@ public partial class MainPage : ContentPage
 
         if (BindingContext is not MainViewModel mainVm) return;
 
+        mainVm.SelectedMonth?.HideEntryActions();
         vm.Prepare(mainVm.SelectedMonth?.Date ?? DateTime.Today);
         vm.SetSaveCallback(async (_) =>
         {
@@ -42,21 +51,31 @@ public partial class MainPage : ContentPage
         await this.ShowPopupAsync(popup);
     }
 
-    private async void OnEntrySelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void OnEntryTapped(object? sender, TouchGestureCompletedEventArgs e)
     {
-        if (e.CurrentSelection.FirstOrDefault() is not MonthlyEntryProjection projection)
+        // TouchBehavior also raises a tap when the finger is lifted after a long press.
+        if (_isLongPressInProgress)
+        {
+            _isLongPressInProgress = false;
+            return;
+        }
+
+        if (GetProjection(sender) is not { } projection)
             return;
 
-        if (sender is CollectionView cv)
-            cv.SelectedItem = null;
+        if (BindingContext is not MainViewModel mainVm) return;
+
+        if (mainVm.SelectedMonth is { RevealedEntryId: not null } month)
+        {
+            month.HideEntryActions();
+            return;
+        }
 
         var entry = await _financeService.GetEntryByIdAsync(projection.FinancialEntryId);
         if (entry is null) return;
 
         var popup = ResolvePopup();
         var vm = (AddEntryViewModel)popup.BindingContext;
-
-        if (BindingContext is not MainViewModel mainVm) return;
 
         vm.PrepareForEdit(entry);
         vm.SetSaveCallback(async (_) =>
@@ -68,6 +87,53 @@ public partial class MainPage : ContentPage
 
         await this.ShowPopupAsync(popup);
     }
+
+    private void OnEntryLongPressed(object? sender, LongPressCompletedEventArgs e)
+    {
+        if (GetProjection(sender) is not { } projection) return;
+        if (BindingContext is not MainViewModel { SelectedMonth: { } month }) return;
+
+        _isLongPressInProgress = true;
+        month.RevealedEntryId = projection.FinancialEntryId;
+    }
+
+    private async void OnDeleteEntryClicked(object? sender, TappedEventArgs e)
+    {
+        if (GetProjection(sender) is not { } projection) return;
+        if (BindingContext is not MainViewModel mainVm) return;
+
+        if (mainVm.SelectedMonth is { } month)
+            month.HideEntryActions();
+
+        var entry = await _financeService.GetEntryByIdAsync(projection.FinancialEntryId);
+        if (entry is null) return;
+
+        EntryDeleteScope? scope;
+
+        if (entry.Recurrence == RecurrenceType.OneTime)
+        {
+            var choice = await DisplayActionSheetAsync(projection.Description, CancelOption, DeleteOption);
+            scope = choice == DeleteOption ? EntryDeleteScope.All : null;
+        }
+        else
+        {
+            var choice = await DisplayActionSheetAsync($"Excluir \"{projection.Description}\"", CancelOption, null,
+                ThisMonthOption, ThisAndFutureOption, AllMonthsOption);
+            scope = choice switch
+            {
+                ThisMonthOption => EntryDeleteScope.ThisMonth,
+                ThisAndFutureOption => EntryDeleteScope.ThisAndFuture,
+                AllMonthsOption => EntryDeleteScope.All,
+                _ => null
+            };
+        }
+
+        if (scope is { } selectedScope)
+            await mainVm.DeleteEntryAsync(projection, selectedScope);
+    }
+
+    private static MonthlyEntryProjection? GetProjection(object? sender) =>
+        (sender as BindableObject)?.BindingContext as MonthlyEntryProjection;
 
     private AddEntryPopup ResolvePopup() =>
         Handler?.MauiContext?.Services.GetService<AddEntryPopup>()

@@ -124,6 +124,31 @@ public class AddEntryViewModelTests
         await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Id == entry.Id));
     }
 
+    [Fact]
+    public async Task Save_EditingEntryWithEndDate_PreservesEndDate()
+    {
+        var entry = MakeEntry();
+        entry.EndDate = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Local);
+        _vm.PrepareForEdit(entry);
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.EndDate == entry.EndDate));
+    }
+
+    [Fact]
+    public async Task Save_AfterPrepareFollowingEdit_HasNoEndDate()
+    {
+        var entry = MakeEntry();
+        entry.EndDate = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Local);
+        _vm.PrepareForEdit(entry);
+        _vm.Prepare(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.EndDate == null));
+    }
+
     // --- IsIncome / SelectIncome / SelectOutcome ---
 
     [Fact]

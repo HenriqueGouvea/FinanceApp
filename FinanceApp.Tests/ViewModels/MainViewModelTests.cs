@@ -185,6 +185,39 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task CurrentPositionChanged_HidesRevealedEntryActions()
+    {
+        await _vm.InitializeAsync();
+        _vm.SelectedMonth!.RevealedEntryId = 7;
+
+        _vm.CurrentPosition = 25;
+
+        _vm.Months.Should().OnlyContain(m => m.RevealedEntryId == null);
+    }
+
+    [Fact]
+    public async Task DeleteEntryAsync_CallsServiceWithSelectedMonthAndScope()
+    {
+        await _vm.InitializeAsync();
+        var selected = _vm.SelectedMonth!.Date;
+
+        await _vm.DeleteEntryAsync(MakeProjection(7), EntryDeleteScope.ThisAndFuture);
+
+        await _service.Received(1).DeleteEntryAsync(7, selected.Year, selected.Month, EntryDeleteScope.ThisAndFuture);
+    }
+
+    [Fact]
+    public async Task DeleteEntryAsync_ReloadsNearbyMonths()
+    {
+        await _vm.InitializeAsync();
+        _service.ClearReceivedCalls();
+
+        await _vm.DeleteEntryAsync(MakeProjection(7), EntryDeleteScope.All);
+
+        await _service.Received().GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>());
+    }
+
+    [Fact]
     public async Task SelectedMonth_ReturnsMonthAtCurrentPosition()
     {
         await _vm.InitializeAsync();
@@ -203,4 +236,15 @@ public class MainViewModelTests
 
         await _service.Received().GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>());
     }
+
+    private static MonthlyEntryProjection MakeProjection(int entryId) => new(
+        FinancialEntryId: entryId,
+        FinancialMonthlyEntryId: null,
+        Description: "Test",
+        EffectiveAmount: 100m,
+        EntryType: FinancialEntryType.Outcome,
+        Category: string.Empty,
+        Status: FinancialMonthlyEntryStatus.Pending,
+        IsProjected: true,
+        InstallmentLabel: null);
 }

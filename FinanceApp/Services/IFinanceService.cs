@@ -12,6 +12,8 @@ public interface IFinanceService
 
     Task SaveMonthlyEntryAsync(FinancialMonthlyEntry entry);
 
+    Task DeleteEntryAsync(int entryId, int year, int month, EntryDeleteScope scope);
+
     /// <summary>
     /// A tool for the development phase only, which clears all data from the database.
     /// </summary>
