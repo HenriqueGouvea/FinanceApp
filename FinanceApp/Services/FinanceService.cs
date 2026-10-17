@@ -49,7 +49,8 @@ public class FinanceService : IFinanceService
                     Category: category,
                     Status: record.Status,
                     IsProjected: false,
-                    InstallmentLabel: BuildInstallmentLabel(template, year, month)
+                    InstallmentLabel: BuildInstallmentLabel(template, year, month),
+                    InstallmentTotalAmount: BuildInstallmentTotal(template)
                 ));
             }
             else
@@ -63,7 +64,8 @@ public class FinanceService : IFinanceService
                     Category: category,
                     Status: FinancialMonthlyEntryStatus.Pending,
                     IsProjected: true,
-                    InstallmentLabel: BuildInstallmentLabel(template, year, month)
+                    InstallmentLabel: BuildInstallmentLabel(template, year, month),
+                    InstallmentTotalAmount: BuildInstallmentTotal(template)
                 ));
             }
         }
@@ -214,4 +216,9 @@ public class FinanceService : IFinanceService
         int n = (year - entry.StartDate.Year) * 12 + (month - entry.StartDate.Month) + 1;
         return $"{n}/{entry.TotalInstallments}";
     }
+
+    private static decimal? BuildInstallmentTotal(FinancialEntry entry) =>
+        entry.Recurrence == RecurrenceType.Installments
+            ? entry.Amount * entry.TotalInstallments
+            : null;
 }

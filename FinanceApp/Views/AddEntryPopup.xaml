@@ -20,12 +20,6 @@
             <Label Text="{Binding PopupTitle}" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
 
             <Entry x:Name="DescriptionEntry" Placeholder="Descrição" Text="{Binding Description}" />
-            <Entry Placeholder="Valor" Text="{Binding Amount}" Keyboard="Numeric" />
-
-            <Picker Title="Categoria"
-                    ItemsSource="{Binding Categories}"
-                    ItemDisplayBinding="{Binding Name, x:DataType=models:FinancialCategory}"
-                    SelectedItem="{Binding SelectedCategory}" />
 
             <!-- Entry type swipe/tap toggle — disabled when editing (structural field) -->
             <Frame CornerRadius="22" Padding="3" BorderColor="LightGray"
@@ -91,10 +85,29 @@
                     IsEnabled="{Binding IsEditing, Converter={x:Static converters:InverseBoolConverter.Instance}}"
                     Opacity="{Binding StructuralFieldsOpacity}" />
 
-<Entry Placeholder="Nº de parcelas"
+            <Entry Placeholder="Nº de parcelas"
                    Text="{Binding TotalInstallments}"
                    Keyboard="Numeric"
                    IsVisible="{Binding IsInstallments}" />
+
+            <!-- Amount — only shown once the recurrence defines what the amount means -->
+            <VerticalStackLayout Spacing="2" IsVisible="{Binding HasRecurrence}">
+                <Label Text="{Binding SelectedRecurrence, Converter={x:Static converters:RecurrenceTypeToAmountLabelConverter.Instance}}"
+                       FontSize="12"
+                       TextColor="Gray" />
+                <Entry Placeholder="{Binding SelectedRecurrence, Converter={x:Static converters:RecurrenceTypeToAmountLabelConverter.Instance}}"
+                       Text="{Binding Amount}"
+                       Keyboard="Numeric" />
+                <Label Text="{Binding InstallmentsTotal, StringFormat='Total: R$ {0:F2}'}"
+                       FontSize="12"
+                       TextColor="Gray"
+                       IsVisible="{Binding InstallmentsTotal, Converter={x:Static converters:IsNotNullConverter.Instance}}" />
+            </VerticalStackLayout>
+
+            <Picker Title="Categoria"
+                    ItemsSource="{Binding Categories}"
+                    ItemDisplayBinding="{Binding Name, x:DataType=models:FinancialCategory}"
+                    SelectedItem="{Binding SelectedCategory}" />
 
             <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,10,0,0">
                 <Button Grid.Column="0" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />

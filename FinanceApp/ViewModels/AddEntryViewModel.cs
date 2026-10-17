@@ -20,10 +20,12 @@ public partial class AddEntryViewModel : ObservableObject
     [ObservableProperty] decimal amount;
     [ObservableProperty] FinancialCategory? selectedCategory;
     [ObservableProperty] FinancialEntryType entryType = FinancialEntryType.Outcome;
-    [ObservableProperty] RecurrenceType selectedRecurrence = RecurrenceType.OneTime;
+    [ObservableProperty] RecurrenceType? selectedRecurrence;
     [ObservableProperty] int? totalInstallments;
 
+    public bool HasRecurrence => SelectedRecurrence is not null;
     public bool IsInstallments => SelectedRecurrence == RecurrenceType.Installments;
+    public decimal? InstallmentsTotal => IsInstallments && TotalInstallments is > 0 ? Amount * TotalInstallments : null;
     public bool IsIncome => EntryType == FinancialEntryType.Income;
     public bool IsEditing => _editingEntryId != 0;
     public double StructuralFieldsOpacity => IsEditing ? 0.4 : 1.0;
@@ -37,11 +39,24 @@ public partial class AddEntryViewModel : ObservableObject
         _categoryService = categoryService;
     }
 
-    partial void OnSelectedRecurrenceChanged(RecurrenceType value)
+    partial void OnSelectedRecurrenceChanged(RecurrenceType? value)
     {
+        OnPropertyChanged(nameof(HasRecurrence));
         OnPropertyChanged(nameof(IsInstallments));
+        OnPropertyChanged(nameof(InstallmentsTotal));
+        SaveCommand.NotifyCanExecuteChanged();
         if (value != RecurrenceType.Installments)
             TotalInstallments = null;
+    }
+
+    partial void OnAmountChanged(decimal value)
+    {
+        OnPropertyChanged(nameof(InstallmentsTotal));
+    }
+
+    partial void OnTotalInstallmentsChanged(int? value)
+    {
+        OnPropertyChanged(nameof(InstallmentsTotal));
     }
 
     partial void OnEntryTypeChanged(FinancialEntryType value)
@@ -63,7 +78,7 @@ public partial class AddEntryViewModel : ObservableObject
         Amount = 0;
         SelectedCategory = null;
         EntryType = FinancialEntryType.Outcome;
-        SelectedRecurrence = RecurrenceType.OneTime;
+        SelectedRecurrence = null;
         TotalInstallments = null;
     }
 
@@ -91,9 +106,12 @@ public partial class AddEntryViewModel : ObservableObject
     [RelayCommand]
     void SelectOutcome() => EntryType = FinancialEntryType.Outcome;
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task Save()
     {
+        if (SelectedRecurrence is not { } recurrence)
+            return;
+
         var entry = new FinancialEntry
         {
             Id = _editingEntryId,
@@ -103,13 +121,15 @@ public partial class AddEntryViewModel : ObservableObject
             StartDate = new DateTime(_targetMonth.Year, _targetMonth.Month, 1),
             EndDate = _editingEndDate,
             EntryType = EntryType,
-            Recurrence = SelectedRecurrence,
+            Recurrence = recurrence,
             TotalInstallments = TotalInstallments
         };
 
         await _financeService.SaveEntryAsync(entry);
         _onSaved?.Invoke(entry);
     }
+
+    private bool CanSave() => SelectedRecurrence is not null;
 
     public void SetSaveCallback(Action<FinancialEntry> onSaved)
     {

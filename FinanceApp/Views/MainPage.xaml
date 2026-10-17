@@ -9,6 +9,83 @@
              x:Class="FinanceApp.Views.MainPage"
              x:DataType="vm:MainViewModel"
              Title="Lançamentos">
+    <ContentPage.Resources>
+        <Color x:Key="OutcomeAccent">#D32F2F</Color>
+        <Color x:Key="OutcomeTint">#FDECEC</Color>
+        <Color x:Key="IncomeAccent">#2E7D32</Color>
+        <Color x:Key="IncomeTint">#E8F5E9</Color>
+
+        <DataTemplate x:Key="EntryRowTemplate" x:DataType="models:MonthlyEntryProjection">
+            <Grid IsClippedToBounds="True">
+                <Grid ColumnDefinitions="*, Auto, Auto" Padding="14,10">
+                    <Grid.Behaviors>
+                        <toolkit:TouchBehavior LongPressDuration="1000"
+                                               TouchGestureCompleted="OnEntryTapped"
+                                               LongPressCompleted="OnEntryLongPressed" />
+                    </Grid.Behaviors>
+                    <VerticalStackLayout Grid.Column="0">
+                        <Label Text="{Binding Description}" FontAttributes="Bold"/>
+                        <HorizontalStackLayout Spacing="4"
+                                               IsVisible="{Binding Category, Converter={x:Static converters:IsNotNullConverter.Instance}}">
+                            <Label Text="{Binding Category.Icon}" FontSize="11"/>
+                            <Label Text="{Binding Category.Name}"
+                                   FontSize="11"
+                                   TextColor="{Binding Category.Color, Converter={x:Static converters:HexToColorConverter.Instance}}"/>
+                        </HorizontalStackLayout>
+                        <Label FontSize="11"
+                               TextColor="Gray"
+                               IsVisible="{Binding InstallmentLabel, Converter={x:Static converters:IsNotNullConverter.Instance}}">
+                            <Label.Text>
+                                <MultiBinding StringFormat="{}{0} · Total R$ {1:F2}">
+                                    <Binding Path="InstallmentLabel" />
+                                    <Binding Path="InstallmentTotalAmount" />
+                                </MultiBinding>
+                            </Label.Text>
+                        </Label>
+                    </VerticalStackLayout>
+                    <Label Grid.Column="1"
+                           Text="{Binding Status}"
+                           FontSize="11"
+                           TextColor="Gray"
+                           VerticalOptions="Center"
+                           Margin="0,0,8,0"/>
+                    <Label Grid.Column="2"
+                           Text="{Binding EffectiveAmount, StringFormat='R$ {0:F2}'}"
+                           TextColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
+                           FontAttributes="Bold"
+                           VerticalOptions="Center"/>
+                </Grid>
+
+                <!-- Entry actions menu, slides in on long press -->
+                <controls:SlideOutPanel HorizontalOptions="End"
+                                        BackgroundColor="#EEEEEE"
+                                        Padding="6">
+                    <controls:SlideOutPanel.IsOpen>
+                        <MultiBinding Converter="{x:Static converters:AreEqualConverter.Instance}">
+                            <Binding Path="FinancialEntryId" />
+                            <Binding Path="RevealedEntryId"
+                                     Source="{RelativeSource AncestorType={x:Type vm:MonthViewModel}}"
+                                     x:DataType="vm:MonthViewModel" />
+                        </MultiBinding>
+                    </controls:SlideOutPanel.IsOpen>
+                    <HorizontalStackLayout Spacing="6">
+                        <Border BackgroundColor="#D32F2F"
+                                StrokeThickness="0"
+                                StrokeShape="RoundRectangle 8"
+                                Padding="16,0">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnDeleteEntryClicked" />
+                            </Border.GestureRecognizers>
+                            <Label Text="Excluir"
+                                   TextColor="White"
+                                   VerticalOptions="Center" />
+                        </Border>
+                    </HorizontalStackLayout>
+                </controls:SlideOutPanel>
+            </Grid>
+        </DataTemplate>
+    </ContentPage.Resources>
+
     <Grid>
         <CarouselView ItemsSource="{Binding Months}"
                       Position="{Binding CurrentPosition, Mode=TwoWay}"
@@ -47,209 +124,93 @@
                                 </HorizontalStackLayout>
                             </Frame>
 
-                            <!-- Outcomes Section Header -->
-                            <Grid ColumnDefinitions="*, Auto, Auto" Padding="0,5">
-                                <Grid.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding ToggleOutcomesCommand}" />
-                                </Grid.GestureRecognizers>
-                                <VerticalStackLayout Grid.Column="0">
-                                    <Label Text="Despesas" FontAttributes="Bold" FontSize="16" TextColor="Red"/>
-                                    <Label TextColor="Gray" FontSize="11">
-                                        <Label.Text>
-                                            <MultiBinding StringFormat="{}{0} lançamento(s) · R$ {1:F2}">
-                                                <Binding Path="OutcomeCount" />
-                                                <Binding Path="TotalOutcomes" />
-                                            </MultiBinding>
-                                        </Label.Text>
-                                    </Label>
+                            <!-- Outcomes Section -->
+                            <Border Stroke="{StaticResource OutcomeAccent}"
+                                    StrokeThickness="1"
+                                    StrokeShape="RoundRectangle 12"
+                                    BackgroundColor="White"
+                                    Padding="0"
+                                    Margin="0,10,0,0">
+                                <VerticalStackLayout>
+                                    <Grid ColumnDefinitions="Auto, *, Auto, Auto"
+                                          ColumnSpacing="12"
+                                          Padding="0,0,12,0"
+                                          BackgroundColor="{StaticResource OutcomeTint}">
+                                        <Grid.GestureRecognizers>
+                                            <TapGestureRecognizer Command="{Binding ToggleOutcomesCommand}" />
+                                        </Grid.GestureRecognizers>
+                                        <BoxView Grid.Column="0"
+                                                 WidthRequest="5"
+                                                 Color="{StaticResource OutcomeAccent}" />
+                                        <VerticalStackLayout Grid.Column="1" Padding="0,10">
+                                            <Label Text="Despesas"
+                                                   FontAttributes="Bold"
+                                                   FontSize="16"
+                                                   TextColor="{StaticResource OutcomeAccent}"/>
+                                            <Label Text="{Binding OutcomeCount, StringFormat='{0} lançamento(s)'}"
+                                                   TextColor="Gray"
+                                                   FontSize="11"/>
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="2"
+                                               Text="{Binding TotalOutcomes, StringFormat='R$ {0:F2}'}"
+                                               TextColor="{StaticResource OutcomeAccent}"
+                                               FontAttributes="Bold"
+                                               VerticalOptions="Center"/>
+                                        <controls:ExpandChevron Grid.Column="3"
+                                                                IsExpanded="{Binding IsOutcomesExpanded}"
+                                                                AccentColor="{StaticResource OutcomeAccent}" />
+                                    </Grid>
+
+                                    <CollectionView ItemsSource="{Binding OutcomeEntries}"
+                                                    ItemTemplate="{StaticResource EntryRowTemplate}"
+                                                    IsVisible="{Binding IsOutcomesExpanded}"
+                                                    SelectionMode="None" />
                                 </VerticalStackLayout>
-                                <Label Grid.Column="1"
-                                       Text="▼"
-                                       FontSize="14"
-                                       TextColor="Gray"
-                                       VerticalOptions="Center"
-                                       IsVisible="{Binding IsOutcomesExpanded}" />
-                                <Label Grid.Column="2"
-                                       Text="▶"
-                                       FontSize="14"
-                                       TextColor="Gray"
-                                       VerticalOptions="Center"
-                                       IsVisible="{Binding IsOutcomesExpanded, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
-                            </Grid>
-                            <BoxView HeightRequest="1" Color="Red" Opacity="0.3" />
+                            </Border>
 
-                            <!-- Outcomes List -->
-                            <CollectionView ItemsSource="{Binding OutcomeEntries}"
-                                            IsVisible="{Binding IsOutcomesExpanded}"
-                                            SelectionMode="None">
-                                <CollectionView.ItemTemplate>
-                                    <DataTemplate x:DataType="models:MonthlyEntryProjection">
-                                        <Grid IsClippedToBounds="True">
-                                            <Grid ColumnDefinitions="*, Auto, Auto" Padding="10">
-                                                <Grid.Behaviors>
-                                                    <toolkit:TouchBehavior LongPressDuration="1000"
-                                                                           TouchGestureCompleted="OnEntryTapped"
-                                                                           LongPressCompleted="OnEntryLongPressed" />
-                                                </Grid.Behaviors>
-                                                <VerticalStackLayout Grid.Column="0">
-                                                    <Label Text="{Binding Description}" FontAttributes="Bold"/>
-                                                    <HorizontalStackLayout Spacing="4"
-                                                                           IsVisible="{Binding Category, Converter={x:Static converters:IsNotNullConverter.Instance}}">
-                                                        <Label Text="{Binding Category.Icon}" FontSize="11"/>
-                                                        <Label Text="{Binding Category.Name}"
-                                                               FontSize="11"
-                                                               TextColor="{Binding Category.Color, Converter={x:Static converters:HexToColorConverter.Instance}}"/>
-                                                    </HorizontalStackLayout>
-                                                    <Label Text="{Binding InstallmentLabel}"
-                                                           FontSize="11"
-                                                           TextColor="Gray"
-                                                           IsVisible="{Binding InstallmentLabel, Converter={x:Static converters:IsNotNullConverter.Instance}}"/>
-                                                </VerticalStackLayout>
-                                                <Label Grid.Column="1"
-                                                       Text="{Binding Status}"
-                                                       FontSize="11"
-                                                       TextColor="Gray"
-                                                       VerticalOptions="Center"
-                                                       Margin="0,0,8,0"/>
-                                                <Label Grid.Column="2"
-                                                       Text="{Binding EffectiveAmount, StringFormat='R$ {0:F2}'}"
-                                                       TextColor="Red"
-                                                       FontAttributes="Bold"
-                                                       VerticalOptions="Center"/>
-                                            </Grid>
+                            <!-- Incomes Section -->
+                            <Border Stroke="{StaticResource IncomeAccent}"
+                                    StrokeThickness="1"
+                                    StrokeShape="RoundRectangle 12"
+                                    BackgroundColor="White"
+                                    Padding="0"
+                                    Margin="0,10,0,0">
+                                <VerticalStackLayout>
+                                    <Grid ColumnDefinitions="Auto, *, Auto, Auto"
+                                          ColumnSpacing="12"
+                                          Padding="0,0,12,0"
+                                          BackgroundColor="{StaticResource IncomeTint}">
+                                        <Grid.GestureRecognizers>
+                                            <TapGestureRecognizer Command="{Binding ToggleIncomesCommand}" />
+                                        </Grid.GestureRecognizers>
+                                        <BoxView Grid.Column="0"
+                                                 WidthRequest="5"
+                                                 Color="{StaticResource IncomeAccent}" />
+                                        <VerticalStackLayout Grid.Column="1" Padding="0,10">
+                                            <Label Text="Receitas"
+                                                   FontAttributes="Bold"
+                                                   FontSize="16"
+                                                   TextColor="{StaticResource IncomeAccent}"/>
+                                            <Label Text="{Binding IncomeCount, StringFormat='{0} lançamento(s)'}"
+                                                   TextColor="Gray"
+                                                   FontSize="11"/>
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="2"
+                                               Text="{Binding TotalIncomes, StringFormat='R$ {0:F2}'}"
+                                               TextColor="{StaticResource IncomeAccent}"
+                                               FontAttributes="Bold"
+                                               VerticalOptions="Center"/>
+                                        <controls:ExpandChevron Grid.Column="3"
+                                                                IsExpanded="{Binding IsIncomesExpanded}"
+                                                                AccentColor="{StaticResource IncomeAccent}" />
+                                    </Grid>
 
-                                            <!-- Entry actions menu, slides in on long press -->
-                                            <controls:SlideOutPanel HorizontalOptions="End"
-                                                                    BackgroundColor="#EEEEEE"
-                                                                    Padding="6">
-                                                <controls:SlideOutPanel.IsOpen>
-                                                    <MultiBinding Converter="{x:Static converters:AreEqualConverter.Instance}">
-                                                        <Binding Path="FinancialEntryId" />
-                                                        <Binding Path="RevealedEntryId"
-                                                                 Source="{RelativeSource AncestorType={x:Type vm:MonthViewModel}}"
-                                                                 x:DataType="vm:MonthViewModel" />
-                                                    </MultiBinding>
-                                                </controls:SlideOutPanel.IsOpen>
-                                                <HorizontalStackLayout Spacing="6">
-                                                    <Border BackgroundColor="#D32F2F"
-                                                            StrokeThickness="0"
-                                                            StrokeShape="RoundRectangle 8"
-                                                            Padding="16,0">
-                                                        <Border.GestureRecognizers>
-                                                            <TapGestureRecognizer Tapped="OnDeleteEntryClicked" />
-                                                        </Border.GestureRecognizers>
-                                                        <Label Text="Excluir"
-                                                               TextColor="White"
-                                                               VerticalOptions="Center" />
-                                                    </Border>
-                                                </HorizontalStackLayout>
-                                            </controls:SlideOutPanel>
-                                        </Grid>
-                                    </DataTemplate>
-                                </CollectionView.ItemTemplate>
-                            </CollectionView>
-
-                            <!-- Incomes Section Header -->
-                            <Grid ColumnDefinitions="*, Auto, Auto" Padding="0,5" Margin="0,10,0,0">
-                                <Grid.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding ToggleIncomesCommand}" />
-                                </Grid.GestureRecognizers>
-                                <VerticalStackLayout Grid.Column="0">
-                                    <Label Text="Receitas" FontAttributes="Bold" FontSize="16" TextColor="Green"/>
-                                    <Label TextColor="Gray" FontSize="11">
-                                        <Label.Text>
-                                            <MultiBinding StringFormat="{}{0} lançamento(s) · R$ {1:F2}">
-                                                <Binding Path="IncomeCount" />
-                                                <Binding Path="TotalIncomes" />
-                                            </MultiBinding>
-                                        </Label.Text>
-                                    </Label>
+                                    <CollectionView ItemsSource="{Binding IncomeEntries}"
+                                                    ItemTemplate="{StaticResource EntryRowTemplate}"
+                                                    IsVisible="{Binding IsIncomesExpanded}"
+                                                    SelectionMode="None" />
                                 </VerticalStackLayout>
-                                <Label Grid.Column="1"
-                                       Text="▼"
-                                       FontSize="14"
-                                       TextColor="Gray"
-                                       VerticalOptions="Center"
-                                       IsVisible="{Binding IsIncomesExpanded}" />
-                                <Label Grid.Column="2"
-                                       Text="▶"
-                                       FontSize="14"
-                                       TextColor="Gray"
-                                       VerticalOptions="Center"
-                                       IsVisible="{Binding IsIncomesExpanded, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
-                            </Grid>
-                            <BoxView HeightRequest="1" Color="Green" Opacity="0.3" />
-
-                            <!-- Incomes List -->
-                            <CollectionView ItemsSource="{Binding IncomeEntries}"
-                                            IsVisible="{Binding IsIncomesExpanded}"
-                                            SelectionMode="None">
-                                <CollectionView.ItemTemplate>
-                                    <DataTemplate x:DataType="models:MonthlyEntryProjection">
-                                        <Grid IsClippedToBounds="True">
-                                            <Grid ColumnDefinitions="*, Auto, Auto" Padding="10">
-                                                <Grid.Behaviors>
-                                                    <toolkit:TouchBehavior LongPressDuration="1000"
-                                                                           TouchGestureCompleted="OnEntryTapped"
-                                                                           LongPressCompleted="OnEntryLongPressed" />
-                                                </Grid.Behaviors>
-                                                <VerticalStackLayout Grid.Column="0">
-                                                    <Label Text="{Binding Description}" FontAttributes="Bold"/>
-                                                    <HorizontalStackLayout Spacing="4"
-                                                                           IsVisible="{Binding Category, Converter={x:Static converters:IsNotNullConverter.Instance}}">
-                                                        <Label Text="{Binding Category.Icon}" FontSize="11"/>
-                                                        <Label Text="{Binding Category.Name}"
-                                                               FontSize="11"
-                                                               TextColor="{Binding Category.Color, Converter={x:Static converters:HexToColorConverter.Instance}}"/>
-                                                    </HorizontalStackLayout>
-                                                    <Label Text="{Binding InstallmentLabel}"
-                                                           FontSize="11"
-                                                           TextColor="Gray"
-                                                           IsVisible="{Binding InstallmentLabel, Converter={x:Static converters:IsNotNullConverter.Instance}}"/>
-                                                </VerticalStackLayout>
-                                                <Label Grid.Column="1"
-                                                       Text="{Binding Status}"
-                                                       FontSize="11"
-                                                       TextColor="Gray"
-                                                       VerticalOptions="Center"
-                                                       Margin="0,0,8,0"/>
-                                                <Label Grid.Column="2"
-                                                       Text="{Binding EffectiveAmount, StringFormat='R$ {0:F2}'}"
-                                                       TextColor="Green"
-                                                       FontAttributes="Bold"
-                                                       VerticalOptions="Center"/>
-                                            </Grid>
-
-                                            <!-- Entry actions menu, slides in on long press -->
-                                            <controls:SlideOutPanel HorizontalOptions="End"
-                                                                    BackgroundColor="#EEEEEE"
-                                                                    Padding="6">
-                                                <controls:SlideOutPanel.IsOpen>
-                                                    <MultiBinding Converter="{x:Static converters:AreEqualConverter.Instance}">
-                                                        <Binding Path="FinancialEntryId" />
-                                                        <Binding Path="RevealedEntryId"
-                                                                 Source="{RelativeSource AncestorType={x:Type vm:MonthViewModel}}"
-                                                                 x:DataType="vm:MonthViewModel" />
-                                                    </MultiBinding>
-                                                </controls:SlideOutPanel.IsOpen>
-                                                <HorizontalStackLayout Spacing="6">
-                                                    <Border BackgroundColor="#D32F2F"
-                                                            StrokeThickness="0"
-                                                            StrokeShape="RoundRectangle 8"
-                                                            Padding="16,0">
-                                                        <Border.GestureRecognizers>
-                                                            <TapGestureRecognizer Tapped="OnDeleteEntryClicked" />
-                                                        </Border.GestureRecognizers>
-                                                        <Label Text="Excluir"
-                                                               TextColor="White"
-                                                               VerticalOptions="Center" />
-                                                    </Border>
-                                                </HorizontalStackLayout>
-                                            </controls:SlideOutPanel>
-                                        </Grid>
-                                    </DataTemplate>
-                                </CollectionView.ItemTemplate>
-                            </CollectionView>
+                            </Border>
 
                             <!-- Bottom padding so FAB doesn't overlap last item -->
                             <BoxView HeightRequest="80" IsVisible="False" />

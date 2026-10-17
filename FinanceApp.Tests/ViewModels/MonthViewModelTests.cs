@@ -236,6 +236,7 @@ public class MonthViewModelTests
             Category: null,
             Status: FinancialMonthlyEntryStatus.Pending,
             IsProjected: true,
-            InstallmentLabel: null
+            InstallmentLabel: null,
+            InstallmentTotalAmount: null
         );
 }

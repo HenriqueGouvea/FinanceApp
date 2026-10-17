@@ -13,6 +13,7 @@ namespace FinanceApp.Models;
 /// <param name="Status">The current payment status (Pending, Paid, etc.).</param>
 /// <param name="IsProjected">True if this occurrence exists only in memory; False if it has been persisted/modified in the DB.</param>
 /// <param name="InstallmentLabel">Formatted string for installments (e.g., '02/10') or null for other types.</param>
+/// <param name="InstallmentTotalAmount">Full amount of all installments (template amount × total installments), or null for other types.</param>
 public record MonthlyEntryProjection(
     int FinancialEntryId,
     int? FinancialMonthlyEntryId,
@@ -22,5 +23,6 @@ public record MonthlyEntryProjection(
     FinancialCategory? Category,
     FinancialMonthlyEntryStatus Status,
     bool IsProjected,
-    string? InstallmentLabel
+    string? InstallmentLabel,
+    decimal? InstallmentTotalAmount
 );
