@@ -210,7 +210,8 @@ public class MainViewModelTests
             Category: null,
             Status: FinancialMonthlyEntryStatus.Pending,
             IsProjected: true,
-            InstallmentLabel: null));
+            InstallmentLabel: null,
+            InstallmentTotalAmount: null));
 
         await _vm.ClearDatabaseAsync();
 
@@ -279,5 +280,6 @@ public class MainViewModelTests
         Category: null,
         Status: FinancialMonthlyEntryStatus.Pending,
         IsProjected: true,
-        InstallmentLabel: null);
+        InstallmentLabel: null,
+        InstallmentTotalAmount: null);
 }

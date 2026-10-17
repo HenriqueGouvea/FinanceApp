@@ -301,6 +301,48 @@ public class FinanceServiceTests
     }
 
     [Fact]
+    public async Task GetMergedEntries_InstallmentsEntry_ReturnsFullInstallmentTotal()
+    {
+        await SaveTemplateAsync(RecurrenceType.Installments, totalInstallments: 10);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 6)).Single();
+
+        projection.EffectiveAmount.Should().Be(100m);
+        projection.InstallmentLabel.Should().Be("3/10");
+        projection.InstallmentTotalAmount.Should().Be(1000m);
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_InstallmentsEntryWithOverride_TotalUsesTemplateAmount()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Installments, totalInstallments: 10);
+        await _service.SaveMonthlyEntryAsync(new FinancialMonthlyEntry
+        {
+            FinancialEntryId = entry.Id,
+            Year = 2026,
+            Month = 4,
+            OverrideAmount = 150m
+        });
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.EffectiveAmount.Should().Be(150m);
+        projection.InstallmentTotalAmount.Should().Be(1000m);
+    }
+
+    [Theory]
+    [InlineData(RecurrenceType.OneTime)]
+    [InlineData(RecurrenceType.Recurrent)]
+    public async Task GetMergedEntries_NonInstallmentsEntry_HasNullInstallmentTotal(RecurrenceType recurrence)
+    {
+        await SaveTemplateAsync(recurrence);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.InstallmentTotalAmount.Should().BeNull();
+    }
+
+    [Fact]
     public async Task GetEntryByIdAsync_ExistingEntry_ReturnsCorrectEntry()
     {
         var entry = new FinancialEntry

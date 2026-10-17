@@ -67,7 +67,8 @@ public class AddEntryViewModelTests
         await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
 
         _vm.EntryType.Should().Be(FinancialEntryType.Outcome);
-        _vm.SelectedRecurrence.Should().Be(RecurrenceType.OneTime);
+        _vm.SelectedRecurrence.Should().BeNull();
+        _vm.HasRecurrence.Should().BeFalse();
     }
 
     [Fact]
@@ -96,6 +97,7 @@ public class AddEntryViewModelTests
         await _vm.PrepareForEditAsync(entry);
 
         await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+        _vm.SelectedRecurrence = RecurrenceType.OneTime;
 
         await _vm.SaveCommand.ExecuteAsync(null);
         await _service.Received().SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Id == 0));
@@ -166,6 +168,7 @@ public class AddEntryViewModelTests
         entry.EndDate = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Local);
         await _vm.PrepareForEditAsync(entry);
         await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+        _vm.SelectedRecurrence = RecurrenceType.OneTime;
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
@@ -250,7 +253,89 @@ public class AddEntryViewModelTests
         _vm.TotalInstallments.Should().BeNull();
     }
 
+    [Fact]
+    public void HasRecurrence_AfterSelectingRecurrence_ReturnsTrue()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Recurrent;
+
+        _vm.HasRecurrence.Should().BeTrue();
+    }
+
+    [Fact]
+    public void OnSelectedRecurrenceChanged_RaisesPropertyChangedForHasRecurrence()
+    {
+        var notified = new List<string>();
+        _vm.PropertyChanged += (_, e) => notified.Add(e.PropertyName!);
+
+        _vm.SelectedRecurrence = RecurrenceType.OneTime;
+
+        notified.Should().Contain(nameof(AddEntryViewModel.HasRecurrence));
+    }
+
+    // --- InstallmentsTotal ---
+
+    [Fact]
+    public void InstallmentsTotal_InstallmentsWithCount_ReturnsAmountTimesCount()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Installments;
+        _vm.Amount = 150m;
+        _vm.TotalInstallments = 4;
+
+        _vm.InstallmentsTotal.Should().Be(600m);
+    }
+
+    [Fact]
+    public void InstallmentsTotal_InstallmentsWithoutCount_ReturnsNull()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Installments;
+        _vm.Amount = 150m;
+
+        _vm.InstallmentsTotal.Should().BeNull();
+    }
+
+    [Fact]
+    public void InstallmentsTotal_NonInstallments_ReturnsNull()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Recurrent;
+        _vm.Amount = 150m;
+
+        _vm.InstallmentsTotal.Should().BeNull();
+    }
+
+    [Fact]
+    public void OnAmountChanged_RaisesPropertyChangedForInstallmentsTotal()
+    {
+        var notified = new List<string>();
+        _vm.PropertyChanged += (_, e) => notified.Add(e.PropertyName!);
+
+        _vm.Amount = 10m;
+
+        notified.Should().Contain(nameof(AddEntryViewModel.InstallmentsTotal));
+    }
+
     // --- SaveCommand ---
+
+    [Fact]
+    public void SaveCommand_WithoutRecurrence_CannotExecute()
+    {
+        _vm.SaveCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void SaveCommand_AfterSelectingRecurrence_CanExecute()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.OneTime;
+
+        _vm.SaveCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SaveCommand_WithoutRecurrence_DoesNotCallService()
+    {
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.DidNotReceive().SaveEntryAsync(Arg.Any<FinancialEntry>());
+    }
 
     [Fact]
     public async Task SaveCommand_CallsServiceWithCorrectEntry()
@@ -273,6 +358,7 @@ public class AddEntryViewModelTests
     public async Task SaveCommand_SetsStartDateToFirstOfTargetMonth()
     {
         await _vm.PrepareAsync(new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Local));
+        _vm.SelectedRecurrence = RecurrenceType.OneTime;
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
@@ -286,6 +372,7 @@ public class AddEntryViewModelTests
     public async Task SaveCommand_WithSelectedCategory_PassesCategoryId()
     {
         _vm.SelectedCategory = Education;
+        _vm.SelectedRecurrence = RecurrenceType.OneTime;
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
@@ -295,6 +382,8 @@ public class AddEntryViewModelTests
     [Fact]
     public async Task SaveCommand_WithoutCategory_PassesNullCategoryId()
     {
+        _vm.SelectedRecurrence = RecurrenceType.OneTime;
+
         await _vm.SaveCommand.ExecuteAsync(null);
 
         await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.CategoryId == null));
@@ -318,6 +407,7 @@ public class AddEntryViewModelTests
     {
         FinancialEntry? captured = null;
         _vm.SetSaveCallback(e => captured = e);
+        _vm.SelectedRecurrence = RecurrenceType.OneTime;
 
         await _vm.SaveCommand.ExecuteAsync(null);
 

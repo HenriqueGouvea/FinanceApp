@@ -41,14 +41,17 @@ The development follows strict guidelines documented in our `CLAUDE.md` to ensur
 - [x] **Edit modal:** Opens when the user taps an entry. Edits Description, Amount, and Category on the template. EntryType and Recurrence are intentionally locked — see architectural constraint below.
 - [x] **Delete entry:** Long-press (1s) an entry to slide in an actions menu from the right (currently a delete button; room for more actions). Tapping anywhere else slides it back out. OneTime entries are removed entirely; Recurrent/Installments entries offer three scopes: *this month only* (cancelled `FinancialMonthlyEntry`), *this and future months* (sets `EndDate` on the template), or *all months* (removes the template and its monthly records).
 - [x] **Category Management:** Dynamic category CRUD (name, emoji icon, color) on a "Categorias" page reached via the hamburger menu. Entries show their category chip in the monthly list. Deleting a category keeps its entries and leaves them uncategorized. The former hardcoded categories are seeded on first run and existing entries are re-linked by name.
-- [ ] **Improve total amount for Installment entries:** Show the total amount of the installment in the list, not just the current month amount.
+- [x] **Income and outcome UI improvements:** Change the UI of the income and outcome list so that it becomes easier to identify that they are two different sessions. In addition, it should be clear that the sessions can be expanded/collapsed.
+- [x] **UX improvements:** Description field auto-focused on popup open; income/outcome selection is a swipe/tap pill toggle defaulting to Outcome; the amount field only appears after the recurrence is chosen and is labelled accordingly ("Valor total", "Valor mensal" or "Valor de cada parcela", with a live installment total).
+- [x] **Improve total amount for Installment entries:** Show the total amount of the installment in the list, not just the current month amount.
 - [ ] **Status control:** Add the possibility to change the status of an entry
+- [ ] **Separate income and outcome categories:** When the user adds an income, it should show just income category options. The same should be valid for outcomes.
 - [ ] **E2E tests:** Investigate end-to-end UI testing options for the MAUI Android app (e.g. Appium + `UITest`, adb-driven scripts) and add an E2E suite covering the main flows: add, edit, and delete entries (all delete scopes), month navigation, and the long-press actions menu.
-- [x] **UX improvements:** Description field auto-focused on popup open; income/outcome selection is a swipe/tap pill toggle defaulting to Outcome.
+- [ ] **Current month button:** A quick navigation button to jump back to the current month.
 
 ### Phase 2: Advanced Features & Scaling
 - [ ] **Create a splash screen:** Check how to design a new one.
-- [ ] **Current month button:** A quick navigation button to jump back to the current month.
+- [ ] **Add a setup page for new users:** This page should be shown for the first time a user opens the app, asking things like his salary, house spends (if it's the case), and other information to configure a pre-existent data for his finance.
 - [ ] **Partial payment:** Add the option to add the partial payment of an entry like supermarket or restaurants. This value should be shown in the list and the user can set it open the entry edit window.
 - [ ] **Payment source engine:** Add a new page accessed via the hamburger menu with a CRUD for the payment sources. When adding a new entry there should have the option to link to a payment source which can be a bank account or a credit card.
 - [ ] **Multi-Platform Sync:** Future transition to a centralized Web API.
