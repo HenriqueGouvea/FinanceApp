@@ -32,7 +32,7 @@
                            VerticalOptions="Center" />
                 </HorizontalStackLayout>
 
-                <Entry x:Name="NameEntry" Placeholder="Nome" Text="{Binding Name}" MaxLength="30" />
+                <Entry x:Name="NameEntry" AutomationId="CategoryNameEntry" Placeholder="Nome" Text="{Binding Name}" MaxLength="30" />
 
                 <Label Text="Ícone" FontSize="13" TextColor="Gray" />
                 <FlexLayout Wrap="Wrap" JustifyContent="Start" BindableLayout.ItemsSource="{Binding Icons}">
@@ -92,7 +92,7 @@
 
                 <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,10,0,0">
                     <Button Grid.Column="0" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />
-                    <Button Grid.Column="1" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="Purple" />
+                    <Button Grid.Column="1" AutomationId="SaveCategoryButton" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="Purple" />
                 </Grid>
             </VerticalStackLayout>
         </ScrollView>

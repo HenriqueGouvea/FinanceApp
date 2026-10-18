@@ -17,22 +17,24 @@
 
         <DataTemplate x:Key="EntryRowTemplate" x:DataType="models:MonthlyEntryProjection">
             <Grid IsClippedToBounds="True">
-                <Grid ColumnDefinitions="*, Auto, Auto" Padding="14,10">
+                <Grid AutomationId="EntryRow" ColumnDefinitions="*, Auto, Auto" Padding="14,10">
                     <Grid.Behaviors>
                         <toolkit:TouchBehavior LongPressDuration="1000"
                                                TouchGestureCompleted="OnEntryTapped"
                                                LongPressCompleted="OnEntryLongPressed" />
                     </Grid.Behaviors>
                     <VerticalStackLayout Grid.Column="0">
-                        <Label Text="{Binding Description}" FontAttributes="Bold"/>
+                        <Label AutomationId="EntryDescriptionLabel" Text="{Binding Description}" FontAttributes="Bold"/>
                         <HorizontalStackLayout Spacing="4"
                                                IsVisible="{Binding Category, Converter={x:Static converters:IsNotNullConverter.Instance}}">
                             <Label Text="{Binding Category.Icon}" FontSize="11"/>
-                            <Label Text="{Binding Category.Name}"
+                            <Label AutomationId="EntryCategoryLabel"
+                                   Text="{Binding Category.Name}"
                                    FontSize="11"
                                    TextColor="{Binding Category.Color, Converter={x:Static converters:HexToColorConverter.Instance}}"/>
                         </HorizontalStackLayout>
-                        <Label FontSize="11"
+                        <Label AutomationId="EntryInstallmentLabel"
+                               FontSize="11"
                                TextColor="Gray"
                                IsVisible="{Binding InstallmentLabel, Converter={x:Static converters:IsNotNullConverter.Instance}}">
                             <Label.Text>
@@ -50,6 +52,7 @@
                            VerticalOptions="Center"
                            Margin="0,0,8,0"/>
                     <Label Grid.Column="2"
+                           AutomationId="EntryAmountLabel"
                            Text="{Binding EffectiveAmount, StringFormat='R$ {0:F2}'}"
                            TextColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
                            FontAttributes="Bold"
@@ -69,7 +72,8 @@
                         </MultiBinding>
                     </controls:SlideOutPanel.IsOpen>
                     <HorizontalStackLayout Spacing="6">
-                        <Border BackgroundColor="#D32F2F"
+                        <Border AutomationId="DeleteEntryAction"
+                                BackgroundColor="#D32F2F"
                                 StrokeThickness="0"
                                 StrokeShape="RoundRectangle 8"
                                 Padding="16,0">
@@ -101,7 +105,8 @@
                             </VerticalStackLayout.GestureRecognizers>
 
                             <!-- Month Title -->
-                            <Label Text="{Binding MonthName}"
+                            <Label AutomationId="MonthTitleLabel"
+                                   Text="{Binding MonthName}"
                                    FontSize="32"
                                    HorizontalOptions="Center"
                                    FontAttributes="Bold" />
@@ -111,15 +116,15 @@
                                 <HorizontalStackLayout HorizontalOptions="Center" Spacing="30">
                                     <VerticalStackLayout>
                                         <Label Text="Receitas" FontSize="12" TextColor="Gray"/>
-                                        <Label Text="{Binding TotalIncomes, StringFormat='R$ {0:F2}'}" TextColor="Green" FontAttributes="Bold"/>
+                                        <Label AutomationId="SummaryIncomeLabel" Text="{Binding TotalIncomes, StringFormat='R$ {0:F2}'}" TextColor="Green" FontAttributes="Bold"/>
                                     </VerticalStackLayout>
                                     <VerticalStackLayout>
                                         <Label Text="Despesas" FontSize="12" TextColor="Gray"/>
-                                        <Label Text="{Binding TotalOutcomes, StringFormat='R$ {0:F2}'}" TextColor="Red" FontAttributes="Bold"/>
+                                        <Label AutomationId="SummaryOutcomeLabel" Text="{Binding TotalOutcomes, StringFormat='R$ {0:F2}'}" TextColor="Red" FontAttributes="Bold"/>
                                     </VerticalStackLayout>
                                     <VerticalStackLayout>
                                         <Label Text="Balanço" FontSize="12" TextColor="Gray"/>
-                                        <Label Text="{Binding Balance, StringFormat='R$ {0:F2}'}" FontAttributes="Bold"/>
+                                        <Label AutomationId="SummaryBalanceLabel" Text="{Binding Balance, StringFormat='R$ {0:F2}'}" FontAttributes="Bold"/>
                                     </VerticalStackLayout>
                                 </HorizontalStackLayout>
                             </Frame>
@@ -132,7 +137,8 @@
                                     Padding="0"
                                     Margin="0,10,0,0">
                                 <VerticalStackLayout>
-                                    <Grid ColumnDefinitions="Auto, *, Auto, Auto"
+                                    <Grid AutomationId="OutcomesHeader"
+                                          ColumnDefinitions="Auto, *, Auto, Auto"
                                           ColumnSpacing="12"
                                           Padding="0,0,12,0"
                                           BackgroundColor="{StaticResource OutcomeTint}">
@@ -147,11 +153,13 @@
                                                    FontAttributes="Bold"
                                                    FontSize="16"
                                                    TextColor="{StaticResource OutcomeAccent}"/>
-                                            <Label Text="{Binding OutcomeCount, StringFormat='{0} lançamento(s)'}"
+                                            <Label AutomationId="OutcomeCountLabel"
+                                                   Text="{Binding OutcomeCount, StringFormat='{0} lançamento(s)'}"
                                                    TextColor="Gray"
                                                    FontSize="11"/>
                                         </VerticalStackLayout>
                                         <Label Grid.Column="2"
+                                               AutomationId="OutcomeTotalLabel"
                                                Text="{Binding TotalOutcomes, StringFormat='R$ {0:F2}'}"
                                                TextColor="{StaticResource OutcomeAccent}"
                                                FontAttributes="Bold"
@@ -176,7 +184,8 @@
                                     Padding="0"
                                     Margin="0,10,0,0">
                                 <VerticalStackLayout>
-                                    <Grid ColumnDefinitions="Auto, *, Auto, Auto"
+                                    <Grid AutomationId="IncomesHeader"
+                                          ColumnDefinitions="Auto, *, Auto, Auto"
                                           ColumnSpacing="12"
                                           Padding="0,0,12,0"
                                           BackgroundColor="{StaticResource IncomeTint}">
@@ -191,11 +200,13 @@
                                                    FontAttributes="Bold"
                                                    FontSize="16"
                                                    TextColor="{StaticResource IncomeAccent}"/>
-                                            <Label Text="{Binding IncomeCount, StringFormat='{0} lançamento(s)'}"
+                                            <Label AutomationId="IncomeCountLabel"
+                                                   Text="{Binding IncomeCount, StringFormat='{0} lançamento(s)'}"
                                                    TextColor="Gray"
                                                    FontSize="11"/>
                                         </VerticalStackLayout>
                                         <Label Grid.Column="2"
+                                               AutomationId="IncomeTotalLabel"
                                                Text="{Binding TotalIncomes, StringFormat='R$ {0:F2}'}"
                                                TextColor="{StaticResource IncomeAccent}"
                                                FontAttributes="Bold"
@@ -231,7 +242,8 @@
                 HorizontalOptions="Start"
                 VerticalOptions="End"
                 Margin="20,0,0,33" />
-        <Button Text="+"
+        <Button AutomationId="AddEntryButton"
+                Text="+"
                 FontSize="24"
                 BackgroundColor="Purple"
                 TextColor="White"

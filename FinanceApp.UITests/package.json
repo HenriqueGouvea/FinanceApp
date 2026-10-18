@@ -1,0 +1,12 @@
+{
+  "name": "financeapp-uitests",
+  "private": true,
+  "description": "Local Appium server and Android driver used by the FinanceApp E2E suite.",
+  "scripts": {
+    "appium": "appium --base-path /"
+  },
+  "devDependencies": {
+    "appium": "2.19.0",
+    "appium-uiautomator2-driver": "4.2.9"
+  }
+}

@@ -19,7 +19,7 @@
             </CollectionView.EmptyView>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:FinancialCategory">
-                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="14" Padding="20,10">
+                    <Grid AutomationId="CategoryRow" ColumnDefinitions="Auto, *, Auto" ColumnSpacing="14" Padding="20,10">
                         <Grid.GestureRecognizers>
                             <TapGestureRecognizer Tapped="OnCategoryTapped" />
                         </Grid.GestureRecognizers>
@@ -32,11 +32,13 @@
                                    HorizontalOptions="Center" VerticalOptions="Center" />
                         </Border>
                         <Label Grid.Column="1"
+                               AutomationId="CategoryNameLabel"
                                Text="{Binding Name}"
                                FontSize="16"
                                FontAttributes="Bold"
                                VerticalOptions="Center" />
                         <Border Grid.Column="2"
+                                AutomationId="DeleteCategoryButton"
                                 BackgroundColor="#D32F2F"
                                 StrokeThickness="0"
                                 StrokeShape="RoundRectangle 8"
@@ -52,7 +54,8 @@
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <Button Text="+"
+        <Button AutomationId="AddCategoryButton"
+                Text="+"
                 FontSize="24"
                 BackgroundColor="Purple"
                 TextColor="White"

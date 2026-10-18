@@ -6,4 +6,5 @@
     <Deploy Solution="Debug|*" />
   </Project>
   <Project Path="FinanceApp.Tests/FinanceApp.Tests.csproj" />
+  <Project Path="FinanceApp.UITests/FinanceApp.UITests.csproj" />
 </Solution>

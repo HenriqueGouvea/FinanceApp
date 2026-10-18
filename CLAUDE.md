@@ -18,9 +18,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Run a single test:** `dotnet test FinanceApp.Tests/FinanceApp.Tests.csproj --filter "FullyQualifiedName~MethodName_Scenario_ExpectedResult"`
 
-**Two-tier strategy:**
+**Three-tier strategy:**
 - **Service tests** (`FinanceApp.Tests/Services/`) — hit a real in-memory SQLite via `TestDatabaseContext`. No mocks.
 - **ViewModel tests** (`FinanceApp.Tests/ViewModels/`) — mock `IFinanceService` with NSubstitute. No DB.
+- **E2E tests** (`FinanceApp.UITests/`) — drive the real Android app and assert on UI and the on-device DB. See "E2E tests" below.
+
+**Definition of done:** a feature or bug fix is not complete with unit tests alone. Any change that adds or alters user-visible behaviour (a new screen, popup, gesture, list or label reaction, or a new DB write triggered from the UI) must also add or update E2E tests covering the happy path and the key variations (e.g. each delete scope, each recurrence type). Then build the APK and run the E2E suite (or the affected test classes) before reporting the work as done. Pure service/ViewModel refactors with no UI impact only need unit tests.
 
 **Infrastructure:**
 - `TestDatabaseContext` (`FinanceApp.Tests/Infrastructure/`) — implements `IDatabaseContext` using a GUID-named SQLite in-memory database (`file:{guid}?mode=memory&cache=shared`). The connection is opened once in the constructor and kept alive for the test lifetime.
@@ -33,6 +36,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Date normalization:** Always use `new DateTime(year, month, day, 0, 0, 0, DateTimeKind.Local)` for `StartDate` in tests to match the `DateTimeKind.Local` comparisons inside `IsActiveForMonth`.
 
 **Member ordering inside test classes:** private fields → constructor → `[Fact]` methods (grouped by the service method under test).
+
+### E2E tests
+`FinanceApp.UITests/` — Appium 2 + UiAutomator2 driving the Android app on an emulator (`emulator-5554` must be running). Not part of the default `dotnet test` above. Full setup in `FinanceApp.UITests/README.md`.
+
+**Run:**
+1. Build the APK (required after any app change; Fast Deployment APKs can't be used): `dotnet build FinanceApp/FinanceApp.csproj -f net10.0-android -c Debug -p:EmbedAssembliesIntoApk=true -o artifacts/e2e-apk`
+2. `dotnet test FinanceApp.UITests/FinanceApp.UITests.csproj` (single class: `--filter "FullyQualifiedName~DeleteEntryTests"`). The full suite takes ~10 minutes.
+
+**Structure:**
+- `Tests/` — one class per feature area (`AddEntryTests`, `EditEntryTests`, `DeleteEntryTests`, `EntryActionsMenuTests`, `MonthNavigationTests`, `SectionToggleTests`, `CategoryTests`). Each class derives from `E2ETestBase` and must carry `[Collection(E2ECollection.Name)]` and `[Trait("Category", "E2E")]`. Shared arrange steps (e.g. creating the entry under test) go in the constructor.
+- `Pages/` — page objects (`MainPageObject`, `AddEntryPopupObject`, `CategoriesPageObject`). Tests never call Appium directly; add a page object method instead. User-facing pt-BR texts the tests select by live in `AppLabels`.
+- `Infrastructure/` — `AppSession` (driver, waits, gestures, diagnostics), `DeviceDatabase` + `TableRows` (DB assertions), `AppFormat` (expected money/month/count strings and enum values).
+
+**Rules:**
+- Locate elements by `AutomationId` (Android `resource-id`). Any element a test interacts with or asserts on needs an `AutomationId` in XAML, named after its role (e.g. `OutcomeTotalLabel`, `SaveEntryButton`).
+- Never hardcode formatted values: use `AppFormat.Money`, `AppFormat.MonthTitle`, `AppFormat.EntryCount`.
+- Always wait (`WaitForVisible`, `WaitForText`, `WaitForGone`), never sleep. The month `CarouselView` keeps neighbour months in the tree, so only consider *displayed* elements.
+- Assert both the UI reaction and the persisted state (`GetEntryRowsAsync`, `GetMonthlyEntryRowsAsync`, `GetCategoryRowsAsync`) when a flow writes to the DB. Row types in `TableRows.cs` mirror the tables and must be updated when the schema changes.
+- Every test gets a fresh Appium session with app data wiped (empty DB, default categories seeded), so tests must not depend on each other.
+- On a timeout, a screenshot + page source are saved to `FinanceApp.UITests/TestResults/diagnostics/`. Check them first when debugging.
 
 ## Project Structure
 - **Data/:** `DatabaseContext.cs` — SQLite singleton connection + table creation via `GetConnectionAsync()`. `IDatabaseContext` is the interface used for DI and test substitution.

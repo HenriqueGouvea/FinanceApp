@@ -20,8 +20,9 @@ This project goes beyond simple CRUD operations. It is designed to handle the co
 - **Toolkit:** CommunityToolkit.Mvvm
 - **Database:** SQLite with Entity Framework Core
 - **Patterns:** Dependency Injection, Repository Pattern, and Clean Code.
-- **Testing:** xUnit, FluentAssertions, NSubstitute (Unit Tests)
-- **Integration Tests:** SQLite In-Memory with custom Projection Engine validation.
+- **Unit Tests:** xUnit, FluentAssertions, NSubstitute (ViewModels with mocked services)
+- **Integration Tests:** xUnit against SQLite In-Memory, validating the Projection Engine and services.
+- **E2E Tests:** Appium 2 + UiAutomator2 driver, Appium .NET client (`Appium.WebDriver`), xUnit, FluentAssertions, and sqlite-net for on-device database assertions.
 
 ## 🏗 Architectural Principles
 
@@ -44,14 +45,15 @@ The development follows strict guidelines documented in our `CLAUDE.md` to ensur
 - [x] **Income and outcome UI improvements:** Change the UI of the income and outcome list so that it becomes easier to identify that they are two different sessions. In addition, it should be clear that the sessions can be expanded/collapsed.
 - [x] **UX improvements:** Description field auto-focused on popup open; income/outcome selection is a swipe/tap pill toggle defaulting to Outcome; the amount field only appears after the recurrence is chosen and is labelled accordingly ("Valor total", "Valor mensal" or "Valor de cada parcela", with a live installment total).
 - [x] **Improve total amount for Installment entries:** Show the total amount of the installment in the list, not just the current month amount.
-- [ ] **Status control:** Add the possibility to change the status of an entry
+- [x] **E2E tests:** Appium 2 + UiAutomator2 suite in `FinanceApp.UITests` that drives the real Android app on an emulator. It uses page objects located by `AutomationId`, asserts on the app's on-device SQLite database, and has a GitHub Actions workflow that runs on merges to `dev`. Starts with the add-entry flow; see [FinanceApp.UITests/README.md](FinanceApp.UITests/README.md) to run it.
+- [ ] **Improve CI automation:** make Claude create pull requests.
+- [ ] **Status control:** Add the possibility to change the status of an entry within the month (ie.: an installment paid on that month). It has a visual identification of that status too, maybe just an icon or whataver is better for the UI/UX.
 - [ ] **Separate income and outcome categories:** When the user adds an income, it should show just income category options. The same should be valid for outcomes.
-- [ ] **E2E tests:** Investigate end-to-end UI testing options for the MAUI Android app (e.g. Appium + `UITest`, adb-driven scripts) and add an E2E suite covering the main flows: add, edit, and delete entries (all delete scopes), month navigation, and the long-press actions menu.
-- [ ] **Current month button:** A quick navigation button to jump back to the current month.
+- [ ] **Improve month navigation:** Add a quick navigation button to jump back to the current month. Add also the possibility to jump to a specific month an year. These options should have a good UI/UX, because we can't start adding a lot of buttons on the top.
 
 ### Phase 2: Advanced Features & Scaling
 - [ ] **Create a splash screen:** Check how to design a new one.
-- [ ] **Add a setup page for new users:** This page should be shown for the first time a user opens the app, asking things like his salary, house spends (if it's the case), and other information to configure a pre-existent data for his finance.
+- [ ] **Add a setup page for new users:** This page should be shown for the first time a user opens the app, asking things like name, picture (optional), salary, house spends (if it's the case), and other information to configure a pre-existent data for his finance. It also should as for an optional password to open the app.
 - [ ] **Partial payment:** Add the option to add the partial payment of an entry like supermarket or restaurants. This value should be shown in the list and the user can set it open the entry edit window.
 - [ ] **Payment source engine:** Add a new page accessed via the hamburger menu with a CRUD for the payment sources. When adding a new entry there should have the option to link to a payment source which can be a bank account or a credit card.
 - [ ] **Multi-Platform Sync:** Future transition to a centralized Web API.
