@@ -17,12 +17,12 @@
 
         <ScrollView>
         <VerticalStackLayout Spacing="15">
-            <Label Text="{Binding PopupTitle}" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
+            <Label AutomationId="EntryPopupTitleLabel" Text="{Binding PopupTitle}" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
 
             <Entry x:Name="DescriptionEntry" AutomationId="DescriptionEntry" Placeholder="Descrição" Text="{Binding Description}" />
 
             <!-- Entry type swipe/tap toggle — disabled when editing (structural field) -->
-            <Frame CornerRadius="22" Padding="3" BorderColor="LightGray"
+            <Frame AutomationId="EntryTypeToggle" CornerRadius="22" Padding="3" BorderColor="LightGray"
                    BackgroundColor="#F0F0F0" HasShadow="False"
                    IsEnabled="{Binding IsEditing, Converter={x:Static converters:InverseBoolConverter.Instance}}"
                    Opacity="{Binding StructuralFieldsOpacity}">
@@ -63,7 +63,8 @@
                                    HorizontalOptions="Center" FontSize="13" />
                         </Frame>
                         <!-- Inactive state — tappable -->
-                        <Frame CornerRadius="19" BackgroundColor="Transparent" Padding="10,8"
+                        <Frame AutomationId="SelectIncomeButton"
+                               CornerRadius="19" BackgroundColor="Transparent" Padding="10,8"
                                HasShadow="False" BorderColor="Transparent"
                                IsVisible="{Binding IsIncome, Converter={x:Static converters:InverseBoolConverter.Instance}}">
                             <Frame.GestureRecognizers>
@@ -86,7 +87,8 @@
                     IsEnabled="{Binding IsEditing, Converter={x:Static converters:InverseBoolConverter.Instance}}"
                     Opacity="{Binding StructuralFieldsOpacity}" />
 
-            <Entry Placeholder="Nº de parcelas"
+            <Entry AutomationId="InstallmentsEntry"
+                   Placeholder="Nº de parcelas"
                    Text="{Binding TotalInstallments}"
                    Keyboard="Numeric"
                    IsVisible="{Binding IsInstallments}" />
@@ -100,19 +102,21 @@
                        Placeholder="{Binding SelectedRecurrence, Converter={x:Static converters:RecurrenceTypeToAmountLabelConverter.Instance}}"
                        Text="{Binding Amount}"
                        Keyboard="Numeric" />
-                <Label Text="{Binding InstallmentsTotal, StringFormat='Total: R$ {0:F2}'}"
+                <Label AutomationId="InstallmentsTotalLabel"
+                       Text="{Binding InstallmentsTotal, StringFormat='Total: R$ {0:F2}'}"
                        FontSize="12"
                        TextColor="Gray"
                        IsVisible="{Binding InstallmentsTotal, Converter={x:Static converters:IsNotNullConverter.Instance}}" />
             </VerticalStackLayout>
 
-            <Picker Title="Categoria"
+            <Picker AutomationId="CategoryPicker"
+                    Title="Categoria"
                     ItemsSource="{Binding Categories}"
                     ItemDisplayBinding="{Binding Name, x:DataType=models:FinancialCategory}"
                     SelectedItem="{Binding SelectedCategory}" />
 
             <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,10,0,0">
-                <Button Grid.Column="0" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />
+                <Button Grid.Column="0" AutomationId="CancelEntryButton" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />
                 <Button Grid.Column="1" AutomationId="SaveEntryButton" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="Purple" />
             </Grid>
         </VerticalStackLayout>

@@ -36,7 +36,22 @@ When a wait times out, the page source and a screenshot are saved under `Finance
 
 ## Writing tests
 
+- Derive from `E2ETestBase` and add `[Collection(E2ECollection.Name)]` and `[Trait("Category", "E2E")]`. Put shared arrange steps (e.g. creating the entry under test) in the constructor.
 - Locate elements by `AutomationId` (it surfaces as the Android `resource-id`). Add one in XAML for every element a test touches.
-- Interact through page objects (`Pages/`); keep raw Appium calls out of test methods.
+- Interact through page objects (`Pages/`); keep raw Appium calls out of test methods. pt-BR texts the tests select by live in `AppLabels`.
+- Compute expected texts with `AppFormat` (`Money`, `MonthTitle`, `EntryCount`) instead of hardcoding them.
 - The month `CarouselView` keeps neighbour months in the tree, so `AppSession` helpers only consider *displayed* elements.
-- Assert persisted state with `_session.Database.QueryAsync<TRow>(sql)`. Row types mirror the tables on purpose. They do not reference the app's models.
+- Popup buttons can sit below the fold on small screens; tap them with `ScrollToAndTap`.
+- Assert persisted state with `GetEntryRowsAsync` / `GetMonthlyEntryRowsAsync` / `GetCategoryRowsAsync`. The row types in `Infrastructure/TableRows.cs` mirror the tables on purpose and don't reference the app's models.
+
+## Coverage
+
+| Class | Flows |
+|---|---|
+| `AddEntryTests` | One-time outcome, income, recurrent (start month onwards), installments (exactly N months, labels, total), category chip, cancel |
+| `EditEntryTests` | Pre-filled popup with locked structural fields; description/amount change across months |
+| `DeleteEntryTests` | One-time; recurrent *this month only*, *this and future*, *all months*; cancelled action sheet |
+| `EntryActionsMenuTests` | Long-press reveals menu; tapping outside or on the entry hides it without opening the editor |
+| `MonthNavigationTests` | Fresh-install state, swipe to next/previous month, entry created in a non-current month |
+| `SectionToggleTests` | Collapse/expand outcomes; collapsed state shared across months |
+| `CategoryTests` | Seeded defaults, add category and use it on an entry, delete a category used by an entry |
