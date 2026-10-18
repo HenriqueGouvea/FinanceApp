@@ -20,8 +20,9 @@ This project goes beyond simple CRUD operations. It is designed to handle the co
 - **Toolkit:** CommunityToolkit.Mvvm
 - **Database:** SQLite with Entity Framework Core
 - **Patterns:** Dependency Injection, Repository Pattern, and Clean Code.
-- **Testing:** xUnit, FluentAssertions, NSubstitute (Unit Tests)
-- **Integration Tests:** SQLite In-Memory with custom Projection Engine validation.
+- **Unit Tests:** xUnit, FluentAssertions, NSubstitute (ViewModels with mocked services)
+- **Integration Tests:** xUnit against SQLite In-Memory, validating the Projection Engine and services.
+- **E2E Tests:** Appium 2 + UiAutomator2 driver, Appium .NET client (`Appium.WebDriver`), xUnit, FluentAssertions, and sqlite-net for on-device database assertions.
 
 ## 🏗 Architectural Principles
 
@@ -44,9 +45,9 @@ The development follows strict guidelines documented in our `CLAUDE.md` to ensur
 - [x] **Income and outcome UI improvements:** Change the UI of the income and outcome list so that it becomes easier to identify that they are two different sessions. In addition, it should be clear that the sessions can be expanded/collapsed.
 - [x] **UX improvements:** Description field auto-focused on popup open; income/outcome selection is a swipe/tap pill toggle defaulting to Outcome; the amount field only appears after the recurrence is chosen and is labelled accordingly ("Valor total", "Valor mensal" or "Valor de cada parcela", with a live installment total).
 - [x] **Improve total amount for Installment entries:** Show the total amount of the installment in the list, not just the current month amount.
+- [x] **E2E tests:** Appium 2 + UiAutomator2 suite in `FinanceApp.UITests` that drives the real Android app on an emulator. It uses page objects located by `AutomationId`, asserts on the app's on-device SQLite database, and has a GitHub Actions workflow that runs on merges to `dev`. Starts with the add-entry flow; see [FinanceApp.UITests/README.md](FinanceApp.UITests/README.md) to run it.
 - [ ] **Status control:** Add the possibility to change the status of an entry
 - [ ] **Separate income and outcome categories:** When the user adds an income, it should show just income category options. The same should be valid for outcomes.
-- [ ] **E2E tests:** Investigate end-to-end UI testing options for the MAUI Android app (e.g. Appium + `UITest`, adb-driven scripts) and add an E2E suite covering the main flows: add, edit, and delete entries (all delete scopes), month navigation, and the long-press actions menu.
 - [ ] **Current month button:** A quick navigation button to jump back to the current month.
 
 ### Phase 2: Advanced Features & Scaling

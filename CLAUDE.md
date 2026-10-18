@@ -34,6 +34,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Member ordering inside test classes:** private fields → constructor → `[Fact]` methods (grouped by the service method under test).
 
+**E2E tests** (`FinanceApp.UITests/`) — Appium 2 + UiAutomator2 driving the Android app on an emulator; see `FinanceApp.UITests/README.md` to run. Not part of the default `dotnet test` above.
+- Elements are located by `AutomationId` (Android `resource-id`). Any element a test interacts with or asserts on needs an `AutomationId` in XAML.
+- Tests go through page objects in `Pages/`; persisted state is asserted by pulling the app DB via `adb run-as` (`DeviceDatabase`), so the APK must be a Debug build with `EmbedAssembliesIntoApk=true`.
+- Every test gets a fresh Appium session with app data wiped (empty DB).
+
 ## Project Structure
 - **Data/:** `DatabaseContext.cs` — SQLite singleton connection + table creation via `GetConnectionAsync()`. `IDatabaseContext` is the interface used for DI and test substitution.
 - **Models/:** Clean POCOs (no persistence attributes). `FinancialEntry` is the template/parent; `FinancialMonthlyEntry` is the physical override; `MonthlyEntryProjection` is the non-persisted read model returned to ViewModels.

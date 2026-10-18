@@ -24,7 +24,7 @@
                                                LongPressCompleted="OnEntryLongPressed" />
                     </Grid.Behaviors>
                     <VerticalStackLayout Grid.Column="0">
-                        <Label Text="{Binding Description}" FontAttributes="Bold"/>
+                        <Label AutomationId="EntryDescriptionLabel" Text="{Binding Description}" FontAttributes="Bold"/>
                         <HorizontalStackLayout Spacing="4"
                                                IsVisible="{Binding Category, Converter={x:Static converters:IsNotNullConverter.Instance}}">
                             <Label Text="{Binding Category.Icon}" FontSize="11"/>
@@ -50,6 +50,7 @@
                            VerticalOptions="Center"
                            Margin="0,0,8,0"/>
                     <Label Grid.Column="2"
+                           AutomationId="EntryAmountLabel"
                            Text="{Binding EffectiveAmount, StringFormat='R$ {0:F2}'}"
                            TextColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
                            FontAttributes="Bold"
@@ -101,7 +102,8 @@
                             </VerticalStackLayout.GestureRecognizers>
 
                             <!-- Month Title -->
-                            <Label Text="{Binding MonthName}"
+                            <Label AutomationId="MonthTitleLabel"
+                                   Text="{Binding MonthName}"
                                    FontSize="32"
                                    HorizontalOptions="Center"
                                    FontAttributes="Bold" />
@@ -147,11 +149,13 @@
                                                    FontAttributes="Bold"
                                                    FontSize="16"
                                                    TextColor="{StaticResource OutcomeAccent}"/>
-                                            <Label Text="{Binding OutcomeCount, StringFormat='{0} lançamento(s)'}"
+                                            <Label AutomationId="OutcomeCountLabel"
+                                                   Text="{Binding OutcomeCount, StringFormat='{0} lançamento(s)'}"
                                                    TextColor="Gray"
                                                    FontSize="11"/>
                                         </VerticalStackLayout>
                                         <Label Grid.Column="2"
+                                               AutomationId="OutcomeTotalLabel"
                                                Text="{Binding TotalOutcomes, StringFormat='R$ {0:F2}'}"
                                                TextColor="{StaticResource OutcomeAccent}"
                                                FontAttributes="Bold"
@@ -231,7 +235,8 @@
                 HorizontalOptions="Start"
                 VerticalOptions="End"
                 Margin="20,0,0,33" />
-        <Button Text="+"
+        <Button AutomationId="AddEntryButton"
+                Text="+"
                 FontSize="24"
                 BackgroundColor="Purple"
                 TextColor="White"

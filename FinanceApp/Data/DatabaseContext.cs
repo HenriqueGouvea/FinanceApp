@@ -15,7 +15,9 @@ public class DatabaseContext : IDatabaseContext
         new() { Name = "Lazer", Icon = "🎉", Color = "#43A047" }
     ];
 
-    private SQLiteAsyncConnection? _connection;
+    // Concurrent first callers (e.g. overlapping month loads at startup) must all await the same
+    // initialization, otherwise they can query tables that are still being created.
+    private readonly Lazy<Task<SQLiteAsyncConnection>> _connection;
     private readonly string _databasePath;
 
     public DatabaseContext()
@@ -25,23 +27,23 @@ public class DatabaseContext : IDatabaseContext
 #else
         _databasePath = Path.Combine(Path.GetTempPath(), "FinanceDataV3.db3");
 #endif
+        _connection = new Lazy<Task<SQLiteAsyncConnection>>(InitializeConnectionAsync);
     }
 
-    public async Task<SQLiteAsyncConnection> GetConnectionAsync()
+    public Task<SQLiteAsyncConnection> GetConnectionAsync() => _connection.Value;
+
+    private async Task<SQLiteAsyncConnection> InitializeConnectionAsync()
     {
-        if (_connection is not null)
-            return _connection;
+        var connection = new SQLiteAsyncConnection(_databasePath);
 
-        _connection = new SQLiteAsyncConnection(_databasePath);
-
-        await _connection.CreateTableAsync<FinancialEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
-        await _connection.CreateTableAsync<FinancialMonthlyEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
-        var categoryTable = await _connection.CreateTableAsync<FinancialCategory>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
+        await connection.CreateTableAsync<FinancialEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
+        await connection.CreateTableAsync<FinancialMonthlyEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
+        var categoryTable = await connection.CreateTableAsync<FinancialCategory>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
 
         if (categoryTable == CreateTableResult.Created)
-            await SeedDefaultCategoriesAsync(_connection);
+            await SeedDefaultCategoriesAsync(connection);
 
-        return _connection;
+        return connection;
     }
 
     private static async Task SeedDefaultCategoriesAsync(SQLiteAsyncConnection db)
