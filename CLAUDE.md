@@ -57,6 +57,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Every test gets a fresh Appium session with app data wiped (empty DB, default categories seeded), so tests must not depend on each other.
 - On a timeout, a screenshot + page source are saved to `FinanceApp.UITests/TestResults/diagnostics/`. Check them first when debugging.
 
+## Git & Pull Request Workflow
+- **Default branch:** `master` (there is no `dev` branch). Never commit directly to `master`.
+- **Branches:** one branch per roadmap task, named `feature/<short-kebab-name>` (bug fixes: `fix/<short-kebab-name>`).
+- **Finishing a task:** once the code is done and the required tests pass (see "Definition of done"), mark the task done in the README roadmap, commit, push the branch, and **open the pull request yourself** with the GitHub CLI. Don't leave it for the user. Use `gh pr create --base master --head <branch> --title "<title>" --body-file <file>`, with the body file in the scratchpad.
+  - **Title:** imperative, describes the change (e.g. "Add entry deletion via long-press actions menu"), never the branch name.
+  - **Body:** follow `.github/pull_request_template.md`: a Summary bullet list, Testing (which suites ran and their pass counts; new tests added), and the Roadmap item. End with the Claude Code attribution line.
+  - If a PR for the branch already exists (`gh pr view`), push the new commits and update the description with `gh pr edit` instead of opening a second PR.
+  - Report the PR URL to the user. Never merge PRs; the user reviews and merges.
+- **CI:** `CI` (`main.yml`, build + unit tests) runs on every PR and push to `master`. `E2E (Android)` (`e2e.yml`) runs on every push to `master` (i.e. after each merge) and on manual dispatch. After opening a PR, check its CI with `gh pr checks <number>`, and fix failures on the same branch.
+- **Clean up merged branches:** when starting a new task (after `git checkout master && git pull`), delete every local branch whose PR is merged into `master`, then run `git fetch --prune`. PRs are squash-merged, so `git branch --merged` doesn't detect them. Use `gh pr list --state merged --base master --json headRefName,headRefOid`, and force-delete (`git branch -D`) a branch only when its local tip equals the merged PR's `headRefOid`. If they differ, the branch has unpushed work: keep it and tell the user. Never delete `master` or the current branch.
+- If `gh` is missing or not authenticated (`gh auth status`), tell the user to run `winget install GitHub.cli` and/or `gh auth login`. Don't try to work around it.
+
 ## Project Structure
 - **Data/:** `DatabaseContext.cs` — SQLite singleton connection + table creation via `GetConnectionAsync()`. `IDatabaseContext` is the interface used for DI and test substitution.
 - **Models/:** Clean POCOs (no persistence attributes). `FinancialEntry` is the template/parent; `FinancialMonthlyEntry` is the physical override; `MonthlyEntryProjection` is the non-persisted read model returned to ViewModels.
