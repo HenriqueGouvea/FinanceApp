@@ -21,5 +21,18 @@ public static class AppLabels
     public const string EntriesMenuItem = "Lançamentos";
     public const string CategoriesMenuItem = "Categorias";
 
-    public static readonly string[] DefaultCategories = ["Moradia", "Educação", "Mercado", "Lazer"];
+    public const string Paid = "Pago";
+    public const string Received = "Recebido";
+    public const string MarkPaid = "Pagar";
+    public const string MarkReceived = "Receber";
+    public const string MarkPending = "Pendente";
+
+    public const string GoToCurrentMonthBackward = "‹ Mês atual";
+    public const string GoToCurrentMonthForward = "Mês atual ›";
+
+    public const string OutcomeCategoriesHeader = "Despesas";
+    public const string IncomeCategoriesHeader = "Receitas";
+
+    public static readonly string[] DefaultOutcomeCategories = ["Moradia", "Educação", "Mercado", "Lazer"];
+    public static readonly string[] DefaultIncomeCategories = ["Salário", "Investimentos"];
 }

@@ -12,26 +12,24 @@ public partial class CategoriesViewModel : ObservableObject
 {
     private readonly ICategoryService _categoryService;
     private readonly IMessenger _messenger;
+    private List<FinancialCategory> _categories = [];
 
-    public ObservableCollection<FinancialCategory> Categories { get; } = [];
+    public ObservableCollection<CategoryGroup> Groups { get; } = [];
 
-    public bool IsEmpty => Categories.Count == 0;
+    public bool IsEmpty => Groups.Count == 0;
 
     public CategoriesViewModel(ICategoryService categoryService, IMessenger messenger)
     {
         _categoryService = categoryService;
         _messenger = messenger;
-        Categories.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
+        Groups.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
     }
 
     [RelayCommand]
     public async Task LoadAsync()
     {
-        var categories = await _categoryService.GetAllAsync();
-
-        Categories.Clear();
-        foreach (var category in categories)
-            Categories.Add(category);
+        _categories = [.. await _categoryService.GetAllAsync()];
+        BuildGroups();
     }
 
     public Task<int> CountEntriesAsync(FinancialCategory category) =>
@@ -40,7 +38,8 @@ public partial class CategoriesViewModel : ObservableObject
     public async Task DeleteAsync(FinancialCategory category)
     {
         await _categoryService.DeleteAsync(category.Id);
-        Categories.Remove(category);
+        _categories.Remove(category);
+        BuildGroups();
         _messenger.Send(new CategoriesChangedMessage());
     }
 
@@ -48,5 +47,19 @@ public partial class CategoriesViewModel : ObservableObject
     {
         await LoadAsync();
         _messenger.Send(new CategoriesChangedMessage());
+    }
+
+    private void BuildGroups()
+    {
+        Groups.Clear();
+        AddGroup(FinancialEntryType.Outcome, "Despesas");
+        AddGroup(FinancialEntryType.Income, "Receitas");
+    }
+
+    private void AddGroup(FinancialEntryType entryType, string title)
+    {
+        var categories = _categories.Where(c => c.EntryType == entryType).ToList();
+        if (categories.Count > 0)
+            Groups.Add(new CategoryGroup(entryType, title, categories));
     }
 }

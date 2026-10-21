@@ -42,7 +42,8 @@
                                    HorizontalOptions="Center" FontSize="13" />
                         </Frame>
                         <!-- Inactive state — tappable -->
-                        <Frame CornerRadius="19" BackgroundColor="Transparent" Padding="10,8"
+                        <Frame AutomationId="SelectOutcomeButton"
+                               CornerRadius="19" BackgroundColor="Transparent" Padding="10,8"
                                HasShadow="False" BorderColor="Transparent"
                                IsVisible="{Binding IsIncome}">
                             <Frame.GestureRecognizers>

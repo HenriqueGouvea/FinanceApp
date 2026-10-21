@@ -23,9 +23,20 @@ public partial class MainViewModel : ObservableObject, IRecipient<CategoriesChan
     ObservableCollection<MonthViewModel> months = [];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAwayFromCurrentMonth))]
+    [NotifyPropertyChangedFor(nameof(GoToCurrentMonthLabel))]
     int currentPosition;
 
     public MonthViewModel? SelectedMonth => Months.ElementAtOrDefault(CurrentPosition);
+
+    public DateTime CurrentMonthDate => FirstOfToday;
+    public DateTime FirstMonthDate => FirstOfToday.AddMonths(-MaxMonthsFromToday);
+    public DateTime LastMonthDate => FirstOfToday.AddMonths(MaxMonthsFromToday);
+
+    public bool IsAwayFromCurrentMonth => Months.Count > 0 && CurrentPosition != MaxMonthsFromToday;
+
+    // The arrow points towards the current month.
+    public string GoToCurrentMonthLabel => CurrentPosition > MaxMonthsFromToday ? "‹ Mês atual" : "Mês atual ›";
 
     private readonly IFinanceService _financeService;
     private readonly IPreferencesService _preferencesService;
@@ -75,6 +86,28 @@ public partial class MainViewModel : ObservableObject, IRecipient<CategoriesChan
         await _financeService.DeleteEntryAsync(projection.FinancialEntryId, month.Date.Year, month.Date.Month, scope);
         await RefreshAllAsync();
     }
+
+    public async Task ToggleEntryStatusAsync(MonthlyEntryProjection projection)
+    {
+        if (SelectedMonth is not { } month)
+            return;
+
+        month.HideEntryActions();
+
+        var status = projection.IsPaid ? FinancialMonthlyEntryStatus.Pending : FinancialMonthlyEntryStatus.Paid;
+        await _financeService.SetEntryStatusAsync(projection.FinancialEntryId, month.Date.Year, month.Date.Month, status);
+        await RefreshAllAsync();
+    }
+
+    public void GoToMonth(DateTime date)
+    {
+        var index = (date.Year - FirstMonthDate.Year) * 12 + date.Month - FirstMonthDate.Month;
+        if (index >= 0 && index < Months.Count)
+            CurrentPosition = index;
+    }
+
+    [RelayCommand]
+    void GoToCurrentMonth() => GoToMonth(FirstOfToday);
 
     [RelayCommand]
     public async Task ClearDatabaseAsync()

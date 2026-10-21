@@ -21,6 +21,7 @@ public sealed class EntryActionsMenuTests : E2ETestBase
         MainPage.RevealActions("Farmácia E2E");
 
         MainPage.IsDeleteActionRevealed.Should().BeTrue();
+        MainPage.RevealedStatusActionText.Should().Be(AppLabels.MarkPaid);
     }
 
     [Fact]
@@ -28,7 +29,7 @@ public sealed class EntryActionsMenuTests : E2ETestBase
     {
         MainPage.RevealActions("Farmácia E2E");
 
-        MainPage.TapMonthTitle();
+        MainPage.TapSummaryBar();
 
         MainPage.WaitForActionsHidden();
     }

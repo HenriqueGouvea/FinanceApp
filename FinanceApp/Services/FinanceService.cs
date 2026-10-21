@@ -113,6 +113,29 @@ public class FinanceService : IFinanceService
         }
     }
 
+    public async Task SetEntryStatusAsync(int entryId, int year, int month, FinancialMonthlyEntryStatus status)
+    {
+        try
+        {
+            var db = await _context.GetConnectionAsync();
+
+            var record = await db.Table<FinancialMonthlyEntry>()
+                .Where(r => r.FinancialEntryId == entryId && r.Year == year && r.Month == month)
+                .FirstOrDefaultAsync()
+                ?? new FinancialMonthlyEntry { FinancialEntryId = entryId, Year = year, Month = month };
+            record.Status = status;
+
+            if (record.Id != 0)
+                await db.UpdateAsync(record);
+            else
+                await db.InsertAsync(record);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error setting entry status: {ex.Message}");
+        }
+    }
+
     public async Task DeleteEntryAsync(int entryId, int year, int month, EntryDeleteScope scope)
     {
         try

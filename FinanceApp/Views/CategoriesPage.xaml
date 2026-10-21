@@ -8,7 +8,8 @@
              x:DataType="vm:CategoriesViewModel"
              Title="Categorias">
     <Grid>
-        <CollectionView ItemsSource="{Binding Categories}"
+        <CollectionView ItemsSource="{Binding Groups}"
+                        IsGrouped="True"
                         SelectionMode="None"
                         Margin="0,10,0,0">
             <CollectionView.EmptyView>
@@ -17,6 +18,16 @@
                        HorizontalTextAlignment="Center"
                        Margin="30" />
             </CollectionView.EmptyView>
+            <CollectionView.GroupHeaderTemplate>
+                <DataTemplate x:DataType="vm:CategoryGroup">
+                    <Label AutomationId="CategoryGroupHeader"
+                           Text="{Binding Title}"
+                           TextColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
+                           FontSize="13"
+                           FontAttributes="Bold"
+                           Padding="20,14,20,4" />
+                </DataTemplate>
+            </CollectionView.GroupHeaderTemplate>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:FinancialCategory">
                     <Grid AutomationId="CategoryRow" ColumnDefinitions="Auto, *, Auto" ColumnSpacing="14" Padding="20,10">

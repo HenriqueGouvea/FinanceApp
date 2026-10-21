@@ -35,11 +35,13 @@ public static class MauiProgram
         builder.Services.AddTransient<AddEntryViewModel>();
         builder.Services.AddTransient<CategoriesViewModel>();
         builder.Services.AddTransient<CategoryEditViewModel>();
+        builder.Services.AddTransient<MonthPickerViewModel>();
 
         builder.Services.AddTransient<MainPage>();
         builder.Services.AddTransient<AddEntryPopup>();
         builder.Services.AddTransient<CategoriesPage>();
         builder.Services.AddTransient<CategoryEditPopup>();
+        builder.Services.AddTransient<MonthPickerPopup>();
 
         return builder.Build();
     }

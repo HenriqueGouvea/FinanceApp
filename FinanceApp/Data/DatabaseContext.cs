@@ -7,12 +7,18 @@ public class DatabaseContext : IDatabaseContext
 {
     private const string LegacyCategoryColumn = "Category";
 
-    private static readonly FinancialCategory[] DefaultCategories =
+    private static readonly FinancialCategory[] DefaultOutcomeCategories =
     [
         new() { Name = "Moradia", Icon = "🏠", Color = "#1E88E5" },
         new() { Name = "Educação", Icon = "🎓", Color = "#8E24AA" },
         new() { Name = "Mercado", Icon = "🛒", Color = "#F4511E" },
         new() { Name = "Lazer", Icon = "🎉", Color = "#43A047" }
+    ];
+
+    private static readonly FinancialCategory[] DefaultIncomeCategories =
+    [
+        new() { Name = "Salário", Icon = "💼", Color = "#00897B", EntryType = FinancialEntryType.Income },
+        new() { Name = "Investimentos", Icon = "📈", Color = "#3949AB", EntryType = FinancialEntryType.Income }
     ];
 
     // Concurrent first callers (e.g. overlapping month loads at startup) must all await the same
@@ -38,17 +44,21 @@ public class DatabaseContext : IDatabaseContext
 
         await connection.CreateTableAsync<FinancialEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
         await connection.CreateTableAsync<FinancialMonthlyEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
+        var categoryColumns = await connection.GetTableInfoAsync(nameof(FinancialCategory));
+        var hadCategoryType = categoryColumns.Any(c => c.Name == nameof(FinancialCategory.EntryType));
         var categoryTable = await connection.CreateTableAsync<FinancialCategory>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
 
         if (categoryTable == CreateTableResult.Created)
             await SeedDefaultCategoriesAsync(connection);
+        else if (!hadCategoryType)
+            await MigrateCategoryTypesAsync(connection);
 
         return connection;
     }
 
     private static async Task SeedDefaultCategoriesAsync(SQLiteAsyncConnection db)
     {
-        await db.InsertAllAsync(DefaultCategories.Select(c => new FinancialCategory { Name = c.Name, Icon = c.Icon, Color = c.Color }));
+        await InsertCopiesAsync(db, [.. DefaultOutcomeCategories, .. DefaultIncomeCategories]);
 
         // Databases created before category management stored the category name as text on FinancialEntry.
         var columns = await db.GetTableInfoAsync(nameof(FinancialEntry));
@@ -58,4 +68,22 @@ public class DatabaseContext : IDatabaseContext
                 $"(SELECT {nameof(FinancialCategory.Id)} FROM {nameof(FinancialCategory)} WHERE {nameof(FinancialCategory.Name)} = {nameof(FinancialEntry)}.{LegacyCategoryColumn}) " +
                 $"WHERE {nameof(FinancialEntry.CategoryId)} IS NULL");
     }
+
+    // Categories created before the income/outcome split were all used for outcomes.
+    private static async Task MigrateCategoryTypesAsync(SQLiteAsyncConnection db)
+    {
+        await db.ExecuteAsync(
+            $"UPDATE {nameof(FinancialCategory)} SET {nameof(FinancialCategory.EntryType)} = ?",
+            (int)FinancialEntryType.Outcome);
+        await InsertCopiesAsync(db, DefaultIncomeCategories);
+    }
+
+    private static Task InsertCopiesAsync(SQLiteAsyncConnection db, IEnumerable<FinancialCategory> categories) =>
+        db.InsertAllAsync(categories.Select(c => new FinancialCategory
+        {
+            Name = c.Name,
+            Icon = c.Icon,
+            Color = c.Color,
+            EntryType = c.EntryType
+        }));
 }

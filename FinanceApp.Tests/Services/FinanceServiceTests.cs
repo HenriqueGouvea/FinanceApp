@@ -398,6 +398,71 @@ public class FinanceServiceTests
     }
 
     [Fact]
+    public async Task SetEntryStatusAsync_ProjectedEntry_PersistsMonthlyRecordWithStatus()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 5, FinancialMonthlyEntryStatus.Paid);
+
+        var db = await _context.GetConnectionAsync();
+        var record = (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Should().ContainSingle().Subject;
+        record.FinancialEntryId.Should().Be(entry.Id);
+        record.Year.Should().Be(2026);
+        record.Month.Should().Be(5);
+        record.Status.Should().Be(FinancialMonthlyEntryStatus.Paid);
+        record.IsCancelled.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SetEntryStatusAsync_Paid_ProjectionIsPaidOnlyInThatMonth()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Installments, totalInstallments: 3);
+
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 5, FinancialMonthlyEntryStatus.Paid);
+
+        var paid = (await _service.GetMergedEntriesForMonthAsync(2026, 5)).Single();
+        paid.IsPaid.Should().BeTrue();
+        paid.IsProjected.Should().BeFalse();
+        paid.InstallmentLabel.Should().Be("2/3");
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single().IsPaid.Should().BeFalse();
+        (await _service.GetMergedEntriesForMonthAsync(2026, 6)).Single().IsPaid.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SetEntryStatusAsync_ExistingRecord_UpdatesItWithoutDuplicating()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveMonthlyEntryAsync(new FinancialMonthlyEntry
+        {
+            FinancialEntryId = entry.Id,
+            Year = 2026,
+            Month = 5,
+            Status = FinancialMonthlyEntryStatus.Paid,
+            OverrideAmount = 120m
+        });
+
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 5, FinancialMonthlyEntryStatus.Pending);
+
+        var db = await _context.GetConnectionAsync();
+        var record = (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Should().ContainSingle().Subject;
+        record.Status.Should().Be(FinancialMonthlyEntryStatus.Pending);
+        record.OverrideAmount.Should().Be(120m);
+    }
+
+    [Fact]
+    public async Task SetEntryStatusAsync_DoesNotAffectOtherEntriesInSameMonth()
+    {
+        var paid = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        var other = await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        await _service.SetEntryStatusAsync(paid.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        var projections = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).ToList();
+        projections.Single(p => p.FinancialEntryId == paid.Id).IsPaid.Should().BeTrue();
+        projections.Single(p => p.FinancialEntryId == other.Id).IsPaid.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task DeleteEntryAsync_OneTimeEntry_RemovesTemplate()
     {
         var entry = await SaveTemplateAsync(RecurrenceType.OneTime);

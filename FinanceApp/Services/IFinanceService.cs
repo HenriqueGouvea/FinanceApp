@@ -12,6 +12,11 @@ public interface IFinanceService
 
     Task SaveMonthlyEntryAsync(FinancialMonthlyEntry entry);
 
+    /// <summary>
+    /// Sets the entry's status for a single month, persisting its monthly record on first change.
+    /// </summary>
+    Task SetEntryStatusAsync(int entryId, int year, int month, FinancialMonthlyEntryStatus status);
+
     Task DeleteEntryAsync(int entryId, int year, int month, EntryDeleteScope scope);
 
     /// <summary>

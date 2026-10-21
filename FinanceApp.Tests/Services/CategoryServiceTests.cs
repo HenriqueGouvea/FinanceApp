@@ -71,6 +71,16 @@ public class CategoryServiceTests
         stored.Color.Should().Be("#E53935");
     }
 
+    [Theory]
+    [InlineData(FinancialEntryType.Income)]
+    [InlineData(FinancialEntryType.Outcome)]
+    public async Task SaveAsync_PersistsEntryType(FinancialEntryType entryType)
+    {
+        await _service.SaveAsync(new FinancialCategory { Name = "Salário", EntryType = entryType });
+
+        (await _service.GetAllAsync()).Single().EntryType.Should().Be(entryType);
+    }
+
     [Fact]
     public async Task SaveAsync_NameWithSurroundingWhitespace_TrimsName()
     {

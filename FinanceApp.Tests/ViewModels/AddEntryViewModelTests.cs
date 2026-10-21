@@ -15,12 +15,13 @@ public class AddEntryViewModelTests
 
     private static readonly FinancialCategory Housing = new() { Id = 1, Name = "Moradia", Icon = "🏠", Color = "#1E88E5" };
     private static readonly FinancialCategory Education = new() { Id = 2, Name = "Educação", Icon = "🎓", Color = "#8E24AA" };
+    private static readonly FinancialCategory Salary = new() { Id = 3, Name = "Salário", Icon = "💼", Color = "#00897B", EntryType = FinancialEntryType.Income };
 
     public AddEntryViewModelTests()
     {
         _service = Substitute.For<IFinanceService>();
         _categoryService = Substitute.For<ICategoryService>();
-        _categoryService.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<FinancialCategory>>([Housing, Education]));
+        _categoryService.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<FinancialCategory>>([Housing, Education, Salary]));
         _vm = new AddEntryViewModel(_service, _categoryService);
         _vm.PrepareAsync(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local)).GetAwaiter().GetResult();
     }
@@ -173,6 +174,90 @@ public class AddEntryViewModelTests
         await _vm.SaveCommand.ExecuteAsync(null);
 
         await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.EndDate == null));
+    }
+
+    // --- Categories by entry type ---
+
+    [Fact]
+    public void Categories_NewOutcome_OffersOnlyOutcomeCategories()
+    {
+        _vm.Categories.Should().Equal(Housing, Education);
+    }
+
+    [Fact]
+    public void Categories_AfterSelectingIncome_OffersOnlyIncomeCategories()
+    {
+        _vm.SelectIncomeCommand.Execute(null);
+
+        _vm.Categories.Should().Equal(Salary);
+    }
+
+    [Fact]
+    public void Categories_SwitchingBackToOutcome_RestoresOutcomeCategories()
+    {
+        _vm.SelectIncomeCommand.Execute(null);
+
+        _vm.SelectOutcomeCommand.Execute(null);
+
+        _vm.Categories.Should().Equal(Housing, Education);
+    }
+
+    [Fact]
+    public void SelectIncome_WithOutcomeCategorySelected_ClearsSelection()
+    {
+        _vm.SelectedCategory = Housing;
+
+        _vm.SelectIncomeCommand.Execute(null);
+
+        _vm.SelectedCategory.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Prepare_AfterIncomeWasSelected_OffersOutcomeCategories()
+    {
+        _vm.SelectIncomeCommand.Execute(null);
+
+        await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+
+        _vm.Categories.Should().Equal(Housing, Education);
+    }
+
+    [Fact]
+    public async Task PrepareForEdit_IncomeEntry_OffersIncomeCategoriesAndSelectsItsCategory()
+    {
+        var entry = MakeEntry();
+        entry.EntryType = FinancialEntryType.Income;
+        entry.CategoryId = Salary.Id;
+
+        await _vm.PrepareForEditAsync(entry);
+
+        _vm.Categories.Should().Equal(Salary);
+        _vm.SelectedCategory.Should().BeSameAs(Salary);
+    }
+
+    [Fact]
+    public async Task PrepareForEdit_EntryWithCategoryOfOtherType_KeepsThatCategory()
+    {
+        var entry = MakeEntry();
+        entry.EntryType = FinancialEntryType.Income;
+
+        await _vm.PrepareForEditAsync(entry);
+
+        _vm.Categories.Should().Equal(Housing, Salary);
+        _vm.SelectedCategory.Should().BeSameAs(Housing);
+    }
+
+    [Fact]
+    public async Task Prepare_AfterEditingMismatchedEntry_NoLongerOffersThatCategory()
+    {
+        var entry = MakeEntry();
+        entry.EntryType = FinancialEntryType.Income;
+        await _vm.PrepareForEditAsync(entry);
+
+        await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+        _vm.SelectIncomeCommand.Execute(null);
+
+        _vm.Categories.Should().Equal(Salary);
     }
 
     // --- IsIncome / SelectIncome / SelectOutcome ---
