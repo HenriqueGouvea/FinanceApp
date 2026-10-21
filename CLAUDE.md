@@ -66,6 +66,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - If a PR for the branch already exists (`gh pr view`), push the new commits and update the description with `gh pr edit` instead of opening a second PR.
   - Report the PR URL to the user. Never merge PRs; the user reviews and merges.
 - **CI:** `CI` (`main.yml`, build + unit tests) runs on every PR and push to `master`. `E2E (Android)` (`e2e.yml`) runs on every push to `master` (i.e. after each merge) and on manual dispatch. After opening a PR, check its CI with `gh pr checks <number>`, and fix failures on the same branch.
+- **Clean up merged branches:** when starting a new task (after `git checkout master && git pull`), delete every local branch whose PR is merged into `master`, then run `git fetch --prune`. PRs are squash-merged, so `git branch --merged` doesn't detect them. Use `gh pr list --state merged --base master --json headRefName,headRefOid`, and force-delete (`git branch -D`) a branch only when its local tip equals the merged PR's `headRefOid`. If they differ, the branch has unpushed work: keep it and tell the user. Never delete `master` or the current branch.
 - If `gh` is missing or not authenticated (`gh auth status`), tell the user to run `winget install GitHub.cli` and/or `gh auth login`. Don't try to work around it.
 
 ## Project Structure
