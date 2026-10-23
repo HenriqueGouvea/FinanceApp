@@ -51,15 +51,23 @@ The development follows strict guidelines documented in our `CLAUDE.md` to ensur
 - [x] **Separate income and outcome categories:** Each category now has a type (Despesa/Receita), chosen with a toggle in the category popup. The "Categorias" page lists them in two groups, and the entry popup only offers categories matching the selected entry type. Existing categories are migrated as outcome categories, and "Salário" and "Investimentos" are seeded as income categories.
 - [x] **Improve month navigation:** Tapping the month title (marked with a ▾) opens a month/year picker: a year switcher and a 3×4 month grid limited to the ±24-month range, plus a "Mês atual" shortcut. When away from the current month, a floating "Mês atual" pill appears at the bottom of the screen, with an arrow pointing toward the current month, to jump back in one tap.
 
-### Phase 2: Advanced Features & Scaling
-- [ ] **Create a splash screen:** Check how to design a new one.
-- [ ] **Add a setup page for new users:** This page should be shown for the first time a user opens the app, asking things like name, picture (optional), salary, house spends (if it's the case), and other information to configure a pre-existent data for his finance. It also should as for an optional password to open the app.
-- [ ] **Partial payment:** Add the option to add the partial payment of an entry like supermarket or restaurants. This value should be shown in the list and the user can set it open the entry edit window.
-- [ ] **Payment source engine:** Add a new page accessed via the hamburger menu with a CRUD for the payment sources. When adding a new entry there should have the option to link to a payment source which can be a bank account or a credit card.
-- [ ] **Multi-Platform Sync:** Future transition to a centralized Web API.
+### Phase 2: Advanced Features for the mobile app
+- [ ] **Add currency mask to the amount fields:**When the user adds an entry, the amount field has no mask. It should have the format like 'R$1.000,00'. In addition, the amounts on the input/output grids has no mask too. It should be 'R$1.000,00' as well.
+- [ ] **Improve the 'recorrente' option:**Some users may not know what's the meaning of 'recorrente'. Maybe we could add something like this: 'Todo mês (recorrrente)' so that it's clear for all user types about what it is.
+- [ ] **Improve the month picker button:**The button/down arrow it's too small. Improve the UX for mobile users so that they can have a better experience when switching to another month. It should be clear to the users that there is an option to switch to the specific month, and also, swipe left/right to move on to the next/previous month, otherwise, they won't know about it.
+- [ ] **Entry paid checks are red:**Red color can lead users to an error. Change the paid check color so that it has a better UI and don't mislead users.
+- [ ] **Add paid/pending amount to the month summary:**The month summary currently has only income, outcomes and balance. It should also show the pending and paid entries on that month.
+- [ ] **Partial payment and estimated amount:** Add the option to add the partial payment of an entry like supermarket or restaurants where users spend this value progressively during the month. This value ('valor já gasto' or some other better label) should be shown in the list and the user can set it when open the entry edit window. In addition, entries may be marked as estimated amount for entries that have different amount on months but the user can estimate, for example, energy or water bill, supermarket, restaurants, etc. These entries should have an icon marking them as estimated amount.
+- [ ] **Payment source engine:** Add a new page accessed via the hamburger menu with a CRUD for the payment sources. When adding a new entry there should have the option to link to a payment source which can be a bank account or a credit card. It's any place where the user's payment comes from.
+- [ ] **Due date:**Add due date to the entries with the possibility to add reminders using push notifications and/or within the app in the month summary.
 - [ ] **Advanced Reporting:** Charts and insights by category and period.
+- [ ] **Add a setup page for new users:** This page should be shown for the first time a user opens the app, asking things like name, picture (optional), salary, house spends (if it's the case), and other information to configure a pre-existent data for his finance. It also should as for an optional password to open the app.
+- [ ] **Create a market identity and splash screen:** Create a logo, coloring, marketing identity, etc.
+- [ ] **Improve UI/UX:**We need to improve the UI/UX of the app, mainly on the monthly entries screen (where we see the incomes, outcomes, summary, month picker), when we have most of the features and based on the markieting identity (task above). To accomplish this, 3 different models should be created with mocked up data and be available on the hamburger menu so that we can decide which one we want to pick.
 - [ ] **Add translation and locale resourse strings**: PT-BR, PT-PT, EN-US
-- [ ] **And much more...**
+
+### Phase 3: Advanced Features & Scaling
+- [ ] **Multi-Platform Sync:** Future transition to a centralized Web API.
 
 ## ⚠️ Architectural Constraint: Template vs. Monthly Edits
 
