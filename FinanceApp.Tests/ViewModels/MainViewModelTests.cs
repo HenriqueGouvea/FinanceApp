@@ -251,6 +251,130 @@ public class MainViewModelTests
         await _service.Received().GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>());
     }
 
+    // --- Status ---
+
+    [Fact]
+    public async Task ToggleEntryStatusAsync_PendingEntry_MarksPaidInSelectedMonth()
+    {
+        await _vm.InitializeAsync();
+        var selected = _vm.SelectedMonth!.Date;
+
+        await _vm.ToggleEntryStatusAsync(MakeProjection(7));
+
+        await _service.Received(1).SetEntryStatusAsync(7, selected.Year, selected.Month, FinancialMonthlyEntryStatus.Paid);
+    }
+
+    [Fact]
+    public async Task ToggleEntryStatusAsync_PaidEntry_MarksPending()
+    {
+        await _vm.InitializeAsync();
+        var selected = _vm.SelectedMonth!.Date;
+
+        await _vm.ToggleEntryStatusAsync(MakeProjection(7) with { Status = FinancialMonthlyEntryStatus.Paid });
+
+        await _service.Received(1).SetEntryStatusAsync(7, selected.Year, selected.Month, FinancialMonthlyEntryStatus.Pending);
+    }
+
+    [Fact]
+    public async Task ToggleEntryStatusAsync_HidesActionsAndReloadsNearbyMonths()
+    {
+        await _vm.InitializeAsync();
+        _vm.SelectedMonth!.RevealedEntryId = 7;
+        _service.ClearReceivedCalls();
+
+        await _vm.ToggleEntryStatusAsync(MakeProjection(7));
+
+        _vm.SelectedMonth.RevealedEntryId.Should().BeNull();
+        await _service.Received(5).GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>());
+    }
+
+    // --- Month navigation ---
+
+    [Fact]
+    public async Task GoToMonth_DateInRange_SelectsThatMonth()
+    {
+        await _vm.InitializeAsync();
+        var target = _vm.CurrentMonthDate.AddMonths(-14);
+
+        _vm.GoToMonth(target);
+
+        _vm.SelectedMonth!.Date.Should().Be(target);
+    }
+
+    [Fact]
+    public async Task GoToMonth_FirstAndLastMonths_SelectRangeEdges()
+    {
+        await _vm.InitializeAsync();
+
+        _vm.GoToMonth(_vm.LastMonthDate);
+        _vm.CurrentPosition.Should().Be(48);
+
+        _vm.GoToMonth(_vm.FirstMonthDate);
+        _vm.CurrentPosition.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task GoToMonth_DateOutsideRange_KeepsCurrentPosition()
+    {
+        await _vm.InitializeAsync();
+
+        _vm.GoToMonth(_vm.LastMonthDate.AddMonths(1));
+        _vm.GoToMonth(_vm.FirstMonthDate.AddMonths(-1));
+
+        _vm.CurrentPosition.Should().Be(24);
+    }
+
+    [Fact]
+    public async Task GoToCurrentMonthCommand_AfterNavigatingAway_ReturnsToCurrentMonth()
+    {
+        await _vm.InitializeAsync();
+        _vm.CurrentPosition = 40;
+
+        _vm.GoToCurrentMonthCommand.Execute(null);
+
+        _vm.CurrentPosition.Should().Be(24);
+        _vm.SelectedMonth!.Date.Should().Be(_vm.CurrentMonthDate);
+    }
+
+    [Fact]
+    public async Task IsAwayFromCurrentMonth_OnCurrentMonth_IsFalse()
+    {
+        await _vm.InitializeAsync();
+
+        _vm.IsAwayFromCurrentMonth.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsAwayFromCurrentMonth_BeforeInitialization_IsFalse()
+    {
+        _vm.IsAwayFromCurrentMonth.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task IsAwayFromCurrentMonth_AfterNavigatingAway_IsTrueAndRaisesChange()
+    {
+        await _vm.InitializeAsync();
+        var notified = new List<string>();
+        _vm.PropertyChanged += (_, e) => notified.Add(e.PropertyName!);
+
+        _vm.CurrentPosition = 25;
+
+        _vm.IsAwayFromCurrentMonth.Should().BeTrue();
+        notified.Should().Contain([nameof(MainViewModel.IsAwayFromCurrentMonth), nameof(MainViewModel.GoToCurrentMonthLabel)]);
+    }
+
+    [Theory]
+    [InlineData(30, "‹ Mês atual")]
+    [InlineData(10, "Mês atual ›")]
+    public async Task GoToCurrentMonthLabel_PointsTowardsCurrentMonth(int position, string expected)
+    {
+        await _vm.InitializeAsync();
+
+        _vm.CurrentPosition = position;
+
+        _vm.GoToCurrentMonthLabel.Should().Be(expected);
+    }
+
     [Fact]
     public async Task SelectedMonth_ReturnsMonthAtCurrentPosition()
     {

@@ -1,5 +1,6 @@
 using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Extensions;
+using CommunityToolkit.Maui.Views;
 using FinanceApp.Models;
 using FinanceApp.Services;
 using FinanceApp.ViewModels;
@@ -34,7 +35,7 @@ public partial class MainPage : ContentPage
 
     private async void OnAddClicked(object sender, EventArgs e)
     {
-        var popup = ResolvePopup();
+        var popup = ResolvePopup<AddEntryPopup>();
         var vm = (AddEntryViewModel)popup.BindingContext;
 
         if (BindingContext is not MainViewModel mainVm) return;
@@ -74,7 +75,7 @@ public partial class MainPage : ContentPage
         var entry = await _financeService.GetEntryByIdAsync(projection.FinancialEntryId);
         if (entry is null) return;
 
-        var popup = ResolvePopup();
+        var popup = ResolvePopup<AddEntryPopup>();
         var vm = (AddEntryViewModel)popup.BindingContext;
 
         await vm.PrepareForEditAsync(entry);
@@ -132,10 +133,37 @@ public partial class MainPage : ContentPage
             await mainVm.DeleteEntryAsync(projection, selectedScope);
     }
 
+    private async void OnToggleStatusClicked(object? sender, TappedEventArgs e)
+    {
+        if (GetProjection(sender) is not { } projection) return;
+        if (BindingContext is not MainViewModel mainVm) return;
+
+        await mainVm.ToggleEntryStatusAsync(projection);
+    }
+
+    private async void OnMonthTitleTapped(object? sender, TappedEventArgs e)
+    {
+        if (BindingContext is not MainViewModel { SelectedMonth: { } month } mainVm) return;
+
+        month.HideEntryActions();
+
+        var popup = ResolvePopup<MonthPickerPopup>();
+        var vm = (MonthPickerViewModel)popup.BindingContext;
+
+        vm.Prepare(month.Date, mainVm.CurrentMonthDate, mainVm.FirstMonthDate, mainVm.LastMonthDate);
+        vm.SetSelectCallback(async date =>
+        {
+            await popup.CloseAsync();
+            mainVm.GoToMonth(date);
+        });
+
+        await this.ShowPopupAsync(popup);
+    }
+
     private static MonthlyEntryProjection? GetProjection(object? sender) =>
         (sender as BindableObject)?.BindingContext as MonthlyEntryProjection;
 
-    private AddEntryPopup ResolvePopup() =>
-        Handler?.MauiContext?.Services.GetService<AddEntryPopup>()
-            ?? throw new InvalidOperationException("AddEntryPopup not found.");
+    private T ResolvePopup<T>() where T : Popup =>
+        Handler?.MauiContext?.Services.GetService<T>()
+            ?? throw new InvalidOperationException($"{typeof(T).Name} not found.");
 }

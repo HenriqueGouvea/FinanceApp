@@ -20,6 +20,12 @@ public partial class CategoryEditViewModel : ObservableObject
     [ObservableProperty] string icon = string.Empty;
     [ObservableProperty] string color = string.Empty;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsIncome))]
+    FinancialEntryType entryType = FinancialEntryType.Outcome;
+
+    public bool IsIncome => EntryType == FinancialEntryType.Income;
+
     public IReadOnlyList<string> Icons { get; } =
     [
         "🏠", "🎓", "🧾", "🎉", "🛒", "🍽️", "🚗", "⛽",
@@ -40,13 +46,14 @@ public partial class CategoryEditViewModel : ObservableObject
         _categoryService = categoryService;
     }
 
-    public void Prepare()
+    public void Prepare(FinancialEntryType entryType = FinancialEntryType.Outcome)
     {
         _editingCategoryId = 0;
         PopupTitle = "Nova Categoria";
         Name = string.Empty;
         Icon = Icons[0];
         Color = Colors[0];
+        EntryType = entryType;
     }
 
     public void PrepareForEdit(FinancialCategory category)
@@ -56,6 +63,7 @@ public partial class CategoryEditViewModel : ObservableObject
         Name = category.Name;
         Icon = category.Icon;
         Color = category.Color;
+        EntryType = category.EntryType;
     }
 
     public void SetSaveCallback(Func<Task> onSaved)
@@ -69,6 +77,12 @@ public partial class CategoryEditViewModel : ObservableObject
     [RelayCommand]
     void SelectColor(string value) => Color = value;
 
+    [RelayCommand]
+    void SelectIncome() => EntryType = FinancialEntryType.Income;
+
+    [RelayCommand]
+    void SelectOutcome() => EntryType = FinancialEntryType.Outcome;
+
     private bool CanSave() => !string.IsNullOrWhiteSpace(Name);
 
     [RelayCommand(CanExecute = nameof(CanSave))]
@@ -79,7 +93,8 @@ public partial class CategoryEditViewModel : ObservableObject
             Id = _editingCategoryId,
             Name = Name.Trim(),
             Icon = Icon,
-            Color = Color
+            Color = Color,
+            EntryType = EntryType
         });
 
         if (_onSaved is not null)

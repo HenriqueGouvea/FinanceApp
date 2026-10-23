@@ -1,5 +1,6 @@
 using FinanceApp.UITests.Infrastructure;
 using OpenQA.Selenium;
+using OpenQA.Selenium.Appium;
 
 namespace FinanceApp.UITests.Pages;
 
@@ -9,11 +10,13 @@ public class AddEntryPopupObject
     private static readonly By DescriptionEntry = AppSession.AutomationId("DescriptionEntry");
     private static readonly By EntryTypeToggle = AppSession.AutomationId("EntryTypeToggle");
     private static readonly By SelectIncomeButton = AppSession.AutomationId("SelectIncomeButton");
+    private static readonly By SelectOutcomeButton = AppSession.AutomationId("SelectOutcomeButton");
     private static readonly By RecurrencePicker = AppSession.AutomationId("RecurrencePicker");
     private static readonly By InstallmentsEntry = AppSession.AutomationId("InstallmentsEntry");
     private static readonly By AmountEntry = AppSession.AutomationId("AmountEntry");
     private static readonly By InstallmentsTotal = AppSession.AutomationId("InstallmentsTotalLabel");
     private static readonly By CategoryPicker = AppSession.AutomationId("CategoryPicker");
+    private static readonly By PickerDialogOption = MobileBy.Id("android:id/text1");
     private const string SaveButtonId = "SaveEntryButton";
     private const string CancelButtonId = "CancelEntryButton";
 
@@ -64,6 +67,14 @@ public class AddEntryPopupObject
         return this;
     }
 
+    public AddEntryPopupObject SelectOutcome()
+    {
+        _session.HideKeyboardIfShown();
+        _session.Tap(SelectOutcomeButton);
+        _session.WaitForGone(SelectOutcomeButton);
+        return this;
+    }
+
     /// <summary>
     /// The MAUI Picker renders as a native dialog on Android, so the option is located by its label.
     /// </summary>
@@ -90,6 +101,22 @@ public class AddEntryPopupObject
         PickOption(CategoryPicker, categoryName);
         return this;
     }
+
+    /// <summary>
+    /// Opens the category picker's native dialog, reads its options and dismisses it without choosing.
+    /// </summary>
+    public IReadOnlyList<string> CategoryOptions()
+    {
+        _session.HideKeyboardIfShown();
+        _session.Tap(CategoryPicker);
+        _session.WaitForVisible(PickerDialogOption);
+        var options = _session.VisibleTexts(PickerDialogOption);
+        _session.PressBack();
+        _session.WaitForGone(PickerDialogOption);
+        return options;
+    }
+
+    public string CategoryText => _session.WaitForVisible(CategoryPicker).Text;
 
     public void Save()
     {

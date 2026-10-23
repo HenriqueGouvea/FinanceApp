@@ -11,6 +11,8 @@ public class CategoriesPageObject
     private static readonly By CategoryName = AppSession.AutomationId("CategoryNameLabel");
     private static readonly By DeleteCategoryButton = AppSession.AutomationId("DeleteCategoryButton");
     private static readonly By NameEntry = AppSession.AutomationId("CategoryNameEntry");
+    private static readonly By IncomeTypeButton = AppSession.AutomationId("CategoryIncomeTypeButton");
+    private static readonly By GroupHeader = AppSession.AutomationId("CategoryGroupHeader");
     private const string SaveButtonId = "SaveCategoryButton";
     private static readonly By FlyoutButton =
         MobileBy.AndroidUIAutomator("new UiSelector().className(\"android.widget.ImageButton\").instance(0)");
@@ -31,12 +33,28 @@ public class CategoriesPageObject
 
     public IReadOnlyList<string> VisibleCategoryNames => _session.VisibleTexts(CategoryName);
 
-    public CategoriesPageObject AddCategory(string name)
+    public IReadOnlyList<string> VisibleGroupHeaders => _session.VisibleTexts(GroupHeader);
+
+    /// <summary>
+    /// Header of the group ("Despesas"/"Receitas") the category is listed under, i.e. the closest header above it.
+    /// </summary>
+    public string GroupOf(string name)
+    {
+        var categoryY = _session.WaitForVisible(CategoryNameWithText(name)).Location.Y;
+        return _session.Driver.FindElements(GroupHeader)
+            .Where(h => h.Displayed && h.Location.Y < categoryY)
+            .MaxBy(h => h.Location.Y)?.Text
+            ?? throw new InvalidOperationException($"No group header above \"{name}\".");
+    }
+
+    public CategoriesPageObject AddCategory(string name, bool isIncome = false)
     {
         _session.Tap(AddCategoryButton);
         var entry = _session.WaitForVisible(NameEntry);
         entry.SendKeys(name);
         _session.HideKeyboardIfShown();
+        if (isIncome)
+            _session.Tap(IncomeTypeButton);
         _session.ScrollToAndTap(SaveButtonId);
         _session.WaitForGone(NameEntry);
         _session.WaitForVisible(CategoryNameWithText(name));

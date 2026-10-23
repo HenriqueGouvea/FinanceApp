@@ -25,4 +25,7 @@ public record MonthlyEntryProjection(
     bool IsProjected,
     string? InstallmentLabel,
     decimal? InstallmentTotalAmount
-);
+)
+{
+    public bool IsPaid => Status == FinancialMonthlyEntryStatus.Paid;
+}

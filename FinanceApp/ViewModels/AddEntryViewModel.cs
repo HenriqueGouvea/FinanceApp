@@ -14,6 +14,8 @@ public partial class AddEntryViewModel : ObservableObject
     private DateTime _targetMonth;
     private int _editingEntryId;
     private DateTime? _editingEndDate;
+    private int? _editingCategoryId;
+    private IReadOnlyList<FinancialCategory> _allCategories = [];
 
     [ObservableProperty] string popupTitle = "Novo Lançamento";
     [ObservableProperty] string description = string.Empty;
@@ -62,14 +64,16 @@ public partial class AddEntryViewModel : ObservableObject
     partial void OnEntryTypeChanged(FinancialEntryType value)
     {
         OnPropertyChanged(nameof(IsIncome));
+        FilterCategories();
     }
 
     public async Task PrepareAsync(DateTime targetMonth)
     {
-        await LoadCategoriesAsync();
-
         _editingEntryId = 0;
         _editingEndDate = null;
+        _editingCategoryId = null;
+        await LoadCategoriesAsync();
+
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(StructuralFieldsOpacity));
         _targetMonth = new DateTime(targetMonth.Year, targetMonth.Month, 1);
@@ -78,24 +82,27 @@ public partial class AddEntryViewModel : ObservableObject
         Amount = 0;
         SelectedCategory = null;
         EntryType = FinancialEntryType.Outcome;
+        FilterCategories();
         SelectedRecurrence = null;
         TotalInstallments = null;
     }
 
     public async Task PrepareForEditAsync(FinancialEntry entry)
     {
-        await LoadCategoriesAsync();
-
         _editingEntryId = entry.Id;
         _editingEndDate = entry.EndDate;
+        _editingCategoryId = entry.CategoryId;
+        await LoadCategoriesAsync();
+
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(StructuralFieldsOpacity));
         _targetMonth = new DateTime(entry.StartDate.Year, entry.StartDate.Month, 1);
         PopupTitle = "Editar Lançamento";
         Description = entry.Description;
         Amount = entry.Amount;
-        SelectedCategory = Categories.FirstOrDefault(c => c.Id == entry.CategoryId);
         EntryType = entry.EntryType;
+        FilterCategories();
+        SelectedCategory = Categories.FirstOrDefault(c => c.Id == entry.CategoryId);
         SelectedRecurrence = entry.Recurrence;
         TotalInstallments = entry.TotalInstallments;
     }
@@ -138,10 +145,18 @@ public partial class AddEntryViewModel : ObservableObject
 
     private async Task LoadCategoriesAsync()
     {
-        var categories = await _categoryService.GetAllAsync();
+        _allCategories = await _categoryService.GetAllAsync();
+    }
+
+    // The edited entry keeps its category even when it belongs to the other type (data from before the split).
+    private void FilterCategories()
+    {
+        var selectedId = SelectedCategory?.Id;
 
         Categories.Clear();
-        foreach (var category in categories)
+        foreach (var category in _allCategories.Where(c => c.EntryType == EntryType || c.Id == _editingCategoryId))
             Categories.Add(category);
+
+        SelectedCategory = Categories.FirstOrDefault(c => c.Id == selectedId);
     }
 }

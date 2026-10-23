@@ -17,13 +17,36 @@
 
         <DataTemplate x:Key="EntryRowTemplate" x:DataType="models:MonthlyEntryProjection">
             <Grid IsClippedToBounds="True">
-                <Grid AutomationId="EntryRow" ColumnDefinitions="*, Auto, Auto" Padding="14,10">
+                <Grid AutomationId="EntryRow" ColumnDefinitions="Auto, *, Auto, Auto" ColumnSpacing="10" Padding="14,10">
                     <Grid.Behaviors>
                         <toolkit:TouchBehavior LongPressDuration="1000"
                                                TouchGestureCompleted="OnEntryTapped"
                                                LongPressCompleted="OnEntryLongPressed" />
                     </Grid.Behaviors>
-                    <VerticalStackLayout Grid.Column="0">
+
+                    <!-- Status indicator: empty ring while pending, filled check once paid/received -->
+                    <Grid Grid.Column="0" WidthRequest="22" HeightRequest="22" VerticalOptions="Center">
+                        <Border AutomationId="EntryPendingIcon"
+                                StrokeShape="RoundRectangle 11"
+                                Stroke="#BDBDBD"
+                                StrokeThickness="2"
+                                BackgroundColor="Transparent"
+                                IsVisible="{Binding IsPaid, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
+                        <Border AutomationId="EntryPaidIcon"
+                                StrokeShape="RoundRectangle 11"
+                                StrokeThickness="0"
+                                BackgroundColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
+                                IsVisible="{Binding IsPaid}">
+                            <Label Text="✓"
+                                   TextColor="White"
+                                   FontSize="13"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"
+                                   VerticalOptions="Center" />
+                        </Border>
+                    </Grid>
+
+                    <VerticalStackLayout Grid.Column="1">
                         <Label AutomationId="EntryDescriptionLabel" Text="{Binding Description}" FontAttributes="Bold"/>
                         <HorizontalStackLayout Spacing="4"
                                                IsVisible="{Binding Category, Converter={x:Static converters:IsNotNullConverter.Instance}}">
@@ -45,13 +68,15 @@
                             </Label.Text>
                         </Label>
                     </VerticalStackLayout>
-                    <Label Grid.Column="1"
-                           Text="{Binding Status}"
-                           FontSize="11"
-                           TextColor="Gray"
-                           VerticalOptions="Center"
-                           Margin="0,0,8,0"/>
                     <Label Grid.Column="2"
+                           AutomationId="EntryStatusLabel"
+                           Text="{Binding EntryType, Converter={x:Static converters:EntryTypeToPaidLabelConverter.Instance}}"
+                           TextColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
+                           FontSize="11"
+                           FontAttributes="Bold"
+                           VerticalOptions="Center"
+                           IsVisible="{Binding IsPaid}"/>
+                    <Label Grid.Column="3"
                            AutomationId="EntryAmountLabel"
                            Text="{Binding EffectiveAmount, StringFormat='R$ {0:F2}'}"
                            TextColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
@@ -72,6 +97,32 @@
                         </MultiBinding>
                     </controls:SlideOutPanel.IsOpen>
                     <HorizontalStackLayout Spacing="6">
+                        <Border AutomationId="MarkPaidEntryAction"
+                                BackgroundColor="#2E7D32"
+                                StrokeThickness="0"
+                                StrokeShape="RoundRectangle 8"
+                                Padding="16,0"
+                                IsVisible="{Binding IsPaid, Converter={x:Static converters:InverseBoolConverter.Instance}}">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnToggleStatusClicked" />
+                            </Border.GestureRecognizers>
+                            <Label Text="{Binding EntryType, Converter={x:Static converters:EntryTypeToMarkPaidLabelConverter.Instance}}"
+                                   TextColor="White"
+                                   VerticalOptions="Center" />
+                        </Border>
+                        <Border AutomationId="MarkPendingEntryAction"
+                                BackgroundColor="#757575"
+                                StrokeThickness="0"
+                                StrokeShape="RoundRectangle 8"
+                                Padding="16,0"
+                                IsVisible="{Binding IsPaid}">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnToggleStatusClicked" />
+                            </Border.GestureRecognizers>
+                            <Label Text="Pendente"
+                                   TextColor="White"
+                                   VerticalOptions="Center" />
+                        </Border>
                         <Border AutomationId="DeleteEntryAction"
                                 BackgroundColor="#D32F2F"
                                 StrokeThickness="0"
@@ -91,8 +142,10 @@
     </ContentPage.Resources>
 
     <Grid>
+        <!-- Programmatic jumps (month picker, "Mês atual") would otherwise animate through every month in between -->
         <CarouselView ItemsSource="{Binding Months}"
                       Position="{Binding CurrentPosition, Mode=TwoWay}"
+                      IsScrollAnimated="False"
                       Loop="False">
             <CarouselView.ItemTemplate>
                 <DataTemplate x:DataType="vm:MonthViewModel">
@@ -104,15 +157,26 @@
                                 <TapGestureRecognizer Command="{Binding HideEntryActionsCommand}" />
                             </VerticalStackLayout.GestureRecognizers>
 
-                            <!-- Month Title -->
-                            <Label AutomationId="MonthTitleLabel"
-                                   Text="{Binding MonthName}"
-                                   FontSize="32"
-                                   HorizontalOptions="Center"
-                                   FontAttributes="Bold" />
+                            <!-- Month Title: tap to pick any month/year -->
+                            <HorizontalStackLayout AutomationId="MonthTitleButton"
+                                                   HorizontalOptions="Center"
+                                                   Spacing="8">
+                                <HorizontalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnMonthTitleTapped" />
+                                </HorizontalStackLayout.GestureRecognizers>
+                                <Label AutomationId="MonthTitleLabel"
+                                       Text="{Binding MonthName}"
+                                       FontSize="32"
+                                       FontAttributes="Bold" />
+                                <Label Text="▾"
+                                       FontSize="22"
+                                       TextColor="Purple"
+                                       VerticalOptions="Center" />
+                            </HorizontalStackLayout>
 
                             <!-- Summary Bar -->
-                            <Frame BackgroundColor="#F0F0F0" CornerRadius="10" Padding="15">
+                            <!-- Input transparent so taps reach the page's "tap outside" recognizer that hides the entry actions -->
+                            <Frame AutomationId="SummaryBar" InputTransparent="True" BackgroundColor="#F0F0F0" CornerRadius="10" Padding="15">
                                 <HorizontalStackLayout HorizontalOptions="Center" Spacing="30">
                                     <VerticalStackLayout>
                                         <Label Text="Receitas" FontSize="12" TextColor="Gray"/>
@@ -242,6 +306,21 @@
                 HorizontalOptions="Start"
                 VerticalOptions="End"
                 Margin="20,0,0,33" />
+        <Button AutomationId="GoToCurrentMonthButton"
+                Text="{Binding GoToCurrentMonthLabel}"
+                Command="{Binding GoToCurrentMonthCommand}"
+                IsVisible="{Binding IsAwayFromCurrentMonth}"
+                FontSize="13"
+                HeightRequest="40"
+                Padding="16,0"
+                CornerRadius="20"
+                BackgroundColor="#EDE7F6"
+                TextColor="Purple"
+                BorderColor="Purple"
+                BorderWidth="1"
+                HorizontalOptions="Center"
+                VerticalOptions="End"
+                Margin="0,0,0,28" />
         <Button AutomationId="AddEntryButton"
                 Text="+"
                 FontSize="24"

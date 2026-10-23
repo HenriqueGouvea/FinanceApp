@@ -37,6 +37,26 @@ public class CategoryEditViewModelTests
     }
 
     [Fact]
+    public void Prepare_WithoutType_DefaultsToOutcome()
+    {
+        _vm.SelectIncomeCommand.Execute(null);
+
+        _vm.Prepare();
+
+        _vm.EntryType.Should().Be(FinancialEntryType.Outcome);
+        _vm.IsIncome.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Prepare_WithIncomeType_StartsAsIncome()
+    {
+        _vm.Prepare(FinancialEntryType.Income);
+
+        _vm.EntryType.Should().Be(FinancialEntryType.Income);
+        _vm.IsIncome.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Prepare_AfterEdit_SavesAsNewCategory()
     {
         _vm.PrepareForEdit(MakeCategory());
@@ -59,6 +79,17 @@ public class CategoryEditViewModelTests
         _vm.Icon.Should().Be("🎉");
         _vm.Color.Should().Be("#43A047");
         _vm.PopupTitle.Should().Be("Editar Categoria");
+    }
+
+    [Fact]
+    public void PrepareForEdit_IncomeCategory_SetsIncomeType()
+    {
+        var category = MakeCategory();
+        category.EntryType = FinancialEntryType.Income;
+
+        _vm.PrepareForEdit(category);
+
+        _vm.EntryType.Should().Be(FinancialEntryType.Income);
     }
 
     [Fact]
@@ -89,7 +120,42 @@ public class CategoryEditViewModelTests
         _vm.Color.Should().Be("#E53935");
     }
 
+    // --- SelectIncome / SelectOutcome ---
+
+    [Fact]
+    public void SelectIncomeCommand_SetsIncomeTypeAndRaisesIsIncome()
+    {
+        var notified = new List<string>();
+        _vm.PropertyChanged += (_, e) => notified.Add(e.PropertyName!);
+
+        _vm.SelectIncomeCommand.Execute(null);
+
+        _vm.EntryType.Should().Be(FinancialEntryType.Income);
+        notified.Should().Contain(nameof(CategoryEditViewModel.IsIncome));
+    }
+
+    [Fact]
+    public void SelectOutcomeCommand_SetsOutcomeType()
+    {
+        _vm.Prepare(FinancialEntryType.Income);
+
+        _vm.SelectOutcomeCommand.Execute(null);
+
+        _vm.EntryType.Should().Be(FinancialEntryType.Outcome);
+    }
+
     // --- SaveCommand ---
+
+    [Fact]
+    public async Task SaveCommand_PassesSelectedType()
+    {
+        _vm.Name = "Salário";
+        _vm.SelectIncomeCommand.Execute(null);
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveAsync(Arg.Is<FinancialCategory>(c => c.EntryType == FinancialEntryType.Income));
+    }
 
     [Theory]
     [InlineData("")]

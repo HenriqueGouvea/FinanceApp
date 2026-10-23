@@ -23,6 +23,13 @@ public class MainPageObject
     private static readonly By EntryCategory = AppSession.AutomationId("EntryCategoryLabel");
     private static readonly By EntryInstallment = AppSession.AutomationId("EntryInstallmentLabel");
     private static readonly By DeleteAction = AppSession.AutomationId("DeleteEntryAction");
+    private static readonly By MarkPaidAction = AppSession.AutomationId("MarkPaidEntryAction");
+    private static readonly By MarkPendingAction = AppSession.AutomationId("MarkPendingEntryAction");
+    private static readonly By EntryPaidIcon = AppSession.AutomationId("EntryPaidIcon");
+    private static readonly By EntryStatus = AppSession.AutomationId("EntryStatusLabel");
+    private static readonly By MonthTitleButton = AppSession.AutomationId("MonthTitleButton");
+    private static readonly By SummaryBar = AppSession.AutomationId("SummaryBar");
+    private static readonly By GoToCurrentMonthButton = AppSession.AutomationId("GoToCurrentMonthButton");
     private static readonly By FlyoutButton =
         MobileBy.AndroidUIAutomator("new UiSelector().className(\"android.widget.ImageButton\").instance(0)");
 
@@ -119,7 +126,7 @@ public class MainPageObject
     /// <summary>
     /// The actions panel is always in the view tree; it is "revealed" when slid inside its row instead of past the right edge.
     /// </summary>
-    public bool IsDeleteActionRevealed => FindRevealedDeleteAction() is not null;
+    public bool IsDeleteActionRevealed => FindRevealedAction(DeleteAction) is not null;
 
     public MainPageObject WaitForActionsHidden()
     {
@@ -127,8 +134,44 @@ public class MainPageObject
         return this;
     }
 
-    public void TapDeleteAction() =>
-        (FindRevealedDeleteAction() ?? throw new InvalidOperationException("No entry actions menu is revealed.")).Click();
+    public void TapDeleteAction() => TapRevealedAction(DeleteAction);
+
+    /// <summary>
+    /// Text of the status action in the revealed menu ("Pagar", "Receber" or "Pendente").
+    /// </summary>
+    public string RevealedStatusActionText =>
+        (FindRevealedAction(MarkPaidAction) ?? FindRevealedAction(MarkPendingAction)
+            ?? throw new InvalidOperationException("No entry actions menu is revealed."))
+            .FindElement(By.ClassName("android.widget.TextView")).Text;
+
+    /// <summary>
+    /// Long-presses the entry and taps "Pagar"/"Receber", then waits for the paid indicator.
+    /// </summary>
+    public MainPageObject MarkPaid(string description)
+    {
+        RevealActions(description);
+        TapRevealedAction(MarkPaidAction);
+        _session.WaitFor(() => IsEntryPaid(description), $"\"{description}\" to show as paid");
+        WaitForActionsHidden();
+        return this;
+    }
+
+    /// <summary>
+    /// Long-presses the entry and taps "Pendente", then waits for the paid indicator to disappear.
+    /// </summary>
+    public MainPageObject MarkPending(string description)
+    {
+        RevealActions(description);
+        TapRevealedAction(MarkPendingAction);
+        _session.WaitFor(() => !IsEntryPaid(description), $"\"{description}\" to show as pending");
+        WaitForActionsHidden();
+        return this;
+    }
+
+    public bool IsEntryPaid(string description) =>
+        FindRow(description).FindElements(EntryPaidIcon).Any(e => e.Displayed);
+
+    public IReadOnlyList<string> VisibleEntryStatuses => _session.VisibleTexts(EntryStatus);
 
     /// <summary>
     /// Long-presses the entry, taps "Excluir" and picks the option in the native action sheet.
@@ -143,7 +186,43 @@ public class MainPageObject
 
     public void ChooseDialogOption(string option) => _session.Tap(AppSession.DialogOption(option));
 
-    public void TapMonthTitle() => _session.Tap(MonthTitle);
+    public void TapSummaryBar() => _session.Tap(SummaryBar);
+
+    public MonthPickerPopupObject OpenMonthPicker()
+    {
+        _session.Tap(MonthTitleButton);
+        return new MonthPickerPopupObject(_session).WaitUntilOpen();
+    }
+
+    public MainPageObject GoToMonth(DateTime month)
+    {
+        OpenMonthPicker().SelectMonth(month);
+        return WaitForMonth(month);
+    }
+
+    public MainPageObject WaitForMonth(DateTime month)
+    {
+        _session.WaitForText(MonthTitle, AppFormat.MonthTitle(month));
+        return this;
+    }
+
+    public bool IsGoToCurrentMonthVisible => _session.IsVisible(GoToCurrentMonthButton);
+
+    public string GoToCurrentMonthText => _session.WaitForVisible(GoToCurrentMonthButton).Text;
+
+    public MainPageObject TapGoToCurrentMonth()
+    {
+        _session.Tap(GoToCurrentMonthButton);
+        _session.WaitForText(MonthTitle, AppFormat.MonthTitle(AppFormat.CurrentMonth));
+        _session.WaitForGone(GoToCurrentMonthButton);
+        return this;
+    }
+
+    public MainPageObject WaitForGoToCurrentMonth()
+    {
+        _session.WaitForVisible(GoToCurrentMonthButton);
+        return this;
+    }
 
     public MainPageObject GoToNextMonth()
     {
@@ -191,15 +270,25 @@ public class MainPageObject
         return new CategoriesPageObject(_session).WaitUntilLoaded();
     }
 
-    private IWebElement? FindRevealedDeleteAction()
+    private void TapRevealedAction(By action) =>
+        (FindRevealedAction(action) ?? throw new InvalidOperationException($"No revealed {action} in the entry actions menu.")).Click();
+
+    private IWebElement? FindRevealedAction(By action)
     {
         var rows = _session.Driver.FindElements(EntryRow).Where(r => r.Displayed).ToList();
         if (rows.Count == 0)
             return null;
 
         var rowRight = rows.Max(r => r.Location.X + r.Size.Width);
-        return _session.Driver.FindElements(DeleteAction)
+        return _session.Driver.FindElements(action)
             .FirstOrDefault(a => a.Displayed && a.Location.X + a.Size.Width / 2 < rowRight);
+    }
+
+    private IWebElement FindRow(string description)
+    {
+        _session.WaitForVisible(EntryByDescription(description));
+        return _session.Driver.FindElements(EntryRow)
+            .First(r => r.Displayed && r.FindElements(EntryDescription).Any(d => d.Text == description));
     }
 
     private static By EntryByDescription(string description) =>

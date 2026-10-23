@@ -51,7 +51,8 @@ When a wait times out, the page source and a screenshot are saved under `Finance
 | `AddEntryTests` | One-time outcome, income, recurrent (start month onwards), installments (exactly N months, labels, total), category chip, cancel |
 | `EditEntryTests` | Pre-filled popup with locked structural fields; description/amount change across months |
 | `DeleteEntryTests` | One-time; recurrent *this month only*, *this and future*, *all months*; cancelled action sheet |
-| `EntryActionsMenuTests` | Long-press reveals menu; tapping outside or on the entry hides it without opening the editor |
-| `MonthNavigationTests` | Fresh-install state, swipe to next/previous month, entry created in a non-current month |
+| `EntryActionsMenuTests` | Long-press reveals menu (with the status action); tapping outside or on the entry hides it without opening the editor |
+| `EntryStatusTests` | Mark an outcome paid (only that month), revert to pending, income "Recebido" labels, pay a single installment in another month |
+| `MonthNavigationTests` | Fresh-install state, swipe to next/previous month, entry created in a non-current month, "Mês atual" pill (visibility, direction, jump back), month picker (year grid, jump to next/previous year, range limits, "Mês atual" shortcut, cancel, entries loaded after a far jump) |
 | `SectionToggleTests` | Collapse/expand outcomes; collapsed state shared across months |
-| `CategoryTests` | Seeded defaults, add category and use it on an entry, delete a category used by an entry |
+| `CategoryTests` | Seeded outcome/income defaults grouped by type, entry popup offers only categories of the selected type, add outcome/income category and use it on an entry, delete a category used by an entry |

@@ -120,6 +120,8 @@ public sealed class AppSession : IDisposable
         });
     }
 
+    public void PressBack() => Driver.Navigate().Back();
+
     public void HideKeyboardIfShown()
     {
         if (Driver.IsKeyboardShown())
