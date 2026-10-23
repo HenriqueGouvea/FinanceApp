@@ -6,7 +6,7 @@ namespace FinanceApp.UITests.Pages;
 public static class AppLabels
 {
     public const string OneTime = "Única";
-    public const string Recurrent = "Recorrente";
+    public const string Recurrent = "Todo mês (recorrente)";
     public const string Installments = "Parcelada";
 
     public const string NewEntryTitle = "Novo Lançamento";
@@ -29,6 +29,7 @@ public static class AppLabels
 
     public const string GoToCurrentMonthBackward = "‹ Mês atual";
     public const string GoToCurrentMonthForward = "Mês atual ›";
+    public const string SwipeHint = "Toque no mês para escolher ou deslize para os lados";
 
     public const string OutcomeCategoriesHeader = "Despesas";
     public const string IncomeCategoriesHeader = "Receitas";

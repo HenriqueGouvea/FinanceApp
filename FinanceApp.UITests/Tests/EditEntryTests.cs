@@ -10,7 +10,7 @@ public sealed class EditEntryTests : E2ETestBase
 {
     public EditEntryTests(AppiumServerFixture server) : base(server)
     {
-        MainPage.AddEntry("Academia E2E", AppLabels.Recurrent, "90");
+        MainPage.AddEntry("Academia E2E", AppLabels.Recurrent, 90m);
     }
 
     [Fact]
@@ -20,7 +20,7 @@ public sealed class EditEntryTests : E2ETestBase
 
         popup.TitleText.Should().Be(AppLabels.EditEntryTitle);
         popup.DescriptionText.Should().Be("Academia E2E");
-        popup.AmountText.Should().Be("90");
+        popup.AmountText.Should().Be(AppFormat.Money(90));
         popup.RecurrenceText.Should().Be(AppLabels.Recurrent);
         popup.IsRecurrenceEnabled.Should().BeFalse("recurrence is a structural field");
         popup.IsEntryTypeEnabled.Should().BeFalse("entry type is a structural field");
@@ -31,7 +31,7 @@ public sealed class EditEntryTests : E2ETestBase
     {
         MainPage.OpenEntry("Academia E2E")
             .EnterDescription("Academia Premium E2E")
-            .EnterAmount("150")
+            .EnterAmount(150)
             .Save();
 
         MainPage.WaitForEntry("Academia Premium E2E");

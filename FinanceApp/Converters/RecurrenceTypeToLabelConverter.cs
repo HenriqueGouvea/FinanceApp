@@ -10,7 +10,7 @@ public class RecurrenceTypeToLabelConverter : IValueConverter
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value switch
     {
         RecurrenceType.OneTime => "Única",
-        RecurrenceType.Recurrent => "Recorrente",
+        RecurrenceType.Recurrent => "Todo mês (recorrente)",
         RecurrenceType.Installments => "Parcelada",
         _ => string.Empty
     };

@@ -10,7 +10,7 @@ public sealed class EntryStatusTests : E2ETestBase
 {
     public EntryStatusTests(AppiumServerFixture server) : base(server)
     {
-        MainPage.AddEntry("Internet E2E", AppLabels.Recurrent, "120");
+        MainPage.AddEntry("Internet E2E", AppLabels.Recurrent, 120m);
     }
 
     [Fact]
@@ -38,6 +38,29 @@ public sealed class EntryStatusTests : E2ETestBase
         record.IsCancelled.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MarkPaid_AnyEntryType_ShowsGreenCheckAndLabelNeverRed(bool isIncome)
+    {
+        var description = "Internet E2E";
+        if (isIncome)
+        {
+            description = "Salário E2E";
+            MainPage.AddEntry(description, AppLabels.Recurrent, 5000m, isIncome: true);
+        }
+
+        MainPage.MarkPaid(description);
+
+        var icon = MainPage.CaptureEntryPaidIcon(description);
+        icon.Pixels().Count(IsGreen).Should().BeGreaterThan(icon.Width * icon.Height / 3, "the paid check is filled green");
+        icon.Pixels().Count(IsRed).Should().Be(0, "red reads as an error, even for a paid outcome");
+
+        var label = MainPage.CaptureEntryStatusLabel(description);
+        label.Pixels().Count(IsGreen).Should().BeGreaterThan(0);
+        label.Pixels().Count(IsRed).Should().Be(0);
+    }
+
     [Fact]
     public async Task MarkPending_PaidEntry_RevertsStatusInListAndDatabase()
     {
@@ -56,7 +79,7 @@ public sealed class EntryStatusTests : E2ETestBase
     [Fact]
     public async Task MarkPaid_Income_ShowsReceivedLabels()
     {
-        MainPage.AddEntry("Salário E2E", AppLabels.Recurrent, "5000", isIncome: true);
+        MainPage.AddEntry("Salário E2E", AppLabels.Recurrent, 5000m, isIncome: true);
         MainPage.RevealActions("Salário E2E");
         MainPage.RevealedStatusActionText.Should().Be(AppLabels.MarkReceived);
         MainPage.TapSummaryBar();
@@ -75,7 +98,7 @@ public sealed class EntryStatusTests : E2ETestBase
     [Fact]
     public async Task MarkPaid_InstallmentInNextMonth_PersistsForThatInstallmentOnly()
     {
-        MainPage.AddEntry("Notebook E2E", AppLabels.Installments, "300", installments: "3");
+        MainPage.AddEntry("Notebook E2E", AppLabels.Installments, 300m, installments: "3");
         var nextMonth = AppFormat.CurrentMonth.AddMonths(1);
 
         MainPage.GoToNextMonth().MarkPaid("Notebook E2E");
@@ -91,4 +114,8 @@ public sealed class EntryStatusTests : E2ETestBase
         record.Month.Should().Be(nextMonth.Month);
         record.Status.Should().Be(AppFormat.Paid);
     }
+
+    private static bool IsGreen((byte R, byte G, byte B) p) => p.G > p.R + 40 && p.G > p.B + 30;
+
+    private static bool IsRed((byte R, byte G, byte B) p) => p.R > p.G + 60 && p.R > p.B + 60;
 }

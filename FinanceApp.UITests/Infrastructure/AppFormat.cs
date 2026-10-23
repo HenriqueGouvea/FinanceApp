@@ -21,7 +21,11 @@ public static class AppFormat
 
     public static DateTime CurrentMonth => new(DateTime.Today.Year, DateTime.Today.Month, 1);
 
-    public static string Money(decimal value) => $"R$ {value.ToString("F2", Culture)}";
+    public static string Money(decimal value)
+    {
+        var formatted = $"R$ {Math.Abs(value).ToString("N2", Culture)}";
+        return value < 0 ? $"-{formatted}" : formatted;
+    }
 
     public static string EntryCount(int count) => $"{count} lançamento(s)";
 

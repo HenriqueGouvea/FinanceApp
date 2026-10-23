@@ -76,7 +76,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **ViewModels/:** UI state only. Depend on `IFinanceService` via constructor injection.
 - **Views/:** XAML pages and `CommunityToolkit.Maui.Views.Popup` subclasses.
 - **Controls/:** Reusable code-only UI controls (e.g. `SlideOutPanel`, the animated entry actions menu revealed by long press).
-- **Converters/:** Value converters use a `static readonly Instance` singleton pattern (e.g., `EntryTypeToColorConverter.Instance`). They are not registered in DI — reference them directly in XAML via `{x:Static}`.
+- **Behaviors/:** Reusable `Behavior<T>` classes attached in XAML (e.g. `CurrencyMaskBehavior`, which turns an `Entry` into an "R$ 1.000,00" currency field; bind its `Value` instead of the entry's `Text`).
+- **Converters/:** Format every displayed amount with `MoneyConverter` (never a raw `StringFormat`), so the app shows a single currency format. Value converters use a `static readonly Instance` singleton pattern (e.g., `EntryTypeToColorConverter.Instance`). They are not registered in DI — reference them directly in XAML via `{x:Static}`.
 
 ## DI Registration
 All registrations are in `MauiProgram.cs`:

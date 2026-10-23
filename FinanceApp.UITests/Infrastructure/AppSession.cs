@@ -82,13 +82,14 @@ public sealed class AppSession : IDisposable
 
     /// <summary>
     /// Scrolls the nearest scrollable container until the element is on screen, then taps it.
-    /// Needed for popups whose buttons sit below the fold on small screens.
+    /// Needed for popups whose buttons sit below the fold on small screens. Scoped to the app so system
+    /// overlays (e.g. a heads-up notification) are never scrolled instead.
     /// </summary>
     public void ScrollToAndTap(string automationId)
     {
         var selector = $"new UiSelector().resourceId(\"{E2ESettings.AppPackage}:id/{automationId}\")";
         Driver.FindElements(MobileBy.AndroidUIAutomator(
-            $"new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView({selector})"));
+            $"new UiScrollable(new UiSelector().scrollable(true).packageName(\"{E2ESettings.AppPackage}\")).scrollIntoView({selector})"));
         Tap(AutomationId(automationId));
     }
 
@@ -119,6 +120,12 @@ public sealed class AppSession : IDisposable
             ["percent"] = 0.75
         });
     }
+
+    /// <summary>
+    /// Decodes the element's on-screen pixels, for asserting on rendered colors.
+    /// </summary>
+    public static PngImage Capture(IWebElement element) =>
+        PngImage.Decode(((ITakesScreenshot)element).GetScreenshot().AsByteArray);
 
     public void PressBack() => Driver.Navigate().Back();
 

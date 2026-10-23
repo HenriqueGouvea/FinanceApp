@@ -10,8 +10,8 @@ public sealed class SectionToggleTests : E2ETestBase
 {
     public SectionToggleTests(AppiumServerFixture server) : base(server)
     {
-        MainPage.AddEntry("Gasolina E2E", AppLabels.Recurrent, "300");
-        MainPage.AddEntry("Freela E2E", AppLabels.Recurrent, "800", isIncome: true);
+        MainPage.AddEntry("Gasolina E2E", AppLabels.Recurrent, 300m);
+        MainPage.AddEntry("Freela E2E", AppLabels.Recurrent, 800m, isIncome: true);
     }
 
     [Fact]

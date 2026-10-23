@@ -26,7 +26,7 @@ public sealed class AddEntryTests : E2ETestBase
         popup.IsAmountVisible.Should().BeTrue();
         popup.IsInstallmentsVisible.Should().BeFalse();
 
-        popup.EnterAmount("1500")
+        popup.EnterAmount(1500)
              .Save();
 
         MainPage.WaitForEntry("Aluguel E2E");
@@ -46,9 +46,37 @@ public sealed class AddEntryTests : E2ETestBase
     }
 
     [Fact]
+    public async Task AddEntry_AmountField_MasksTypedDigitsAsCurrency()
+    {
+        var popup = MainPage.OpenAddEntry()
+            .EnterDescription("Celular E2E")
+            .SelectRecurrence(AppLabels.OneTime);
+        popup.AmountText.Should().Be(AppFormat.Money(0));
+
+        popup.EnterAmount(1234.56m);
+        popup.AmountText.Should().Be(AppFormat.Money(1234.56m)).And.Be("R$ 1.234,56");
+        popup.Save();
+
+        MainPage.WaitForEntry("Celular E2E");
+        MainPage.VisibleEntryAmounts.Should().ContainSingle().Which.Should().Be("R$ 1.234,56");
+        MainPage.OutcomeTotalText.Should().Be("R$ 1.234,56");
+        MainPage.SummaryBalanceText.Should().Be("-R$ 1.234,56");
+
+        (await GetEntryRowsAsync()).Should().ContainSingle().Which.Amount.Should().Be(1234.56m);
+    }
+
+    [Fact]
+    public void AddEntry_RecurrencePicker_ExplainsRecurrentOption()
+    {
+        var popup = MainPage.OpenAddEntry();
+
+        popup.RecurrenceOptions().Should().Equal(AppLabels.OneTime, "Todo mês (recorrente)", AppLabels.Installments);
+    }
+
+    [Fact]
     public async Task AddEntry_Income_ShowsInIncomeSectionAndUpdatesBalance()
     {
-        MainPage.AddEntry("Salário E2E", AppLabels.Recurrent, "5000", isIncome: true);
+        MainPage.AddEntry("Salário E2E", AppLabels.Recurrent, 5000m, isIncome: true);
 
         MainPage.IncomeCountText.Should().Be(AppFormat.EntryCount(1));
         MainPage.IncomeTotalText.Should().Be(AppFormat.Money(5000));
@@ -64,7 +92,7 @@ public sealed class AddEntryTests : E2ETestBase
     [Fact]
     public async Task AddEntry_Recurrent_AppearsFromStartMonthOnwards()
     {
-        MainPage.AddEntry("Internet E2E", AppLabels.Recurrent, "120");
+        MainPage.AddEntry("Internet E2E", AppLabels.Recurrent, 120m);
 
         MainPage.GoToNextMonth().WaitForEntry("Internet E2E");
         MainPage.GoToNextMonth().WaitForEntry("Internet E2E");
@@ -85,7 +113,7 @@ public sealed class AddEntryTests : E2ETestBase
             .SelectRecurrence(AppLabels.Installments);
         popup.IsInstallmentsVisible.Should().BeTrue();
 
-        popup.EnterInstallments("3").EnterAmount("100");
+        popup.EnterInstallments("3").EnterAmount(100);
         popup.InstallmentsTotalText.Should().Be($"Total: {AppFormat.Money(300)}");
         popup.Save();
 
@@ -109,7 +137,7 @@ public sealed class AddEntryTests : E2ETestBase
     [Fact]
     public async Task AddEntry_WithCategory_ShowsCategoryChipAndLinksCategory()
     {
-        MainPage.AddEntry("Supermercado E2E", AppLabels.OneTime, "350", category: "Mercado");
+        MainPage.AddEntry("Supermercado E2E", AppLabels.OneTime, 350m, category: "Mercado");
 
         MainPage.VisibleEntryCategories.Should().ContainSingle().Which.Should().Be("Mercado");
 
@@ -124,7 +152,7 @@ public sealed class AddEntryTests : E2ETestBase
         var popup = MainPage.OpenAddEntry()
             .EnterDescription("Descartado E2E")
             .SelectRecurrence(AppLabels.OneTime)
-            .EnterAmount("10");
+            .EnterAmount(10);
 
         popup.Cancel();
 

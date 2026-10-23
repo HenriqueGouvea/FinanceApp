@@ -395,6 +395,92 @@ public class MainViewModelTests
         await _service.Received().GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>());
     }
 
+    [Fact]
+    public async Task GoToNextMonthCommand_MovesOneMonthForward()
+    {
+        await _vm.InitializeAsync();
+
+        _vm.GoToNextMonthCommand.Execute(null);
+
+        _vm.CurrentPosition.Should().Be(25);
+    }
+
+    [Fact]
+    public async Task GoToPreviousMonthCommand_MovesOneMonthBack()
+    {
+        await _vm.InitializeAsync();
+
+        _vm.GoToPreviousMonthCommand.Execute(null);
+
+        _vm.CurrentPosition.Should().Be(23);
+    }
+
+    [Fact]
+    public async Task GoToPreviousMonthCommand_OnFirstMonth_CannotExecute()
+    {
+        await _vm.InitializeAsync();
+
+        _vm.GoToMonth(_vm.FirstMonthDate);
+
+        _vm.GoToPreviousMonthCommand.CanExecute(null).Should().BeFalse();
+        _vm.GoToNextMonthCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GoToNextMonthCommand_OnLastMonth_CannotExecute()
+    {
+        await _vm.InitializeAsync();
+
+        _vm.GoToMonth(_vm.LastMonthDate);
+
+        _vm.GoToNextMonthCommand.CanExecute(null).Should().BeFalse();
+        _vm.GoToPreviousMonthCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GoToNextMonthCommand_PositionChanges_RaisesCanExecuteChanged()
+    {
+        await _vm.InitializeAsync();
+        var raised = false;
+        _vm.GoToNextMonthCommand.CanExecuteChanged += (_, _) => raised = true;
+
+        _vm.CurrentPosition = 30;
+
+        raised.Should().BeTrue();
+    }
+
+    // --- Swipe hint ---
+
+    [Fact]
+    public async Task ShowSwipeHint_NotSeenBefore_IsShownAfterInitialization()
+    {
+        await _vm.InitializeAsync();
+
+        _vm.ShowSwipeHint.Should().BeTrue();
+        _preferencesService.DidNotReceive().Set("show_month_swipe_hint", Arg.Any<bool>());
+    }
+
+    [Fact]
+    public void ShowSwipeHint_DismissedBefore_IsHidden()
+    {
+        _preferencesService.Get("show_month_swipe_hint", Arg.Any<bool>()).Returns(false);
+
+        var vm = new MainViewModel(_service, _preferencesService, _messenger);
+
+        vm.ShowSwipeHint.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ShowSwipeHint_AfterChangingMonth_IsHiddenAndPersisted()
+    {
+        await _vm.InitializeAsync();
+
+        _vm.CurrentPosition = 25;
+
+        _vm.ShowSwipeHint.Should().BeFalse();
+        _preferencesService.Received(1).Set("show_month_swipe_hint", false);
+    }
+
     private static MonthlyEntryProjection MakeProjection(int entryId) => new(
         FinancialEntryId: entryId,
         FinancialMonthlyEntryId: null,
