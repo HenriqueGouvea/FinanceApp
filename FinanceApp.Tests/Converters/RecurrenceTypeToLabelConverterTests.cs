@@ -10,7 +10,7 @@ public class RecurrenceTypeToLabelConverterTests
 {
     [Theory]
     [InlineData(RecurrenceType.OneTime, "Única")]
-    [InlineData(RecurrenceType.Recurrent, "Recorrente")]
+    [InlineData(RecurrenceType.Recurrent, "Todo mês (recorrente)")]
     [InlineData(RecurrenceType.Installments, "Parcelada")]
     public void Convert_RecurrenceType_ReturnsPortugueseLabel(RecurrenceType recurrence, string expected)
     {

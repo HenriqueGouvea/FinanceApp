@@ -10,7 +10,7 @@ public sealed class EntryActionsMenuTests : E2ETestBase
 {
     public EntryActionsMenuTests(AppiumServerFixture server) : base(server)
     {
-        MainPage.AddEntry("Farmácia E2E", AppLabels.OneTime, "45");
+        MainPage.AddEntry("Farmácia E2E", AppLabels.OneTime, 45m);
     }
 
     [Fact]

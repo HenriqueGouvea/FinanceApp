@@ -14,6 +14,25 @@
         <Color x:Key="OutcomeTint">#FDECEC</Color>
         <Color x:Key="IncomeAccent">#2E7D32</Color>
         <Color x:Key="IncomeTint">#E8F5E9</Color>
+        <!-- Same for incomes and outcomes: a paid outcome is good news, so it must not use the red outcome accent -->
+        <Color x:Key="PaidAccent">#2E7D32</Color>
+        <Color x:Key="MonthNavAccent">#6A1B9A</Color>
+        <Color x:Key="MonthNavTint">#EDE7F6</Color>
+        <Style x:Key="MonthArrowButton" TargetType="Button">
+            <Setter Property="FontSize" Value="26" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="WidthRequest" Value="44" />
+            <Setter Property="HeightRequest" Value="44" />
+            <Setter Property="CornerRadius" Value="22" />
+            <Setter Property="BackgroundColor" Value="{StaticResource MonthNavTint}" />
+            <Setter Property="TextColor" Value="{StaticResource MonthNavAccent}" />
+            <Setter Property="VerticalOptions" Value="Center" />
+            <Style.Triggers>
+                <Trigger TargetType="Button" Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.35" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
 
         <DataTemplate x:Key="EntryRowTemplate" x:DataType="models:MonthlyEntryProjection">
             <Grid IsClippedToBounds="True">
@@ -35,7 +54,7 @@
                         <Border AutomationId="EntryPaidIcon"
                                 StrokeShape="RoundRectangle 11"
                                 StrokeThickness="0"
-                                BackgroundColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
+                                BackgroundColor="{StaticResource PaidAccent}"
                                 IsVisible="{Binding IsPaid}">
                             <Label Text="✓"
                                    TextColor="White"
@@ -61,9 +80,9 @@
                                TextColor="Gray"
                                IsVisible="{Binding InstallmentLabel, Converter={x:Static converters:IsNotNullConverter.Instance}}">
                             <Label.Text>
-                                <MultiBinding StringFormat="{}{0} · Total R$ {1:F2}">
+                                <MultiBinding StringFormat="{}{0} · Total {1}">
                                     <Binding Path="InstallmentLabel" />
-                                    <Binding Path="InstallmentTotalAmount" />
+                                    <Binding Path="InstallmentTotalAmount" Converter="{x:Static converters:MoneyConverter.Instance}" />
                                 </MultiBinding>
                             </Label.Text>
                         </Label>
@@ -71,14 +90,14 @@
                     <Label Grid.Column="2"
                            AutomationId="EntryStatusLabel"
                            Text="{Binding EntryType, Converter={x:Static converters:EntryTypeToPaidLabelConverter.Instance}}"
-                           TextColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
+                           TextColor="{StaticResource PaidAccent}"
                            FontSize="11"
                            FontAttributes="Bold"
                            VerticalOptions="Center"
                            IsVisible="{Binding IsPaid}"/>
                     <Label Grid.Column="3"
                            AutomationId="EntryAmountLabel"
-                           Text="{Binding EffectiveAmount, StringFormat='R$ {0:F2}'}"
+                           Text="{Binding EffectiveAmount, Converter={x:Static converters:MoneyConverter.Instance}}"
                            TextColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
                            FontAttributes="Bold"
                            VerticalOptions="Center"/>
@@ -157,22 +176,68 @@
                                 <TapGestureRecognizer Command="{Binding HideEntryActionsCommand}" />
                             </VerticalStackLayout.GestureRecognizers>
 
-                            <!-- Month Title: tap to pick any month/year -->
-                            <HorizontalStackLayout AutomationId="MonthTitleButton"
-                                                   HorizontalOptions="Center"
-                                                   Spacing="8">
-                                <HorizontalStackLayout.GestureRecognizers>
-                                    <TapGestureRecognizer Tapped="OnMonthTitleTapped" />
-                                </HorizontalStackLayout.GestureRecognizers>
-                                <Label AutomationId="MonthTitleLabel"
-                                       Text="{Binding MonthName}"
-                                       FontSize="32"
-                                       FontAttributes="Bold" />
-                                <Label Text="▾"
-                                       FontSize="22"
-                                       TextColor="Purple"
-                                       VerticalOptions="Center" />
-                            </HorizontalStackLayout>
+                            <!-- Month header: arrows step one month, the title pill opens the month/year picker -->
+                            <VerticalStackLayout Spacing="6">
+                                <Grid ColumnDefinitions="44, *, 44" ColumnSpacing="6">
+                                    <Button Grid.Column="0"
+                                            AutomationId="PreviousMonthButton"
+                                            Text="‹"
+                                            Style="{StaticResource MonthArrowButton}"
+                                            Command="{Binding GoToPreviousMonthCommand, Source={RelativeSource AncestorType={x:Type vm:MainViewModel}}, x:DataType=vm:MainViewModel}" />
+
+                                    <Border Grid.Column="1"
+                                            AutomationId="MonthTitleButton"
+                                            HorizontalOptions="Center"
+                                            BackgroundColor="{StaticResource MonthNavTint}"
+                                            Stroke="{StaticResource MonthNavAccent}"
+                                            StrokeThickness="1"
+                                            StrokeShape="RoundRectangle 24"
+                                            Padding="14,8,8,8"
+                                            MinimumHeightRequest="44">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="OnMonthTitleTapped" />
+                                        </Border.GestureRecognizers>
+                                        <!-- The badge has its own column so a long month name truncates instead of pushing it out of the pill -->
+                                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
+                                            <Label AutomationId="MonthTitleLabel"
+                                                   Text="{Binding MonthName}"
+                                                   FontSize="20"
+                                                   FontAttributes="Bold"
+                                                   LineBreakMode="TailTruncation"
+                                                   MaxLines="1"
+                                                   TextColor="{StaticResource MonthNavAccent}"
+                                                   VerticalOptions="Center" />
+                                            <Border Grid.Column="1"
+                                                    AutomationId="MonthPickerBadge"
+                                                    BackgroundColor="{StaticResource MonthNavAccent}"
+                                                    StrokeThickness="0"
+                                                    StrokeShape="RoundRectangle 12"
+                                                    WidthRequest="24"
+                                                    HeightRequest="24"
+                                                    VerticalOptions="Center">
+                                                <Label Text="▾"
+                                                       FontSize="16"
+                                                       TextColor="White"
+                                                       HorizontalOptions="Center"
+                                                       VerticalOptions="Center" />
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+
+                                    <Button Grid.Column="2"
+                                            AutomationId="NextMonthButton"
+                                            Text="›"
+                                            Style="{StaticResource MonthArrowButton}"
+                                            Command="{Binding GoToNextMonthCommand, Source={RelativeSource AncestorType={x:Type vm:MainViewModel}}, x:DataType=vm:MainViewModel}" />
+                                </Grid>
+
+                                <Label AutomationId="SwipeHintLabel"
+                                       Text="Toque no mês para escolher ou deslize para os lados"
+                                       FontSize="12"
+                                       TextColor="Gray"
+                                       HorizontalTextAlignment="Center"
+                                       IsVisible="{Binding ShowSwipeHint, Source={RelativeSource AncestorType={x:Type vm:MainViewModel}}, x:DataType=vm:MainViewModel}" />
+                            </VerticalStackLayout>
 
                             <!-- Summary Bar -->
                             <!-- Input transparent so taps reach the page's "tap outside" recognizer that hides the entry actions -->
@@ -180,15 +245,15 @@
                                 <HorizontalStackLayout HorizontalOptions="Center" Spacing="30">
                                     <VerticalStackLayout>
                                         <Label Text="Receitas" FontSize="12" TextColor="Gray"/>
-                                        <Label AutomationId="SummaryIncomeLabel" Text="{Binding TotalIncomes, StringFormat='R$ {0:F2}'}" TextColor="Green" FontAttributes="Bold"/>
+                                        <Label AutomationId="SummaryIncomeLabel" Text="{Binding TotalIncomes, Converter={x:Static converters:MoneyConverter.Instance}}" TextColor="Green" FontAttributes="Bold"/>
                                     </VerticalStackLayout>
                                     <VerticalStackLayout>
                                         <Label Text="Despesas" FontSize="12" TextColor="Gray"/>
-                                        <Label AutomationId="SummaryOutcomeLabel" Text="{Binding TotalOutcomes, StringFormat='R$ {0:F2}'}" TextColor="Red" FontAttributes="Bold"/>
+                                        <Label AutomationId="SummaryOutcomeLabel" Text="{Binding TotalOutcomes, Converter={x:Static converters:MoneyConverter.Instance}}" TextColor="Red" FontAttributes="Bold"/>
                                     </VerticalStackLayout>
                                     <VerticalStackLayout>
                                         <Label Text="Balanço" FontSize="12" TextColor="Gray"/>
-                                        <Label AutomationId="SummaryBalanceLabel" Text="{Binding Balance, StringFormat='R$ {0:F2}'}" FontAttributes="Bold"/>
+                                        <Label AutomationId="SummaryBalanceLabel" Text="{Binding Balance, Converter={x:Static converters:MoneyConverter.Instance}}" FontAttributes="Bold"/>
                                     </VerticalStackLayout>
                                 </HorizontalStackLayout>
                             </Frame>
@@ -224,7 +289,7 @@
                                         </VerticalStackLayout>
                                         <Label Grid.Column="2"
                                                AutomationId="OutcomeTotalLabel"
-                                               Text="{Binding TotalOutcomes, StringFormat='R$ {0:F2}'}"
+                                               Text="{Binding TotalOutcomes, Converter={x:Static converters:MoneyConverter.Instance}}"
                                                TextColor="{StaticResource OutcomeAccent}"
                                                FontAttributes="Bold"
                                                VerticalOptions="Center"/>
@@ -271,7 +336,7 @@
                                         </VerticalStackLayout>
                                         <Label Grid.Column="2"
                                                AutomationId="IncomeTotalLabel"
-                                               Text="{Binding TotalIncomes, StringFormat='R$ {0:F2}'}"
+                                               Text="{Binding TotalIncomes, Converter={x:Static converters:MoneyConverter.Instance}}"
                                                TextColor="{StaticResource IncomeAccent}"
                                                FontAttributes="Bold"
                                                VerticalOptions="Center"/>

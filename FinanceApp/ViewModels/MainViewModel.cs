@@ -15,6 +15,7 @@ public partial class MainViewModel : ObservableObject, IRecipient<CategoriesChan
     private const int MaxMonthsFromToday = 24;
     private const string IncomesExpandedKey = "incomes_expanded";
     private const string OutcomesExpandedKey = "outcomes_expanded";
+    private const string ShowSwipeHintKey = "show_month_swipe_hint";
 
     private static readonly DateTime FirstOfToday =
         new(DateTime.Today.Year, DateTime.Today.Month, 1, 0, 0, 0, DateTimeKind.Local);
@@ -25,7 +26,12 @@ public partial class MainViewModel : ObservableObject, IRecipient<CategoriesChan
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAwayFromCurrentMonth))]
     [NotifyPropertyChangedFor(nameof(GoToCurrentMonthLabel))]
+    [NotifyCanExecuteChangedFor(nameof(GoToPreviousMonthCommand))]
+    [NotifyCanExecuteChangedFor(nameof(GoToNextMonthCommand))]
     int currentPosition;
+
+    [ObservableProperty]
+    bool showSwipeHint;
 
     public MonthViewModel? SelectedMonth => Months.ElementAtOrDefault(CurrentPosition);
 
@@ -41,11 +47,13 @@ public partial class MainViewModel : ObservableObject, IRecipient<CategoriesChan
     private readonly IFinanceService _financeService;
     private readonly IPreferencesService _preferencesService;
     private bool _isSyncing;
+    private bool _isInitialized;
 
     public MainViewModel(IFinanceService financeService, IPreferencesService preferencesService, IMessenger messenger)
     {
         _financeService = financeService;
         _preferencesService = preferencesService;
+        ShowSwipeHint = preferencesService.Get(ShowSwipeHintKey, true);
         messenger.Register(this);
     }
 
@@ -62,6 +70,7 @@ public partial class MainViewModel : ObservableObject, IRecipient<CategoriesChan
             }
 
             CurrentPosition = MaxMonthsFromToday;
+            _isInitialized = true;
         }
 
         await LoadNearbyMonthsAsync(CurrentPosition);
@@ -109,6 +118,16 @@ public partial class MainViewModel : ObservableObject, IRecipient<CategoriesChan
     [RelayCommand]
     void GoToCurrentMonth() => GoToMonth(FirstOfToday);
 
+    [RelayCommand(CanExecute = nameof(CanGoToPreviousMonth))]
+    void GoToPreviousMonth() => CurrentPosition--;
+
+    [RelayCommand(CanExecute = nameof(CanGoToNextMonth))]
+    void GoToNextMonth() => CurrentPosition++;
+
+    private bool CanGoToPreviousMonth() => CurrentPosition > 0;
+
+    private bool CanGoToNextMonth() => CurrentPosition < Months.Count - 1;
+
     [RelayCommand]
     public async Task ClearDatabaseAsync()
     {
@@ -127,6 +146,13 @@ public partial class MainViewModel : ObservableObject, IRecipient<CategoriesChan
     {
         foreach (var month in Months)
             month.HideEntryActions();
+
+        // Once the user has changed month they know navigation exists, so the hint is never shown again.
+        if (_isInitialized && ShowSwipeHint)
+        {
+            ShowSwipeHint = false;
+            _preferencesService.Set(ShowSwipeHintKey, false);
+        }
 
         _ = LoadNearbyMonthsAsync(value);
     }

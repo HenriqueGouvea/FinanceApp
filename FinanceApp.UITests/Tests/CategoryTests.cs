@@ -52,7 +52,7 @@ public sealed class CategoryTests : E2ETestBase
     [Fact]
     public async Task AddEntry_IncomeWithIncomeCategory_ShowsChipAndPersists()
     {
-        MainPage.AddEntry("Salário E2E", AppLabels.Recurrent, "5000", isIncome: true, category: "Salário");
+        MainPage.AddEntry("Salário E2E", AppLabels.Recurrent, 5000m, isIncome: true, category: "Salário");
 
         MainPage.VisibleEntryCategories.Should().ContainSingle().Which.Should().Be("Salário");
 
@@ -80,7 +80,7 @@ public sealed class CategoryTests : E2ETestBase
         MainPage.OpenCategories()
             .AddCategory("Pets E2E")
             .GoToEntries()
-            .AddEntry("Ração E2E", AppLabels.OneTime, "130", category: "Pets E2E");
+            .AddEntry("Ração E2E", AppLabels.OneTime, 130m, category: "Pets E2E");
 
         MainPage.VisibleEntryCategories.Should().ContainSingle().Which.Should().Be("Pets E2E");
 
@@ -94,7 +94,7 @@ public sealed class CategoryTests : E2ETestBase
     [Fact]
     public async Task DeleteCategory_UsedByEntry_KeepsEntryUncategorized()
     {
-        MainPage.AddEntry("Aluguel E2E", AppLabels.Recurrent, "1500", category: "Moradia");
+        MainPage.AddEntry("Aluguel E2E", AppLabels.Recurrent, 1500m, category: "Moradia");
 
         MainPage.OpenCategories()
             .DeleteCategory("Moradia")

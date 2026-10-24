@@ -1,3 +1,4 @@
+using System.Drawing;
 using FinanceApp.UITests.Infrastructure;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Appium;
@@ -30,6 +31,10 @@ public class MainPageObject
     private static readonly By MonthTitleButton = AppSession.AutomationId("MonthTitleButton");
     private static readonly By SummaryBar = AppSession.AutomationId("SummaryBar");
     private static readonly By GoToCurrentMonthButton = AppSession.AutomationId("GoToCurrentMonthButton");
+    private static readonly By PreviousMonthButton = AppSession.AutomationId("PreviousMonthButton");
+    private static readonly By NextMonthButton = AppSession.AutomationId("NextMonthButton");
+    private static readonly By SwipeHint = AppSession.AutomationId("SwipeHintLabel");
+    private static readonly By MonthPickerBadge = AppSession.AutomationId("MonthPickerBadge");
     private static readonly By FlyoutButton =
         MobileBy.AndroidUIAutomator("new UiSelector().className(\"android.widget.ImageButton\").instance(0)");
 
@@ -72,7 +77,7 @@ public class MainPageObject
     public MainPageObject AddEntry(
         string description,
         string recurrence,
-        string amount,
+        decimal amount,
         bool isIncome = false,
         string? installments = null,
         string? category = null)
@@ -173,6 +178,10 @@ public class MainPageObject
 
     public IReadOnlyList<string> VisibleEntryStatuses => _session.VisibleTexts(EntryStatus);
 
+    public PngImage CaptureEntryPaidIcon(string description) => CaptureInRow(description, EntryPaidIcon);
+
+    public PngImage CaptureEntryStatusLabel(string description) => CaptureInRow(description, EntryStatus);
+
     /// <summary>
     /// Long-presses the entry, taps "Excluir" and picks the option in the native action sheet.
     /// </summary>
@@ -224,19 +233,67 @@ public class MainPageObject
         return this;
     }
 
-    public MainPageObject GoToNextMonth()
+    public MainPageObject GoToNextMonth() => SwipeMonth("left", 1);
+
+    public MainPageObject GoToPreviousMonth() => SwipeMonth("right", -1);
+
+    /// <summary>
+    /// A swipe sent while the app is still settling (e.g. right after launch) is sometimes dropped by the
+    /// CarouselView. It is retried only when the month provably didn't change, so it can never overshoot.
+    /// </summary>
+    private MainPageObject SwipeMonth(string direction, int monthOffset)
+    {
+        const int maxAttempts = 3;
+        var original = MonthTitleText;
+        var expected = AppFormat.MonthTitle(CurrentMonth.AddMonths(monthOffset));
+
+        for (var attempt = 1; ; attempt++)
+        {
+            _session.SwipeHorizontally(direction);
+            try
+            {
+                _session.WaitForText(MonthTitle, expected, TimeSpan.FromSeconds(8));
+                return this;
+            }
+            catch (WebDriverTimeoutException) when (attempt < maxAttempts && MonthTitleText == original)
+            {
+            }
+        }
+    }
+
+    public MainPageObject TapNextMonthArrow()
     {
         var expected = AppFormat.MonthTitle(CurrentMonth.AddMonths(1));
-        _session.SwipeHorizontally("left");
+        _session.Tap(NextMonthButton);
         _session.WaitForText(MonthTitle, expected);
         return this;
     }
 
-    public MainPageObject GoToPreviousMonth()
+    public MainPageObject TapPreviousMonthArrow()
     {
         var expected = AppFormat.MonthTitle(CurrentMonth.AddMonths(-1));
-        _session.SwipeHorizontally("right");
+        _session.Tap(PreviousMonthButton);
         _session.WaitForText(MonthTitle, expected);
+        return this;
+    }
+
+    public bool IsPreviousMonthArrowEnabled => _session.WaitForVisible(PreviousMonthButton).Enabled;
+
+    public bool IsNextMonthArrowEnabled => _session.WaitForVisible(NextMonthButton).Enabled;
+
+    /// <summary>
+    /// On-screen bounds of the month title pill, its label and its ▾ badge, for layout assertions.
+    /// </summary>
+    public (Rectangle Pill, Rectangle Title, Rectangle Badge) MonthHeaderBounds =>
+        (Bounds(MonthTitleButton), Bounds(MonthTitle), Bounds(MonthPickerBadge));
+
+    public bool IsSwipeHintVisible => _session.IsVisible(SwipeHint);
+
+    public string SwipeHintText => _session.WaitForVisible(SwipeHint).Text;
+
+    public MainPageObject WaitForSwipeHintGone()
+    {
+        _session.WaitForGone(SwipeHint);
         return this;
     }
 
@@ -289,6 +346,15 @@ public class MainPageObject
         _session.WaitForVisible(EntryByDescription(description));
         return _session.Driver.FindElements(EntryRow)
             .First(r => r.Displayed && r.FindElements(EntryDescription).Any(d => d.Text == description));
+    }
+
+    private PngImage CaptureInRow(string description, By element) =>
+        AppSession.Capture(FindRow(description).FindElements(element).First(e => e.Displayed));
+
+    private Rectangle Bounds(By locator)
+    {
+        var element = _session.WaitForVisible(locator);
+        return new Rectangle(element.Location, element.Size);
     }
 
     private static By EntryByDescription(string description) =>

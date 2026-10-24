@@ -1,3 +1,4 @@
+using System.Globalization;
 using FinanceApp.UITests.Infrastructure;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Appium;
@@ -90,9 +91,13 @@ public class AddEntryPopupObject
         return this;
     }
 
-    public AddEntryPopupObject EnterAmount(string amount)
+    /// <summary>
+    /// The amount field is masked as currency and reads typed digits as cents, so 1500 is typed as "150000".
+    /// </summary>
+    public AddEntryPopupObject EnterAmount(decimal amount)
     {
-        Type(AmountEntry, amount);
+        Type(AmountEntry, decimal.ToInt64(amount * 100).ToString(CultureInfo.InvariantCulture));
+        _session.WaitForText(AmountEntry, AppFormat.Money(amount));
         return this;
     }
 
@@ -105,16 +110,9 @@ public class AddEntryPopupObject
     /// <summary>
     /// Opens the category picker's native dialog, reads its options and dismisses it without choosing.
     /// </summary>
-    public IReadOnlyList<string> CategoryOptions()
-    {
-        _session.HideKeyboardIfShown();
-        _session.Tap(CategoryPicker);
-        _session.WaitForVisible(PickerDialogOption);
-        var options = _session.VisibleTexts(PickerDialogOption);
-        _session.PressBack();
-        _session.WaitForGone(PickerDialogOption);
-        return options;
-    }
+    public IReadOnlyList<string> CategoryOptions() => PickerOptions(CategoryPicker);
+
+    public IReadOnlyList<string> RecurrenceOptions() => PickerOptions(RecurrencePicker);
 
     public string CategoryText => _session.WaitForVisible(CategoryPicker).Text;
 
@@ -138,6 +136,17 @@ public class AddEntryPopupObject
         entry.Clear();
         entry.SendKeys(text);
         _session.HideKeyboardIfShown();
+    }
+
+    private IReadOnlyList<string> PickerOptions(By picker)
+    {
+        _session.HideKeyboardIfShown();
+        _session.Tap(picker);
+        _session.WaitForVisible(PickerDialogOption);
+        var options = _session.VisibleTexts(PickerDialogOption);
+        _session.PressBack();
+        _session.WaitForGone(PickerDialogOption);
+        return options;
     }
 
     private void PickOption(By picker, string optionLabel)

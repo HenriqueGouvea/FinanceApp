@@ -15,7 +15,7 @@ public sealed class DeleteEntryTests : E2ETestBase
     [Fact]
     public async Task DeleteEntry_OneTime_RemovesFromListAndDatabase()
     {
-        MainPage.AddEntry("Presente E2E", AppLabels.OneTime, "80");
+        MainPage.AddEntry("Presente E2E", AppLabels.OneTime, 80m);
 
         MainPage.DeleteEntry("Presente E2E", AppLabels.Delete)
             .WaitForEntryGone("Presente E2E");
@@ -28,7 +28,7 @@ public sealed class DeleteEntryTests : E2ETestBase
     [Fact]
     public async Task DeleteEntry_RecurrentThisMonthOnly_HidesOnlyCurrentMonth()
     {
-        MainPage.AddEntry("Streaming E2E", AppLabels.Recurrent, "40");
+        MainPage.AddEntry("Streaming E2E", AppLabels.Recurrent, 40m);
 
         MainPage.DeleteEntry("Streaming E2E", AppLabels.DeleteThisMonth)
             .WaitForEntryGone("Streaming E2E");
@@ -46,7 +46,7 @@ public sealed class DeleteEntryTests : E2ETestBase
     public async Task DeleteEntry_RecurrentThisAndFutureMonths_KeepsPreviousMonths()
     {
         MainPage.GoToPreviousMonth()
-            .AddEntry("Condomínio E2E", AppLabels.Recurrent, "600")
+            .AddEntry("Condomínio E2E", AppLabels.Recurrent, 600m)
             .GoToNextMonth()
             .WaitForEntry("Condomínio E2E");
 
@@ -64,7 +64,7 @@ public sealed class DeleteEntryTests : E2ETestBase
     [Fact]
     public async Task DeleteEntry_RecurrentAllMonths_RemovesEverywhere()
     {
-        MainPage.AddEntry("Seguro E2E", AppLabels.Recurrent, "200");
+        MainPage.AddEntry("Seguro E2E", AppLabels.Recurrent, 200m);
         MainPage.GoToNextMonth()
             .DeleteEntry("Seguro E2E", AppLabels.DeleteThisMonth)
             .WaitForEntryGone("Seguro E2E");
@@ -82,7 +82,7 @@ public sealed class DeleteEntryTests : E2ETestBase
     [Fact]
     public async Task DeleteEntry_ActionSheetCancelled_KeepsEntry()
     {
-        MainPage.AddEntry("Luz E2E", AppLabels.Recurrent, "150");
+        MainPage.AddEntry("Luz E2E", AppLabels.Recurrent, 150m);
 
         MainPage.DeleteEntry("Luz E2E", AppLabels.Cancel);
 

@@ -5,6 +5,7 @@
                xmlns:vm="clr-namespace:FinanceApp.ViewModels"
                xmlns:models="clr-namespace:FinanceApp.Models"
                xmlns:converters="clr-namespace:FinanceApp.Converters"
+               xmlns:behaviors="clr-namespace:FinanceApp.Behaviors"
                x:Class="FinanceApp.Views.AddEntryPopup"
                x:DataType="vm:AddEntryViewModel">
 
@@ -101,10 +102,13 @@
                        TextColor="Gray" />
                 <Entry AutomationId="AmountEntry"
                        Placeholder="{Binding SelectedRecurrence, Converter={x:Static converters:RecurrenceTypeToAmountLabelConverter.Instance}}"
-                       Text="{Binding Amount}"
-                       Keyboard="Numeric" />
+                       Keyboard="Numeric">
+                    <Entry.Behaviors>
+                        <behaviors:CurrencyMaskBehavior Value="{Binding Amount}" />
+                    </Entry.Behaviors>
+                </Entry>
                 <Label AutomationId="InstallmentsTotalLabel"
-                       Text="{Binding InstallmentsTotal, StringFormat='Total: R$ {0:F2}'}"
+                       Text="{Binding InstallmentsTotal, Converter={x:Static converters:MoneyConverter.Instance}, StringFormat='Total: {0}'}"
                        FontSize="12"
                        TextColor="Gray"
                        IsVisible="{Binding InstallmentsTotal, Converter={x:Static converters:IsNotNullConverter.Instance}}" />

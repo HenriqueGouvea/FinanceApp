@@ -40,6 +40,66 @@ public sealed class MonthNavigationTests : E2ETestBase
     }
 
     [Fact]
+    public void MonthArrows_TapNextAndPrevious_StepOneMonth()
+    {
+        MainPage.TapNextMonthArrow();
+        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth.AddMonths(1)));
+
+        MainPage.TapPreviousMonthArrow().TapPreviousMonthArrow();
+        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth.AddMonths(-1)));
+    }
+
+    [Fact]
+    public void MonthArrows_AtRangeEdges_DisableArrowPointingOutOfRange()
+    {
+        MainPage.IsPreviousMonthArrowEnabled.Should().BeTrue();
+        MainPage.IsNextMonthArrowEnabled.Should().BeTrue();
+
+        MainPage.GoToMonth(AppFormat.CurrentMonth.AddMonths(24));
+        MainPage.IsNextMonthArrowEnabled.Should().BeFalse();
+        MainPage.IsPreviousMonthArrowEnabled.Should().BeTrue();
+
+        MainPage.GoToMonth(AppFormat.CurrentMonth.AddMonths(-24));
+        MainPage.IsPreviousMonthArrowEnabled.Should().BeFalse();
+        MainPage.IsNextMonthArrowEnabled.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(9)]
+    public void MonthHeader_LongMonthName_KeepsPickerBadgeInsidePill(int month)
+    {
+        var target = new DateTime(AppFormat.CurrentMonth.Year + 1, month, 1);
+
+        MainPage.GoToMonth(target);
+
+        var (pill, title, badge) = MainPage.MonthHeaderBounds;
+        pill.Contains(badge).Should().BeTrue($"the ▾ badge {badge} must sit inside the pill {pill}");
+        badge.Width.Should().BeGreaterThanOrEqualTo(badge.Height - 2, "a clipped badge would be narrower than it is tall");
+        title.Right.Should().BeLessThanOrEqualTo(badge.Left, "the month name must not overlap the badge");
+    }
+
+    [Fact]
+    public void SwipeHint_FreshInstall_ShownUntilFirstMonthChange()
+    {
+        MainPage.SwipeHintText.Should().Be(AppLabels.SwipeHint);
+
+        MainPage.GoToNextMonth().WaitForSwipeHintGone();
+
+        MainPage.GoToPreviousMonth();
+        MainPage.IsSwipeHintVisible.Should().BeFalse("the hint is dismissed for good once the user changes month");
+    }
+
+    [Fact]
+    public void SwipeHint_MonthChangedWithArrow_IsDismissed()
+    {
+        MainPage.TapNextMonthArrow().WaitForSwipeHintGone();
+
+        MainPage.TapPreviousMonthArrow();
+        MainPage.IsSwipeHintVisible.Should().BeFalse();
+    }
+
+    [Fact]
     public void GoToCurrentMonthButton_HiddenOnCurrentMonthAndShownAfterSwipe()
     {
         MainPage.IsGoToCurrentMonthVisible.Should().BeFalse();
@@ -132,7 +192,7 @@ public sealed class MonthNavigationTests : E2ETestBase
     [Fact]
     public void MonthPicker_JumpFarAway_LoadsThatMonthsEntries()
     {
-        MainPage.AddEntry("Aluguel E2E", AppLabels.Recurrent, "1500");
+        MainPage.AddEntry("Aluguel E2E", AppLabels.Recurrent, 1500m);
         var target = AppFormat.CurrentMonth.AddMonths(18);
 
         MainPage.GoToMonth(target).WaitForEntry("Aluguel E2E");
@@ -144,7 +204,7 @@ public sealed class MonthNavigationTests : E2ETestBase
     [Fact]
     public void AddEntry_InAnotherMonth_StartsInThatMonth()
     {
-        MainPage.GoToNextMonth().AddEntry("Viagem E2E", AppLabels.OneTime, "2000");
+        MainPage.GoToNextMonth().AddEntry("Viagem E2E", AppLabels.OneTime, 2000m);
 
         MainPage.GoToPreviousMonth();
         MainPage.IsEntryVisible("Viagem E2E").Should().BeFalse();
