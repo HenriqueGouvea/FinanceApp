@@ -510,6 +510,143 @@ public class AddEntryViewModelTests
         await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Id == entry.Id));
     }
 
+    // --- Estimated amount ---
+
+    [Fact]
+    public async Task Prepare_ResetsIsEstimated()
+    {
+        _vm.IsEstimated = true;
+
+        await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+
+        _vm.IsEstimated.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PrepareForEdit_EstimatedEntry_PrefillsIsEstimated()
+    {
+        var entry = MakeEntry();
+        entry.IsEstimated = true;
+
+        await _vm.PrepareForEditAsync(entry);
+
+        _vm.IsEstimated.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SaveCommand_WithIsEstimated_PassesItToService()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Recurrent;
+        _vm.IsEstimated = true;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.IsEstimated));
+    }
+
+    // --- Paid amount ---
+
+    [Fact]
+    public async Task PrepareForEdit_WithPaidAmount_PrefillsIt()
+    {
+        await _vm.PrepareForEditAsync(MakeEntry(), new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Local), 300m);
+
+        _vm.PaidAmount.Should().Be(300m);
+    }
+
+    [Fact]
+    public async Task Prepare_ResetsPaidAmount()
+    {
+        await _vm.PrepareForEditAsync(MakeEntry(), new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Local), 300m);
+
+        await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+
+        _vm.PaidAmount.Should().Be(0m);
+    }
+
+    [Theory]
+    [InlineData(FinancialEntryType.Outcome, "Valor já pago neste mês")]
+    [InlineData(FinancialEntryType.Income, "Valor já recebido neste mês")]
+    public void PaidAmountLabel_DependsOnEntryType(FinancialEntryType type, string expected)
+    {
+        _vm.EntryType = type;
+
+        _vm.PaidAmountLabel.Should().Be(expected);
+    }
+
+    [Fact]
+    public void EntryType_WhenChanged_RaisesPropertyChangedForPaidAmountLabel()
+    {
+        var notified = new List<string>();
+        _vm.PropertyChanged += (_, e) => notified.Add(e.PropertyName!);
+
+        _vm.EntryType = FinancialEntryType.Income;
+
+        notified.Should().Contain(nameof(AddEntryViewModel.PaidAmountLabel));
+    }
+
+    [Fact]
+    public async Task SaveCommand_EditingWithChangedPaidAmount_SetsItForTheOpenedMonth()
+    {
+        var entry = MakeEntry();
+        await _vm.PrepareForEditAsync(entry, new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Local), 0m);
+        _vm.PaidAmount = 250m;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        Received.InOrder(() =>
+        {
+            _service.SaveEntryAsync(Arg.Any<FinancialEntry>());
+            _service.SetPaidAmountAsync(entry.Id, 2026, 6, 250m);
+        });
+    }
+
+    [Fact]
+    public async Task SaveCommand_EditingWithClearedPaidAmount_SetsZero()
+    {
+        var entry = MakeEntry();
+        await _vm.PrepareForEditAsync(entry, new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Local), 250m);
+        _vm.PaidAmount = 0m;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SetPaidAmountAsync(entry.Id, 2026, 6, 0m);
+    }
+
+    [Fact]
+    public async Task SaveCommand_EditingWithUnchangedPaidAmount_DoesNotSetIt()
+    {
+        await _vm.PrepareForEditAsync(MakeEntry(), new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Local), 250m);
+        _vm.Amount = 900m;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.DidNotReceive().SetPaidAmountAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<decimal>());
+    }
+
+    [Fact]
+    public async Task SaveCommand_EditingWithoutMonth_SetsPaidAmountForStartMonth()
+    {
+        var entry = MakeEntry();
+        await _vm.PrepareForEditAsync(entry);
+        _vm.PaidAmount = 100m;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SetPaidAmountAsync(entry.Id, 2026, 4, 100m);
+    }
+
+    [Fact]
+    public async Task SaveCommand_NewEntry_DoesNotSetPaidAmount()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.OneTime;
+        _vm.PaidAmount = 100m;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.DidNotReceive().SetPaidAmountAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<decimal>());
+    }
+
     private static FinancialEntry MakeEntry() => new()
     {
         Id = 42,

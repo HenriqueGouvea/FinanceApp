@@ -214,6 +214,66 @@ public class MonthViewModelTests
         _vm.RevealedEntryId.Should().BeNull();
     }
 
+    // --- Paid / pending summary ---
+
+    [Fact]
+    public void PaidAndPendingTotals_WithNoEntries_ReturnZero()
+    {
+        _vm.ReceivedIncomes.Should().Be(0m);
+        _vm.PendingIncomes.Should().Be(0m);
+        _vm.PaidOutcomes.Should().Be(0m);
+        _vm.PendingOutcomes.Should().Be(0m);
+    }
+
+    [Fact]
+    public void PaidOutcomes_WithMixedStatuses_SumsPaidAndPartialAmountsOfOutcomesOnly()
+    {
+        _vm.Entries.Add(MakeProjection(300m, FinancialEntryType.Outcome, FinancialMonthlyEntryStatus.Paid, paidAmount: 300m));
+        _vm.Entries.Add(MakeProjection(800m, FinancialEntryType.Outcome, FinancialMonthlyEntryStatus.PartiallyPaid, paidAmount: 250m));
+        _vm.Entries.Add(MakeProjection(100m, FinancialEntryType.Outcome));
+        _vm.Entries.Add(MakeProjection(5000m, FinancialEntryType.Income, FinancialMonthlyEntryStatus.Paid, paidAmount: 5000m));
+
+        _vm.PaidOutcomes.Should().Be(550m);
+        _vm.PendingOutcomes.Should().Be(650m);
+    }
+
+    [Fact]
+    public void ReceivedIncomes_WithMixedStatuses_SumsReceivedAndPendingOfIncomesOnly()
+    {
+        _vm.Entries.Add(MakeProjection(5000m, FinancialEntryType.Income, FinancialMonthlyEntryStatus.Paid, paidAmount: 5000m));
+        _vm.Entries.Add(MakeProjection(1000m, FinancialEntryType.Income, FinancialMonthlyEntryStatus.PartiallyPaid, paidAmount: 400m));
+        _vm.Entries.Add(MakeProjection(200m, FinancialEntryType.Income));
+        _vm.Entries.Add(MakeProjection(300m, FinancialEntryType.Outcome, FinancialMonthlyEntryStatus.Paid, paidAmount: 300m));
+
+        _vm.ReceivedIncomes.Should().Be(5400m);
+        _vm.PendingIncomes.Should().Be(800m);
+    }
+
+    [Fact]
+    public void PaidAndPendingTotals_AlwaysAddUpToSectionTotals()
+    {
+        _vm.Entries.Add(MakeProjection(800m, FinancialEntryType.Outcome, FinancialMonthlyEntryStatus.PartiallyPaid, paidAmount: 250m));
+        _vm.Entries.Add(MakeProjection(100m, FinancialEntryType.Outcome, FinancialMonthlyEntryStatus.Paid, paidAmount: 100m));
+        _vm.Entries.Add(MakeProjection(1000m, FinancialEntryType.Income));
+
+        (_vm.PaidOutcomes + _vm.PendingOutcomes).Should().Be(_vm.TotalOutcomes);
+        (_vm.ReceivedIncomes + _vm.PendingIncomes).Should().Be(_vm.TotalIncomes);
+    }
+
+    [Fact]
+    public void Entries_WhenEntryAdded_RaisesPropertyChangedForPaidAndPendingTotals()
+    {
+        var notified = new List<string>();
+        _vm.PropertyChanged += (_, e) => notified.Add(e.PropertyName!);
+
+        _vm.Entries.Add(MakeProjection(100m, FinancialEntryType.Outcome));
+
+        notified.Should().Contain(nameof(MonthViewModel.ReceivedIncomes))
+            .And.Contain(nameof(MonthViewModel.PendingIncomes))
+            .And.Contain(nameof(MonthViewModel.PaidOutcomes))
+            .And.Contain(nameof(MonthViewModel.PendingOutcomes));
+    }
+
     // --- Entry actions ---
 
     [Fact]
@@ -226,7 +286,11 @@ public class MonthViewModelTests
         _vm.RevealedEntryId.Should().BeNull();
     }
 
-    private static MonthlyEntryProjection MakeProjection(decimal amount, FinancialEntryType type) =>
+    private static MonthlyEntryProjection MakeProjection(
+        decimal amount,
+        FinancialEntryType type,
+        FinancialMonthlyEntryStatus status = FinancialMonthlyEntryStatus.Pending,
+        decimal paidAmount = 0) =>
         new(
             FinancialEntryId: 1,
             FinancialMonthlyEntryId: null,
@@ -234,9 +298,10 @@ public class MonthViewModelTests
             EffectiveAmount: amount,
             EntryType: type,
             Category: null,
-            Status: FinancialMonthlyEntryStatus.Pending,
+            Status: status,
             IsProjected: true,
             InstallmentLabel: null,
-            InstallmentTotalAmount: null
+            InstallmentTotalAmount: null,
+            PaidAmount: paidAmount
         );
 }

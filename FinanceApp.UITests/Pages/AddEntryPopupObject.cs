@@ -12,11 +12,15 @@ public class AddEntryPopupObject
     private static readonly By EntryTypeToggle = AppSession.AutomationId("EntryTypeToggle");
     private static readonly By SelectIncomeButton = AppSession.AutomationId("SelectIncomeButton");
     private static readonly By SelectOutcomeButton = AppSession.AutomationId("SelectOutcomeButton");
-    private static readonly By RecurrencePicker = AppSession.AutomationId("RecurrencePicker");
+    private const string RecurrencePickerId = "RecurrencePicker";
+    private static readonly By RecurrencePicker = AppSession.AutomationId(RecurrencePickerId);
     private static readonly By InstallmentsEntry = AppSession.AutomationId("InstallmentsEntry");
     private static readonly By AmountEntry = AppSession.AutomationId("AmountEntry");
     private static readonly By InstallmentsTotal = AppSession.AutomationId("InstallmentsTotalLabel");
-    private static readonly By CategoryPicker = AppSession.AutomationId("CategoryPicker");
+    private const string CategoryPickerId = "CategoryPicker";
+    private const string EstimatedSwitchId = "EstimatedSwitch";
+    private const string PaidAmountEntryId = "PaidAmountEntry";
+    private const string PaidAmountLabelId = "PaidAmountLabel";
     private static readonly By PickerDialogOption = MobileBy.Id("android:id/text1");
     private const string SaveButtonId = "SaveEntryButton";
     private const string CancelButtonId = "CancelEntryButton";
@@ -81,7 +85,7 @@ public class AddEntryPopupObject
     /// </summary>
     public AddEntryPopupObject SelectRecurrence(string recurrenceLabel)
     {
-        PickOption(RecurrencePicker, recurrenceLabel);
+        PickOption(RecurrencePickerId, recurrenceLabel);
         return this;
     }
 
@@ -101,33 +105,82 @@ public class AddEntryPopupObject
         return this;
     }
 
+    public bool IsEstimated => _session.ScrollTo(EstimatedSwitchId).GetAttribute("checked") == "true";
+
+    public AddEntryPopupObject SetEstimated(bool isEstimated)
+    {
+        _session.HideKeyboardIfShown();
+        if (IsEstimated != isEstimated)
+            _session.ScrollTo(EstimatedSwitchId).Click();
+        _session.WaitFor(() => IsEstimated == isEstimated, $"the estimated switch to be {(isEstimated ? "on" : "off")}");
+        return this;
+    }
+
+    /// <summary>
+    /// The paid amount field only exists when editing and may sit below the fold, so the popup is scrolled to look for it.
+    /// </summary>
+    public bool IsPaidAmountVisible
+    {
+        get
+        {
+            _session.HideKeyboardIfShown();
+            return _session.TryScrollTo(PaidAmountEntryId) is not null;
+        }
+    }
+
+    public string PaidAmountLabelText => _session.ScrollTo(PaidAmountLabelId).Text;
+
+    public string PaidAmountText => _session.ScrollTo(PaidAmountEntryId).Text;
+
+    /// <summary>
+    /// Masked like the amount field: typed digits are read as cents.
+    /// </summary>
+    public AddEntryPopupObject EnterPaidAmount(decimal amount)
+    {
+        _session.HideKeyboardIfShown();
+        var entry = _session.ScrollTo(PaidAmountEntryId);
+        entry.Clear();
+        entry.SendKeys(decimal.ToInt64(amount * 100).ToString(CultureInfo.InvariantCulture));
+        _session.WaitForText(AppSession.AutomationId(PaidAmountEntryId), AppFormat.Money(amount));
+        _session.HideKeyboardIfShown();
+        return this;
+    }
+
+    public AddEntryPopupObject ClearPaidAmount()
+    {
+        _session.HideKeyboardIfShown();
+        _session.ScrollTo(PaidAmountEntryId).Clear();
+        _session.HideKeyboardIfShown();
+        return this;
+    }
+
     public AddEntryPopupObject SelectCategory(string categoryName)
     {
-        PickOption(CategoryPicker, categoryName);
+        PickOption(CategoryPickerId, categoryName);
         return this;
     }
 
     /// <summary>
     /// Opens the category picker's native dialog, reads its options and dismisses it without choosing.
     /// </summary>
-    public IReadOnlyList<string> CategoryOptions() => PickerOptions(CategoryPicker);
+    public IReadOnlyList<string> CategoryOptions() => PickerOptions(CategoryPickerId);
 
-    public IReadOnlyList<string> RecurrenceOptions() => PickerOptions(RecurrencePicker);
+    public IReadOnlyList<string> RecurrenceOptions() => PickerOptions(RecurrencePickerId);
 
-    public string CategoryText => _session.WaitForVisible(CategoryPicker).Text;
+    public string CategoryText => _session.ScrollTo(CategoryPickerId).Text;
 
     public void Save()
     {
         _session.HideKeyboardIfShown();
         _session.ScrollToAndTap(SaveButtonId);
-        _session.WaitForGone(DescriptionEntry);
+        _session.WaitForGone(AppSession.AutomationId(SaveButtonId));
     }
 
     public void Cancel()
     {
         _session.HideKeyboardIfShown();
         _session.ScrollToAndTap(CancelButtonId);
-        _session.WaitForGone(DescriptionEntry);
+        _session.WaitForGone(AppSession.AutomationId(CancelButtonId));
     }
 
     private void Type(By locator, string text)
@@ -138,10 +191,10 @@ public class AddEntryPopupObject
         _session.HideKeyboardIfShown();
     }
 
-    private IReadOnlyList<string> PickerOptions(By picker)
+    private IReadOnlyList<string> PickerOptions(string pickerId)
     {
         _session.HideKeyboardIfShown();
-        _session.Tap(picker);
+        _session.ScrollTo(pickerId).Click();
         _session.WaitForVisible(PickerDialogOption);
         var options = _session.VisibleTexts(PickerDialogOption);
         _session.PressBack();
@@ -149,11 +202,11 @@ public class AddEntryPopupObject
         return options;
     }
 
-    private void PickOption(By picker, string optionLabel)
+    private void PickOption(string pickerId, string optionLabel)
     {
         _session.HideKeyboardIfShown();
-        _session.Tap(picker);
+        _session.ScrollTo(pickerId).Click();
         _session.Tap(AppSession.Text(optionLabel));
-        _session.WaitForText(picker, optionLabel);
+        _session.WaitForText(AppSession.AutomationId(pickerId), optionLabel);
     }
 }

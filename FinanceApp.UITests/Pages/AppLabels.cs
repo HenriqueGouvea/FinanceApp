@@ -27,6 +27,9 @@ public static class AppLabels
     public const string MarkReceived = "Receber";
     public const string MarkPending = "Pendente";
 
+    public const string PaidAmountOutcome = "Valor já pago neste mês";
+    public const string PaidAmountIncome = "Valor já recebido neste mês";
+
     public const string GoToCurrentMonthBackward = "‹ Mês atual";
     public const string GoToCurrentMonthForward = "Mês atual ›";
     public const string SwipeHint = "Toque no mês para escolher ou deslize para os lados";

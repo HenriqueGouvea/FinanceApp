@@ -78,7 +78,7 @@ public partial class MainPage : ContentPage
         var popup = ResolvePopup<AddEntryPopup>();
         var vm = (AddEntryViewModel)popup.BindingContext;
 
-        await vm.PrepareForEditAsync(entry);
+        await vm.PrepareForEditAsync(entry, mainVm.SelectedMonth?.Date, projection.PaidAmount);
         vm.SetSaveCallback(async (_) =>
         {
             await popup.CloseAsync();

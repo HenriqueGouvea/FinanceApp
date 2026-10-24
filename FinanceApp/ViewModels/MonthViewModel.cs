@@ -42,6 +42,11 @@ public partial class MonthViewModel : ObservableObject
 
     public decimal Balance => TotalIncomes - TotalOutcomes;
 
+    public decimal ReceivedIncomes => IncomeEntries.Sum(e => e.PaidAmount);
+    public decimal PendingIncomes => IncomeEntries.Sum(e => e.PendingAmount);
+    public decimal PaidOutcomes => OutcomeEntries.Sum(e => e.PaidAmount);
+    public decimal PendingOutcomes => OutcomeEntries.Sum(e => e.PendingAmount);
+
     public int OutcomeCount => OutcomeEntries.Count();
     public int IncomeCount => IncomeEntries.Count();
 
@@ -52,6 +57,10 @@ public partial class MonthViewModel : ObservableObject
             OnPropertyChanged(nameof(TotalIncomes));
             OnPropertyChanged(nameof(TotalOutcomes));
             OnPropertyChanged(nameof(Balance));
+            OnPropertyChanged(nameof(ReceivedIncomes));
+            OnPropertyChanged(nameof(PendingIncomes));
+            OnPropertyChanged(nameof(PaidOutcomes));
+            OnPropertyChanged(nameof(PendingOutcomes));
             OnPropertyChanged(nameof(OutcomeEntries));
             OnPropertyChanged(nameof(IncomeEntries));
             OnPropertyChanged(nameof(OutcomeCount));
