@@ -1,3 +1,4 @@
+using System.Drawing;
 using FinanceApp.UITests.Infrastructure;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Appium;
@@ -33,6 +34,7 @@ public class MainPageObject
     private static readonly By PreviousMonthButton = AppSession.AutomationId("PreviousMonthButton");
     private static readonly By NextMonthButton = AppSession.AutomationId("NextMonthButton");
     private static readonly By SwipeHint = AppSession.AutomationId("SwipeHintLabel");
+    private static readonly By MonthPickerBadge = AppSession.AutomationId("MonthPickerBadge");
     private static readonly By FlyoutButton =
         MobileBy.AndroidUIAutomator("new UiSelector().className(\"android.widget.ImageButton\").instance(0)");
 
@@ -279,6 +281,12 @@ public class MainPageObject
 
     public bool IsNextMonthArrowEnabled => _session.WaitForVisible(NextMonthButton).Enabled;
 
+    /// <summary>
+    /// On-screen bounds of the month title pill, its label and its ▾ badge, for layout assertions.
+    /// </summary>
+    public (Rectangle Pill, Rectangle Title, Rectangle Badge) MonthHeaderBounds =>
+        (Bounds(MonthTitleButton), Bounds(MonthTitle), Bounds(MonthPickerBadge));
+
     public bool IsSwipeHintVisible => _session.IsVisible(SwipeHint);
 
     public string SwipeHintText => _session.WaitForVisible(SwipeHint).Text;
@@ -342,6 +350,12 @@ public class MainPageObject
 
     private PngImage CaptureInRow(string description, By element) =>
         AppSession.Capture(FindRow(description).FindElements(element).First(e => e.Displayed));
+
+    private Rectangle Bounds(By locator)
+    {
+        var element = _session.WaitForVisible(locator);
+        return new Rectangle(element.Location, element.Size);
+    }
 
     private static By EntryByDescription(string description) =>
         AppSession.AutomationIdWithText("EntryDescriptionLabel", description);

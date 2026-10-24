@@ -64,6 +64,21 @@ public sealed class MonthNavigationTests : E2ETestBase
         MainPage.IsNextMonthArrowEnabled.Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData(2)]
+    [InlineData(9)]
+    public void MonthHeader_LongMonthName_KeepsPickerBadgeInsidePill(int month)
+    {
+        var target = new DateTime(AppFormat.CurrentMonth.Year + 1, month, 1);
+
+        MainPage.GoToMonth(target);
+
+        var (pill, title, badge) = MainPage.MonthHeaderBounds;
+        pill.Contains(badge).Should().BeTrue($"the ▾ badge {badge} must sit inside the pill {pill}");
+        badge.Width.Should().BeGreaterThanOrEqualTo(badge.Height - 2, "a clipped badge would be narrower than it is tall");
+        title.Right.Should().BeLessThanOrEqualTo(badge.Left, "the month name must not overlap the badge");
+    }
+
     [Fact]
     public void SwipeHint_FreshInstall_ShownUntilFirstMonthChange()
     {

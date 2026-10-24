@@ -21,9 +21,9 @@
         <Style x:Key="MonthArrowButton" TargetType="Button">
             <Setter Property="FontSize" Value="26" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="WidthRequest" Value="48" />
-            <Setter Property="HeightRequest" Value="48" />
-            <Setter Property="CornerRadius" Value="24" />
+            <Setter Property="WidthRequest" Value="44" />
+            <Setter Property="HeightRequest" Value="44" />
+            <Setter Property="CornerRadius" Value="22" />
             <Setter Property="BackgroundColor" Value="{StaticResource MonthNavTint}" />
             <Setter Property="TextColor" Value="{StaticResource MonthNavAccent}" />
             <Setter Property="VerticalOptions" Value="Center" />
@@ -178,7 +178,7 @@
 
                             <!-- Month header: arrows step one month, the title pill opens the month/year picker -->
                             <VerticalStackLayout Spacing="6">
-                                <Grid ColumnDefinitions="48, *, 48" ColumnSpacing="6">
+                                <Grid ColumnDefinitions="44, *, 44" ColumnSpacing="6">
                                     <Button Grid.Column="0"
                                             AutomationId="PreviousMonthButton"
                                             Text="‹"
@@ -192,23 +192,28 @@
                                             Stroke="{StaticResource MonthNavAccent}"
                                             StrokeThickness="1"
                                             StrokeShape="RoundRectangle 24"
-                                            Padding="18,8,10,8"
-                                            MinimumHeightRequest="48">
+                                            Padding="14,8,8,8"
+                                            MinimumHeightRequest="44">
                                         <Border.GestureRecognizers>
                                             <TapGestureRecognizer Tapped="OnMonthTitleTapped" />
                                         </Border.GestureRecognizers>
-                                        <HorizontalStackLayout Spacing="8">
+                                        <!-- The badge has its own column so a long month name truncates instead of pushing it out of the pill -->
+                                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
                                             <Label AutomationId="MonthTitleLabel"
                                                    Text="{Binding MonthName}"
-                                                   FontSize="22"
+                                                   FontSize="20"
                                                    FontAttributes="Bold"
+                                                   LineBreakMode="TailTruncation"
+                                                   MaxLines="1"
                                                    TextColor="{StaticResource MonthNavAccent}"
                                                    VerticalOptions="Center" />
-                                            <Border BackgroundColor="{StaticResource MonthNavAccent}"
+                                            <Border Grid.Column="1"
+                                                    AutomationId="MonthPickerBadge"
+                                                    BackgroundColor="{StaticResource MonthNavAccent}"
                                                     StrokeThickness="0"
-                                                    StrokeShape="RoundRectangle 13"
-                                                    WidthRequest="26"
-                                                    HeightRequest="26"
+                                                    StrokeShape="RoundRectangle 12"
+                                                    WidthRequest="24"
+                                                    HeightRequest="24"
                                                     VerticalOptions="Center">
                                                 <Label Text="▾"
                                                        FontSize="16"
@@ -216,7 +221,7 @@
                                                        HorizontalOptions="Center"
                                                        VerticalOptions="Center" />
                                             </Border>
-                                        </HorizontalStackLayout>
+                                        </Grid>
                                     </Border>
 
                                     <Button Grid.Column="2"
