@@ -87,10 +87,49 @@ public sealed class AppSession : IDisposable
     /// </summary>
     public void ScrollToAndTap(string automationId)
     {
+        ScrollTo(automationId);
+        TapWhenSettled(AutomationId(automationId));
+    }
+
+    /// <summary>
+    /// Taps once the element stops moving, e.g. while a popup re-centers after the keyboard hides,
+    /// so the tap can't land where the element used to be.
+    /// </summary>
+    public void TapWhenSettled(By locator)
+    {
+        var last = Rectangle.Empty;
+        var element = WaitUntil(d =>
+        {
+            var current = d.FindElements(locator).FirstOrDefault(e => e.Displayed);
+            if (current is null)
+                return null;
+
+            var bounds = new Rectangle(current.Location, current.Size);
+            var settled = bounds == last;
+            last = bounds;
+            return settled ? current : null;
+        }, $"{locator} to stop moving", null)!;
+        element.Click();
+    }
+
+    public IWebElement ScrollTo(string automationId)
+    {
+        TryScrollTo(automationId);
+        return WaitForVisible(AutomationId(automationId));
+    }
+
+    /// <summary>
+    /// Scrolls until the element is on screen and returns it, or null without waiting when it doesn't exist.
+    /// The keyboard is hidden first: a scroll swipe over it would glide-type into the focused entry.
+    /// </summary>
+    public IWebElement? TryScrollTo(string automationId)
+    {
+        HideKeyboardIfShown();
+
         var selector = $"new UiSelector().resourceId(\"{E2ESettings.AppPackage}:id/{automationId}\")";
-        Driver.FindElements(MobileBy.AndroidUIAutomator(
-            $"new UiScrollable(new UiSelector().scrollable(true).packageName(\"{E2ESettings.AppPackage}\")).scrollIntoView({selector})"));
-        Tap(AutomationId(automationId));
+        return Driver.FindElements(MobileBy.AndroidUIAutomator(
+                $"new UiScrollable(new UiSelector().scrollable(true).packageName(\"{E2ESettings.AppPackage}\")).scrollIntoView({selector})"))
+            .FirstOrDefault(e => e.Displayed);
     }
 
     public void LongPress(IWebElement element, int durationMs = 1500)
@@ -102,6 +141,33 @@ public sealed class AppSession : IDisposable
             ["y"] = center.Y,
             ["duration"] = durationMs
         });
+    }
+
+    /// <summary>
+    /// Scrolls the page content up until the element ends above <paramref name="limitY"/> (e.g. the top of floating buttons).
+    /// </summary>
+    public void ScrollAbove(Func<IWebElement> element, int limitY)
+    {
+        bool IsClear()
+        {
+            var e = element();
+            return e.Location.Y + e.Size.Height <= limitY;
+        }
+
+        if (IsClear())
+            return;
+
+        var size = Driver.Manage().Window.Size;
+        Driver.ExecuteScript("mobile: scrollGesture", new Dictionary<string, object>
+        {
+            ["left"] = size.Width / 10,
+            ["top"] = size.Height / 4,
+            ["width"] = size.Width * 8 / 10,
+            ["height"] = size.Height / 2,
+            ["direction"] = "down",
+            ["percent"] = 1.0
+        });
+        WaitFor(IsClear, "the element to scroll above the floating buttons");
     }
 
     /// <summary>
@@ -131,8 +197,11 @@ public sealed class AppSession : IDisposable
 
     public void HideKeyboardIfShown()
     {
-        if (Driver.IsKeyboardShown())
-            Driver.HideKeyboard();
+        if (!Driver.IsKeyboardShown())
+            return;
+
+        Driver.HideKeyboard();
+        WaitFor(() => !Driver.IsKeyboardShown(), "the keyboard to hide");
     }
 
     public void Dispose() => Driver.Quit();

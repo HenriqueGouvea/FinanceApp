@@ -14,6 +14,7 @@ public class FinancialEntryRow
     public int EntryType { get; set; }
     public int? TotalInstallments { get; set; }
     public int? CategoryId { get; set; }
+    public bool IsEstimated { get; set; }
 }
 
 public class FinancialMonthlyEntryRow
@@ -24,6 +25,7 @@ public class FinancialMonthlyEntryRow
     public int Month { get; set; }
     public int Status { get; set; }
     public decimal? OverrideAmount { get; set; }
+    public decimal? PaidAmount { get; set; }
     public bool IsCancelled { get; set; }
 }
 

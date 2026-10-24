@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Runtime.CompilerServices;
 using FinanceApp.UITests.Infrastructure;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Appium;
@@ -12,6 +13,10 @@ public class MainPageObject
     private static readonly By SummaryIncome = AppSession.AutomationId("SummaryIncomeLabel");
     private static readonly By SummaryOutcome = AppSession.AutomationId("SummaryOutcomeLabel");
     private static readonly By SummaryBalance = AppSession.AutomationId("SummaryBalanceLabel");
+    private static readonly By SummaryReceived = AppSession.AutomationId("SummaryReceivedLabel");
+    private static readonly By SummaryToReceive = AppSession.AutomationId("SummaryToReceiveLabel");
+    private static readonly By SummaryPaid = AppSession.AutomationId("SummaryPaidLabel");
+    private static readonly By SummaryToPay = AppSession.AutomationId("SummaryToPayLabel");
     private static readonly By OutcomesHeader = AppSession.AutomationId("OutcomesHeader");
     private static readonly By OutcomeCount = AppSession.AutomationId("OutcomeCountLabel");
     private static readonly By OutcomeTotal = AppSession.AutomationId("OutcomeTotalLabel");
@@ -28,6 +33,9 @@ public class MainPageObject
     private static readonly By MarkPendingAction = AppSession.AutomationId("MarkPendingEntryAction");
     private static readonly By EntryPaidIcon = AppSession.AutomationId("EntryPaidIcon");
     private static readonly By EntryStatus = AppSession.AutomationId("EntryStatusLabel");
+    private static readonly By EntryPartialIcon = AppSession.AutomationId("EntryPartialIcon");
+    private static readonly By EntryPartial = AppSession.AutomationId("EntryPartialLabel");
+    private static readonly By EntryEstimatedIcon = AppSession.AutomationId("EntryEstimatedIcon");
     private static readonly By MonthTitleButton = AppSession.AutomationId("MonthTitleButton");
     private static readonly By SummaryBar = AppSession.AutomationId("SummaryBar");
     private static readonly By GoToCurrentMonthButton = AppSession.AutomationId("GoToCurrentMonthButton");
@@ -56,6 +64,10 @@ public class MainPageObject
     public string SummaryIncomeText => _session.WaitForVisible(SummaryIncome).Text;
     public string SummaryOutcomeText => _session.WaitForVisible(SummaryOutcome).Text;
     public string SummaryBalanceText => _session.WaitForVisible(SummaryBalance).Text;
+    public string SummaryReceivedText => _session.WaitForVisible(SummaryReceived).Text;
+    public string SummaryToReceiveText => _session.WaitForVisible(SummaryToReceive).Text;
+    public string SummaryPaidText => _session.WaitForVisible(SummaryPaid).Text;
+    public string SummaryToPayText => _session.WaitForVisible(SummaryToPay).Text;
     public string OutcomeCountText => _session.WaitForVisible(OutcomeCount).Text;
     public string OutcomeTotalText => _session.WaitForVisible(OutcomeTotal).Text;
     public string IncomeCountText => _session.WaitForVisible(IncomeCount).Text;
@@ -67,6 +79,15 @@ public class MainPageObject
     public IReadOnlyList<string> VisibleInstallmentLabels => _session.VisibleTexts(EntryInstallment);
 
     public bool IsEntryVisible(string description) => _session.IsVisible(EntryByDescription(description));
+
+    /// <summary>
+    /// Waits for a state that the page reaches asynchronously, e.g. after a save refreshes the month.
+    /// </summary>
+    public MainPageObject WaitFor(Func<bool> condition, [CallerArgumentExpression(nameof(condition))] string description = "")
+    {
+        _session.WaitFor(condition, description);
+        return this;
+    }
 
     public AddEntryPopupObject OpenAddEntry()
     {
@@ -80,7 +101,8 @@ public class MainPageObject
         decimal amount,
         bool isIncome = false,
         string? installments = null,
-        string? category = null)
+        string? category = null,
+        bool isEstimated = false)
     {
         var popup = OpenAddEntry().EnterDescription(description);
 
@@ -93,6 +115,9 @@ public class MainPageObject
             popup.EnterInstallments(installments);
 
         popup.EnterAmount(amount);
+
+        if (isEstimated)
+            popup.SetEstimated(true);
 
         if (category is not null)
             popup.SelectCategory(category);
@@ -177,6 +202,30 @@ public class MainPageObject
         FindRow(description).FindElements(EntryPaidIcon).Any(e => e.Displayed);
 
     public IReadOnlyList<string> VisibleEntryStatuses => _session.VisibleTexts(EntryStatus);
+
+    public bool IsEntryPartiallyPaid(string description) =>
+        FindRow(description).FindElements(EntryPartialIcon).Any(e => e.Displayed);
+
+    /// <summary>
+    /// The row's partial payment line (e.g. "Pago R$ 250,00 · falta R$ 550,00"), or null when not partially paid.
+    /// </summary>
+    public string? EntryPartialText(string description) =>
+        FindRow(description).FindElements(EntryPartial).FirstOrDefault(e => e.Displayed)?.Text;
+
+    public string EntryAmountText(string description) =>
+        FindRow(description).FindElements(EntryAmount).First(e => e.Displayed).Text;
+
+    public bool IsEntryEstimated(string description) =>
+        FindRow(description).FindElements(EntryEstimatedIcon).Any(e => e.Displayed);
+
+    /// <summary>
+    /// Opens the entry, enters the amount already paid this month and saves.
+    /// </summary>
+    public MainPageObject SetPaidAmount(string description, decimal paidAmount)
+    {
+        OpenEntry(description).EnterPaidAmount(paidAmount).Save();
+        return WaitForEntry(description);
+    }
 
     public PngImage CaptureEntryPaidIcon(string description) => CaptureInRow(description, EntryPaidIcon);
 
@@ -348,8 +397,16 @@ public class MainPageObject
             .First(r => r.Displayed && r.FindElements(EntryDescription).Any(d => d.Text == description));
     }
 
-    private PngImage CaptureInRow(string description, By element) =>
-        AppSession.Capture(FindRow(description).FindElements(element).First(e => e.Displayed));
+    /// <summary>
+    /// The element is first scrolled above the floating buttons at the bottom, which would otherwise tint its pixels.
+    /// </summary>
+    private PngImage CaptureInRow(string description, By element)
+    {
+        IWebElement Find() => FindRow(description).FindElements(element).First(e => e.Displayed);
+
+        _session.ScrollAbove(Find, _session.WaitForVisible(AddEntryButton).Location.Y);
+        return AppSession.Capture(Find());
+    }
 
     private Rectangle Bounds(By locator)
     {

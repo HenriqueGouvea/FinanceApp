@@ -16,6 +16,7 @@ public static class AppFormat
 
     public const int Pending = 0;
     public const int Paid = 1;
+    public const int PartiallyPaid = 2;
 
     private static readonly CultureInfo Culture = new("pt-BR");
 
@@ -28,6 +29,12 @@ public static class AppFormat
     }
 
     public static string EntryCount(int count) => $"{count} lançamento(s)";
+
+    /// <summary>
+    /// Partial payment line of an entry row (e.g. "Pago R$ 250,00 · falta R$ 550,00").
+    /// </summary>
+    public static string PartialPayment(string paidLabel, decimal paid, decimal pending) =>
+        $"{paidLabel} {Money(paid)} · falta {Money(pending)}";
 
     public static string MonthTitle(DateTime month)
     {
