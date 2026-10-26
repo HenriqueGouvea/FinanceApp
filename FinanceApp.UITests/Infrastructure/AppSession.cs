@@ -171,21 +171,34 @@ public sealed class AppSession : IDisposable
     }
 
     /// <summary>
-    /// Swipes horizontally across the middle of the screen. "left" moves the finger to the left.
+    /// Swipes horizontally across the lower middle of the screen, below the month summary (which takes
+    /// sideways swipes for its own pages). "left" moves the finger to the left.
     /// </summary>
     public void SwipeHorizontally(string direction)
     {
         var size = Driver.Manage().Window.Size;
+        Swipe(new Rectangle(size.Width / 10, size.Height / 2, size.Width * 8 / 10, size.Height / 5), direction);
+    }
+
+    /// <summary>
+    /// Swipes horizontally across the middle of the element. "left" moves the finger to the left.
+    /// The swipe stays clear of the screen edges, where Android's gesture navigation would take it as "back".
+    /// </summary>
+    public void SwipeOn(IWebElement element, string direction) =>
+        Swipe(new Rectangle(
+            element.Location.X + element.Size.Width / 5, element.Location.Y,
+            element.Size.Width * 3 / 5, element.Size.Height), direction);
+
+    private void Swipe(Rectangle area, string direction) =>
         Driver.ExecuteScript("mobile: swipeGesture", new Dictionary<string, object>
         {
-            ["left"] = size.Width / 10,
-            ["top"] = size.Height / 3,
-            ["width"] = size.Width * 8 / 10,
-            ["height"] = size.Height / 5,
+            ["left"] = area.X,
+            ["top"] = area.Y,
+            ["width"] = area.Width,
+            ["height"] = area.Height,
             ["direction"] = direction,
             ["percent"] = 0.75
         });
-    }
 
     /// <summary>
     /// Decodes the element's on-screen pixels, for asserting on rendered colors.
@@ -194,6 +207,19 @@ public sealed class AppSession : IDisposable
         PngImage.Decode(((ITakesScreenshot)element).GetScreenshot().AsByteArray);
 
     public void PressBack() => Driver.Navigate().Back();
+
+    /// <summary>
+    /// Closes the keyboard through its "Done" action. Unlike <see cref="HideKeyboardIfShown"/>, it can never fall
+    /// back to pressing Back, which would dismiss a popup without saving.
+    /// </summary>
+    public void CloseKeyboardWithDone()
+    {
+        if (!Driver.IsKeyboardShown())
+            return;
+
+        Driver.ExecuteScript("mobile: performEditorAction", new Dictionary<string, object> { ["action"] = "done" });
+        WaitFor(() => !Driver.IsKeyboardShown(), "the keyboard to close");
+    }
 
     public void HideKeyboardIfShown()
     {

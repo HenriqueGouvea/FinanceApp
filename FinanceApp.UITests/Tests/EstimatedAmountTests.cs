@@ -19,6 +19,7 @@ public sealed class EstimatedAmountTests : E2ETestBase
     {
         MainPage.IsEntryEstimated("Luz E2E").Should().BeTrue();
         MainPage.IsEntryEstimated("Aluguel E2E").Should().BeFalse();
+        MainPage.EntryEstimatedSymbol("Luz E2E").Should().Be(AppLabels.EstimatedSymbol);
         MainPage.EntryAmountText("Luz E2E").Should().Be(AppFormat.Money(200));
 
         MainPage.GoToNextMonth().WaitForEntry("Luz E2E");

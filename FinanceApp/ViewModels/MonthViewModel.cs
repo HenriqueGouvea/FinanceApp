@@ -24,6 +24,12 @@ public partial class MonthViewModel : ObservableObject
     [ObservableProperty]
     int? revealedEntryId;
 
+    /// <summary>
+    /// Page of the month summary: totals, paid/to pay or received/to receive.
+    /// </summary>
+    [ObservableProperty]
+    int summaryPage;
+
     public DateTime Date { get; set; }
 
     public IEnumerable<MonthlyEntryProjection> OutcomeEntries =>

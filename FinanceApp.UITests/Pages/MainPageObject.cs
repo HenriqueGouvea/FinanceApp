@@ -36,6 +36,8 @@ public class MainPageObject
     private static readonly By EntryPartialIcon = AppSession.AutomationId("EntryPartialIcon");
     private static readonly By EntryPartial = AppSession.AutomationId("EntryPartialLabel");
     private static readonly By EntryEstimatedIcon = AppSession.AutomationId("EntryEstimatedIcon");
+    private static readonly By PartialPaymentAction = AppSession.AutomationId("PartialPaymentEntryAction");
+    private static readonly By PagerDot = AppSession.AutomationId("PagerDot");
     private static readonly By MonthTitleButton = AppSession.AutomationId("MonthTitleButton");
     private static readonly By SummaryBar = AppSession.AutomationId("SummaryBar");
     private static readonly By GoToCurrentMonthButton = AppSession.AutomationId("GoToCurrentMonthButton");
@@ -61,13 +63,55 @@ public class MainPageObject
     }
 
     public string MonthTitleText => _session.WaitForVisible(MonthTitle).Text;
-    public string SummaryIncomeText => _session.WaitForVisible(SummaryIncome).Text;
-    public string SummaryOutcomeText => _session.WaitForVisible(SummaryOutcome).Text;
-    public string SummaryBalanceText => _session.WaitForVisible(SummaryBalance).Text;
-    public string SummaryReceivedText => _session.WaitForVisible(SummaryReceived).Text;
-    public string SummaryToReceiveText => _session.WaitForVisible(SummaryToReceive).Text;
-    public string SummaryPaidText => _session.WaitForVisible(SummaryPaid).Text;
-    public string SummaryToPayText => _session.WaitForVisible(SummaryToPay).Text;
+    public string SummaryIncomeText => SummaryValue(SummaryPage.Totals, SummaryIncome);
+    public string SummaryOutcomeText => SummaryValue(SummaryPage.Totals, SummaryOutcome);
+    public string SummaryBalanceText => SummaryValue(SummaryPage.Totals, SummaryBalance);
+    public string SummaryPaidText => SummaryValue(SummaryPage.Paid, SummaryPaid);
+    public string SummaryToPayText => SummaryValue(SummaryPage.Paid, SummaryToPay);
+    public string SummaryReceivedText => SummaryValue(SummaryPage.Received, SummaryReceived);
+    public string SummaryToReceiveText => SummaryValue(SummaryPage.Received, SummaryToReceive);
+
+    /// <summary>
+    /// The summary page currently shown, or null while none is fully displayed (e.g. mid-animation).
+    /// </summary>
+    public SummaryPage? VisibleSummaryPage =>
+        Enum.GetValues<SummaryPage>().Cast<SummaryPage?>().FirstOrDefault(p => _session.IsVisible(SummaryPageLocator(p!.Value)));
+
+    public MainPageObject SwipeSummary(string direction)
+    {
+        _session.SwipeOn(_session.WaitForVisible(SummaryBar), direction);
+        return this;
+    }
+
+    public MainPageObject WaitForSummaryPage(SummaryPage page)
+    {
+        _session.WaitFor(() => VisibleSummaryPage == page, $"the {page} summary page to show");
+        return this;
+    }
+
+    /// <summary>
+    /// Taps the page's dot below the summary (dots are ordered left to right like the pages).
+    /// </summary>
+    public MainPageObject TapSummaryDot(SummaryPage page)
+    {
+        _session.WaitForVisible(PagerDot);
+        _session.Driver.FindElements(PagerDot).Where(d => d.Displayed).OrderBy(d => d.Location.X).ElementAt((int)page).Click();
+        return WaitForSummaryPage(page);
+    }
+
+    private string SummaryValue(SummaryPage page, By value)
+    {
+        if (VisibleSummaryPage != page)
+            TapSummaryDot(page);
+        return _session.WaitForVisible(value).Text;
+    }
+
+    private static By SummaryPageLocator(SummaryPage page) => AppSession.AutomationId(page switch
+    {
+        SummaryPage.Totals => "SummaryTotalsPage",
+        SummaryPage.Paid => "SummaryPaidPage",
+        _ => "SummaryReceivedPage"
+    });
     public string OutcomeCountText => _session.WaitForVisible(OutcomeCount).Text;
     public string OutcomeTotalText => _session.WaitForVisible(OutcomeTotal).Text;
     public string IncomeCountText => _session.WaitForVisible(IncomeCount).Text;
@@ -214,6 +258,35 @@ public class MainPageObject
 
     public string EntryAmountText(string description) =>
         FindRow(description).FindElements(EntryAmount).First(e => e.Displayed).Text;
+
+    public string EntryEstimatedSymbol(string description) =>
+        FindRow(description).FindElements(EntryEstimatedIcon).First(e => e.Displayed)
+            .FindElement(By.ClassName("android.widget.TextView")).Text;
+
+    /// <summary>
+    /// Text of the partial payment action in the revealed menu ("Pagar parcial"/"Receber parcial"), or null when it isn't offered.
+    /// </summary>
+    public string? RevealedPartialPaymentActionText =>
+        FindRevealedAction(PartialPaymentAction)?.FindElement(By.ClassName("android.widget.TextView")).Text;
+
+    /// <summary>
+    /// Long-presses the entry and taps "Pagar parcial"/"Receber parcial".
+    /// </summary>
+    public PartialPaymentPopupObject OpenPartialPayment(string description)
+    {
+        RevealActions(description);
+        TapRevealedAction(PartialPaymentAction);
+        return new PartialPaymentPopupObject(_session).WaitUntilOpen();
+    }
+
+    /// <summary>
+    /// Adds a payment through the actions menu and waits for the row to show the new paid amount.
+    /// </summary>
+    public MainPageObject AddPartialPayment(string description, decimal amount)
+    {
+        OpenPartialPayment(description).EnterAmount(amount).Save();
+        return WaitForEntry(description);
+    }
 
     public bool IsEntryEstimated(string description) =>
         FindRow(description).FindElements(EntryEstimatedIcon).Any(e => e.Displayed);
@@ -417,3 +490,8 @@ public class MainPageObject
     private static By EntryByDescription(string description) =>
         AppSession.AutomationIdWithText("EntryDescriptionLabel", description);
 }
+
+/// <summary>
+/// Pages of the month summary, in swipe order.
+/// </summary>
+public enum SummaryPage { Totals = 0, Paid = 1, Received = 2 }

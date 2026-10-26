@@ -595,6 +595,67 @@ public class FinanceServiceTests
     }
 
     [Fact]
+    public async Task AddPaidAmountAsync_ProjectedEntry_PersistsPartiallyPaidRecord()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        await _service.AddPaidAmountAsync(entry.Id, 2026, 5, 30m);
+
+        var db = await _context.GetConnectionAsync();
+        var record = (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Should().ContainSingle().Subject;
+        record.Month.Should().Be(5);
+        record.PaidAmount.Should().Be(30m);
+        record.Status.Should().Be(FinancialMonthlyEntryStatus.PartiallyPaid);
+    }
+
+    [Fact]
+    public async Task AddPaidAmountAsync_PartiallyPaidEntry_AddsToPaidAmount()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 30m);
+
+        await _service.AddPaidAmountAsync(entry.Id, 2026, 4, 25m);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+        projection.IsPartiallyPaid.Should().BeTrue();
+        projection.PaidAmount.Should().Be(55m);
+        projection.PendingAmount.Should().Be(45m);
+    }
+
+    [Fact]
+    public async Task AddPaidAmountAsync_ReachingAmount_MarksEntryAsPaid()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 60m);
+
+        await _service.AddPaidAmountAsync(entry.Id, 2026, 4, 40m);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single().IsPaid.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AddPaidAmountAsync_PaidEntry_AddsOnTopOfWholeAmount()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        await _service.AddPaidAmountAsync(entry.Id, 2026, 4, 20m);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+        projection.IsPaid.Should().BeTrue();
+        projection.EffectiveAmount.Should().Be(120m);
+    }
+
+    [Fact]
+    public async Task AddPaidAmountAsync_UnknownEntry_DoesNotPersistRecord()
+    {
+        await _service.AddPaidAmountAsync(999, 2026, 4, 40m);
+
+        var db = await _context.GetConnectionAsync();
+        (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task GetMergedEntries_EstimatedTemplate_ProjectionIsEstimated()
     {
         var entry = new FinancialEntry

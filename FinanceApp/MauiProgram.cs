@@ -1,4 +1,5 @@
 ﻿using FinanceApp.Data;
+using FinanceApp.Controls;
 using FinanceApp.Services;
 using FinanceApp.ViewModels;
 using FinanceApp.Views;
@@ -21,6 +22,12 @@ public static class MauiProgram
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+            })
+            .ConfigureMauiHandlers(handlers =>
+            {
+#if ANDROID
+                handlers.AddHandler<SwipePager, SwipePagerHandler>();
+#endif
             });
 #if DEBUG
         builder.Logging.AddDebug();
@@ -36,12 +43,14 @@ public static class MauiProgram
         builder.Services.AddTransient<CategoriesViewModel>();
         builder.Services.AddTransient<CategoryEditViewModel>();
         builder.Services.AddTransient<MonthPickerViewModel>();
+        builder.Services.AddTransient<PartialPaymentViewModel>();
 
         builder.Services.AddTransient<MainPage>();
         builder.Services.AddTransient<AddEntryPopup>();
         builder.Services.AddTransient<CategoriesPage>();
         builder.Services.AddTransient<CategoryEditPopup>();
         builder.Services.AddTransient<MonthPickerPopup>();
+        builder.Services.AddTransient<PartialPaymentPopup>();
 
         return builder.Build();
     }

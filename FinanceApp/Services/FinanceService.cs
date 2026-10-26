@@ -146,7 +146,14 @@ public class FinanceService : IFinanceService
         }
     }
 
-    public async Task SetPaidAmountAsync(int entryId, int year, int month, decimal paidAmount)
+    public Task SetPaidAmountAsync(int entryId, int year, int month, decimal paidAmount) =>
+        UpdatePaidAmountAsync(entryId, year, month, (_, _) => paidAmount);
+
+    public Task AddPaidAmountAsync(int entryId, int year, int month, decimal amount) =>
+        UpdatePaidAmountAsync(entryId, year, month, (record, plannedAmount) =>
+            (record.PaidAmount ?? (record.Status == FinancialMonthlyEntryStatus.Paid ? plannedAmount : 0)) + amount);
+
+    private async Task UpdatePaidAmountAsync(int entryId, int year, int month, Func<FinancialMonthlyEntry, decimal, decimal> newPaidAmount)
     {
         try
         {
@@ -157,8 +164,10 @@ public class FinanceService : IFinanceService
                 return;
 
             var record = await GetOrCreateMonthlyRecordAsync(db, entryId, year, month);
+            var plannedAmount = record.OverrideAmount ?? template.Amount;
+            var paidAmount = newPaidAmount(record, plannedAmount);
             record.PaidAmount = paidAmount > 0 ? paidAmount : null;
-            record.Status = GetEffectiveStatus(record, record.OverrideAmount ?? template.Amount);
+            record.Status = GetEffectiveStatus(record, plannedAmount);
 
             await UpsertAsync(db, record);
         }

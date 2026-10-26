@@ -141,6 +141,26 @@ public partial class MainPage : ContentPage
         await mainVm.ToggleEntryStatusAsync(projection);
     }
 
+    private async void OnPartialPaymentClicked(object? sender, TappedEventArgs e)
+    {
+        if (GetProjection(sender) is not { } projection) return;
+        if (BindingContext is not MainViewModel { SelectedMonth: { } month } mainVm) return;
+
+        month.HideEntryActions();
+
+        var popup = ResolvePopup<PartialPaymentPopup>();
+        var vm = (PartialPaymentViewModel)popup.BindingContext;
+
+        vm.Prepare(projection, month.Date);
+        vm.SetSaveCallback(async () =>
+        {
+            await popup.CloseAsync();
+            await mainVm.RefreshAllAsync();
+        });
+
+        await this.ShowPopupAsync(popup);
+    }
+
     private async void OnMonthTitleTapped(object? sender, TappedEventArgs e)
     {
         if (BindingContext is not MainViewModel { SelectedMonth: { } month } mainVm) return;

@@ -46,7 +46,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Structure:**
 - `Tests/` — one class per feature area (`AddEntryTests`, `EditEntryTests`, `DeleteEntryTests`, `EntryActionsMenuTests`, `EntryStatusTests`, `MonthSummaryTests`, `PartialPaymentTests`, `EstimatedAmountTests`, `MonthNavigationTests`, `SectionToggleTests`, `CategoryTests`). Each class derives from `E2ETestBase` and must carry `[Collection(E2ECollection.Name)]` and `[Trait("Category", "E2E")]`. Shared arrange steps (e.g. creating the entry under test) go in the constructor.
-- `Pages/` — page objects (`MainPageObject`, `AddEntryPopupObject`, `CategoriesPageObject`, `MonthPickerPopupObject`). Tests never call Appium directly; add a page object method instead. User-facing pt-BR texts the tests select by live in `AppLabels`.
+- `Pages/` — page objects (`MainPageObject`, `AddEntryPopupObject`, `CategoriesPageObject`, `MonthPickerPopupObject`, `PartialPaymentPopupObject`). Tests never call Appium directly; add a page object method instead. User-facing pt-BR texts the tests select by live in `AppLabels`.
 - `Infrastructure/` — `AppSession` (driver, waits, gestures, diagnostics), `DeviceDatabase` + `TableRows` (DB assertions), `AppFormat` (expected money/month/count strings and enum values).
 
 **Rules:**
@@ -75,7 +75,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Services/:** All DB access is mediated by `IFinanceService` / `FinanceService`. Business logic lives here, not in ViewModels.
 - **ViewModels/:** UI state only. Depend on `IFinanceService` via constructor injection.
 - **Views/:** XAML pages and `CommunityToolkit.Maui.Views.Popup` subclasses.
-- **Controls/:** Reusable code-only UI controls (e.g. `SlideOutPanel`, the animated entry actions menu revealed by long press).
+- **Controls/:** Reusable code-only UI controls (e.g. `SlideOutPanel`, the animated entry actions menu revealed by long press; `SwipePager`, the month summary pages switched by swiping or tapping dots. On Android `Platforms/Android/SwipePagerHandler.cs` keeps the month carousel from stealing its swipes).
 - **Behaviors/:** Reusable `Behavior<T>` classes attached in XAML (e.g. `CurrencyMaskBehavior`, which turns an `Entry` into an "R$ 1.000,00" currency field; bind its `Value` instead of the entry's `Text`).
 - **Converters/:** Format every displayed amount with `MoneyConverter` (never a raw `StringFormat`), so the app shows a single currency format. Value converters use a `static readonly Instance` singleton pattern (e.g., `EntryTypeToColorConverter.Instance`). They are not registered in DI — reference them directly in XAML via `{x:Static}`.
 
@@ -84,7 +84,7 @@ All registrations are in `MauiProgram.cs`:
 - `IDatabaseContext` → Singleton (resolved by `DatabaseContext`)
 - `IFinanceService`, `ICategoryService`, `IPreferencesService` → Singleton
 - `IMessenger` → Singleton (`WeakReferenceMessenger.Default`), used to broadcast `CategoriesChangedMessage` so `MainViewModel` refreshes
-- `MainViewModel`, `AddEntryViewModel`, `CategoriesViewModel`, `CategoryEditViewModel`, `MonthPickerViewModel`, `MainPage`, `AddEntryPopup`, `CategoriesPage`, `CategoryEditPopup`, `MonthPickerPopup` → Transient
+- `MainViewModel`, `AddEntryViewModel`, `CategoriesViewModel`, `CategoryEditViewModel`, `MonthPickerViewModel`, `PartialPaymentViewModel`, `MainPage`, `AddEntryPopup`, `CategoriesPage`, `CategoryEditPopup`, `MonthPickerPopup`, `PartialPaymentPopup` → Transient
 
 Never manually instantiate services or ViewModels. If a new service or VM is added, register it in `MauiProgram.cs`.
 

@@ -36,7 +36,7 @@ public sealed class PartialPaymentTests : E2ETestBase
         MainPage.SetPaidAmount("Mercado E2E", 250m);
 
         MainPage.WaitFor(() => MainPage.IsEntryPartiallyPaid("Mercado E2E"));
-        MainPage.EntryPartialText("Mercado E2E").Should().Be(AppFormat.PartialPayment(AppLabels.Paid, 250, 550));
+        MainPage.EntryPartialText("Mercado E2E").Should().Be(AppFormat.PartialPayment(250, AppLabels.PartialPaidOutcome));
         MainPage.EntryAmountText("Mercado E2E").Should().Be(AppFormat.Money(800));
         MainPage.IsEntryPaid("Mercado E2E").Should().BeFalse();
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(250));
@@ -149,7 +149,7 @@ public sealed class PartialPaymentTests : E2ETestBase
         MainPage.SetPaidAmount("Freela E2E", 400m);
 
         MainPage.WaitFor(() => MainPage.IsEntryPartiallyPaid("Freela E2E"));
-        MainPage.EntryPartialText("Freela E2E").Should().Be(AppFormat.PartialPayment(AppLabels.Received, 400, 600));
+        MainPage.EntryPartialText("Freela E2E").Should().Be(AppFormat.PartialPayment(400, AppLabels.PartialPaidIncome));
         MainPage.SummaryReceivedText.Should().Be(AppFormat.Money(400));
         MainPage.SummaryToReceiveText.Should().Be(AppFormat.Money(600));
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(0), "outcomes are untouched");
@@ -170,7 +170,7 @@ public sealed class PartialPaymentTests : E2ETestBase
         MainPage.GoToNextMonth().SetPaidAmount("Notebook E2E", 100m);
 
         MainPage.WaitFor(() => MainPage.IsEntryPartiallyPaid("Notebook E2E"));
-        MainPage.EntryPartialText("Notebook E2E").Should().Be(AppFormat.PartialPayment(AppLabels.Paid, 100, 200));
+        MainPage.EntryPartialText("Notebook E2E").Should().Be(AppFormat.PartialPayment(100, AppLabels.PartialPaidOutcome));
         MainPage.GoToPreviousMonth().WaitForEntry("Notebook E2E");
         MainPage.IsEntryPartiallyPaid("Notebook E2E").Should().BeFalse();
 
@@ -180,5 +180,110 @@ public sealed class PartialPaymentTests : E2ETestBase
         record.Year.Should().Be(nextMonth.Year);
         record.Month.Should().Be(nextMonth.Month);
         record.PaidAmount.Should().Be(100m);
+    }
+
+    [Fact]
+    public async Task PartialPaymentAction_PendingOutcome_AddsPaymentAndShowsAlreadySpent()
+    {
+        MainPage.RevealActions("Mercado E2E");
+        MainPage.RevealedPartialPaymentActionText.Should().Be(AppLabels.MarkPartialPaid);
+        MainPage.TapSummaryBar();
+        MainPage.WaitForActionsHidden();
+
+        var popup = MainPage.OpenPartialPayment("Mercado E2E");
+        popup.TitleText.Should().Be(AppLabels.MarkPartialPaid);
+        popup.DescriptionText.Should().Be("Mercado E2E");
+        popup.ProgressText.Should().Be(AppFormat.PartialPaymentProgress(AppLabels.AlreadySpent, 0, 800));
+        popup.EnterAmount(150m);
+        popup.NewTotalText.Should().Be(AppFormat.PartialPaymentNewTotal(150));
+        popup.Save();
+
+        MainPage.WaitFor(() => MainPage.EntryPartialText("Mercado E2E") == AppFormat.PartialPayment(150, AppLabels.PartialPaidOutcome));
+        MainPage.IsEntryPartiallyPaid("Mercado E2E").Should().BeTrue();
+        MainPage.SummaryPaidText.Should().Be(AppFormat.Money(150));
+        MainPage.SummaryToPayText.Should().Be(AppFormat.Money(650));
+
+        var record = (await GetMonthlyEntryRowsAsync()).Should().ContainSingle().Subject;
+        record.Month.Should().Be(AppFormat.CurrentMonth.Month);
+        record.Status.Should().Be(AppFormat.PartiallyPaid);
+        record.PaidAmount.Should().Be(150m);
+    }
+
+    [Fact]
+    public async Task PartialPaymentAction_Twice_AddsUpPayments()
+    {
+        MainPage.AddPartialPayment("Mercado E2E", 150m);
+        MainPage.WaitFor(() => MainPage.IsEntryPartiallyPaid("Mercado E2E"));
+
+        var popup = MainPage.OpenPartialPayment("Mercado E2E");
+        popup.ProgressText.Should().Be(AppFormat.PartialPaymentProgress(AppLabels.AlreadySpent, 150, 800));
+        popup.EnterAmount(100m);
+        popup.NewTotalText.Should().Be(AppFormat.PartialPaymentNewTotal(250));
+        popup.Save();
+
+        MainPage.WaitFor(() => MainPage.EntryPartialText("Mercado E2E") == AppFormat.PartialPayment(250, AppLabels.PartialPaidOutcome));
+        (await GetMonthlyEntryRowsAsync()).Should().ContainSingle().Which.PaidAmount.Should().Be(250m);
+    }
+
+    [Fact]
+    public async Task PartialPaymentAction_ReachingAmount_MarksPaidAndNoLongerOffersPartialPayment()
+    {
+        MainPage.AddPartialPayment("Mercado E2E", 300m);
+        MainPage.WaitFor(() => MainPage.IsEntryPartiallyPaid("Mercado E2E"));
+
+        MainPage.AddPartialPayment("Mercado E2E", 500m);
+
+        MainPage.WaitFor(() => MainPage.IsEntryPaid("Mercado E2E"));
+        MainPage.EntryPartialText("Mercado E2E").Should().BeNull();
+        MainPage.RevealActions("Mercado E2E");
+        MainPage.RevealedPartialPaymentActionText.Should().BeNull("a paid entry has nothing left to pay");
+        MainPage.RevealedStatusActionText.Should().Be(AppLabels.MarkPending);
+
+        var record = (await GetMonthlyEntryRowsAsync()).Should().ContainSingle().Subject;
+        record.Status.Should().Be(AppFormat.Paid);
+        record.PaidAmount.Should().Be(800m);
+    }
+
+    [Fact]
+    public async Task PartialPaymentAction_Income_UsesReceiveLabels()
+    {
+        MainPage.AddEntry("Freela E2E", AppLabels.OneTime, 1000m, isIncome: true);
+        MainPage.RevealActions("Freela E2E");
+        MainPage.RevealedPartialPaymentActionText.Should().Be(AppLabels.MarkPartialReceived);
+        MainPage.TapSummaryBar();
+        MainPage.WaitForActionsHidden();
+
+        var popup = MainPage.OpenPartialPayment("Freela E2E");
+        popup.TitleText.Should().Be(AppLabels.MarkPartialReceived);
+        popup.ProgressText.Should().Be(AppFormat.PartialPaymentProgress(AppLabels.AlreadyReceived, 0, 1000));
+        popup.EnterAmount(400m).Save();
+
+        MainPage.WaitFor(() => MainPage.EntryPartialText("Freela E2E") == AppFormat.PartialPayment(400, AppLabels.PartialPaidIncome));
+        MainPage.SummaryReceivedText.Should().Be(AppFormat.Money(400));
+        MainPage.SummaryToReceiveText.Should().Be(AppFormat.Money(600));
+
+        var income = (await GetEntryRowsAsync()).Single(e => e.EntryType == AppFormat.Income);
+        var record = (await GetMonthlyEntryRowsAsync()).Should().ContainSingle().Subject;
+        record.FinancialEntryId.Should().Be(income.Id);
+        record.PaidAmount.Should().Be(400m);
+    }
+
+    [Fact]
+    public void PartialPaymentAction_NoAmount_CannotSave()
+    {
+        var popup = MainPage.OpenPartialPayment("Mercado E2E");
+
+        popup.IsSaveEnabled.Should().BeFalse();
+        popup.EnterAmount(10m);
+        popup.IsSaveEnabled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task PartialPaymentAction_Cancel_SavesNothing()
+    {
+        MainPage.OpenPartialPayment("Mercado E2E").EnterAmount(150m).Cancel();
+
+        MainPage.IsEntryPartiallyPaid("Mercado E2E").Should().BeFalse();
+        (await GetMonthlyEntryRowsAsync()).Should().BeEmpty();
     }
 }

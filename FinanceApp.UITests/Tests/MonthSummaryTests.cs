@@ -70,4 +70,53 @@ public sealed class MonthSummaryTests : E2ETestBase
         MainPage.WaitFor(() => MainPage.SummaryToPayText == AppFormat.Money(1500));
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(0));
     }
+
+    [Fact]
+    public void Summary_FreshMonth_ShowsTotalsPageFirst()
+    {
+        MainPage.VisibleSummaryPage.Should().Be(SummaryPage.Totals);
+        MainPage.SummaryIncomeText.Should().Be(AppFormat.Money(5000));
+        MainPage.SummaryOutcomeText.Should().Be(AppFormat.Money(1620));
+        MainPage.SummaryBalanceText.Should().Be(AppFormat.Money(3380));
+    }
+
+    [Fact]
+    public void SwipeSummary_Left_ShowsPaidThenReceivedPagesWithoutChangingMonth()
+    {
+        var month = MainPage.MonthTitleText;
+
+        MainPage.SwipeSummary("left").WaitForSummaryPage(SummaryPage.Paid);
+        MainPage.MonthTitleText.Should().Be(month, "swiping the summary must not change month");
+
+        MainPage.SwipeSummary("left").WaitForSummaryPage(SummaryPage.Received);
+        MainPage.SwipeSummary("left");
+        MainPage.WaitForSummaryPage(SummaryPage.Received);
+        MainPage.MonthTitleText.Should().Be(month);
+    }
+
+    [Fact]
+    public void SwipeSummary_Right_GoesBackToPreviousPage()
+    {
+        MainPage.SwipeSummary("left").WaitForSummaryPage(SummaryPage.Paid);
+
+        MainPage.SwipeSummary("right").WaitForSummaryPage(SummaryPage.Totals);
+    }
+
+    [Fact]
+    public void TapSummaryDot_AnyPage_ShowsThatPage()
+    {
+        MainPage.TapSummaryDot(SummaryPage.Received);
+        MainPage.TapSummaryDot(SummaryPage.Paid);
+        MainPage.TapSummaryDot(SummaryPage.Totals);
+    }
+
+    [Fact]
+    public void SummaryPage_ChangeMonth_KeepsSelectedPage()
+    {
+        MainPage.SwipeSummary("left").WaitForSummaryPage(SummaryPage.Paid);
+
+        MainPage.GoToNextMonth().WaitForEntry("Internet E2E");
+
+        MainPage.VisibleSummaryPage.Should().Be(SummaryPage.Paid);
+    }
 }
