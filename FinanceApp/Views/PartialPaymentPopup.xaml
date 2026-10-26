@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+               xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+               xmlns:toolkit="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
+               xmlns:vm="clr-namespace:FinanceApp.ViewModels"
+               xmlns:converters="clr-namespace:FinanceApp.Converters"
+               xmlns:behaviors="clr-namespace:FinanceApp.Behaviors"
+               x:Class="FinanceApp.Views.PartialPaymentPopup"
+               x:DataType="vm:PartialPaymentViewModel">
+
+    <Border BackgroundColor="White"
+            StrokeShape="RoundRectangle 12"
+            Padding="20"
+            WidthRequest="330"
+            VerticalOptions="Center">
+
+        <VerticalStackLayout Spacing="12">
+            <VerticalStackLayout HorizontalOptions="Center">
+                <Label AutomationId="PartialPaymentTitleLabel"
+                       Text="{Binding Title}"
+                       FontSize="20"
+                       FontAttributes="Bold"
+                       HorizontalOptions="Center" />
+                <Label AutomationId="PartialPaymentDescriptionLabel"
+                       Text="{Binding Description}"
+                       FontSize="14"
+                       TextColor="Gray"
+                       HorizontalOptions="Center" />
+            </VerticalStackLayout>
+
+            <Label AutomationId="PartialPaymentProgressLabel" FontSize="13" HorizontalOptions="Center">
+                <Label.Text>
+                    <MultiBinding StringFormat="{}{0}: {1} de {2}">
+                        <Binding Path="PaidAmountLabel" />
+                        <Binding Path="PaidAmount" Converter="{x:Static converters:MoneyConverter.Instance}" />
+                        <Binding Path="TotalAmount" Converter="{x:Static converters:MoneyConverter.Instance}" />
+                    </MultiBinding>
+                </Label.Text>
+            </Label>
+
+            <VerticalStackLayout Spacing="2">
+                <Label Text="{Binding AmountLabel}" FontSize="12" TextColor="Gray" />
+                <Entry x:Name="AmountEntry"
+                       AutomationId="PartialPaymentAmountEntry"
+                       Placeholder="{Binding AmountLabel}"
+                       Keyboard="Numeric">
+                    <Entry.Behaviors>
+                        <behaviors:CurrencyMaskBehavior Value="{Binding Amount}" />
+                    </Entry.Behaviors>
+                </Entry>
+                <Label AutomationId="PartialPaymentNewTotalLabel"
+                       Text="{Binding NewPaidAmount, Converter={x:Static converters:MoneyConverter.Instance}, StringFormat='Novo total: {0}'}"
+                       FontSize="12"
+                       TextColor="Gray" />
+            </VerticalStackLayout>
+
+            <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,8,0,0">
+                <Button Grid.Column="0" AutomationId="CancelPartialPaymentButton" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />
+                <Button Grid.Column="1" AutomationId="SavePartialPaymentButton" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="Purple" />
+            </Grid>
+        </VerticalStackLayout>
+    </Border>
+</toolkit:Popup>

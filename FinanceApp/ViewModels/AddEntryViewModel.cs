@@ -14,6 +14,8 @@ public partial class AddEntryViewModel : ObservableObject
     private DateTime _targetMonth;
     private int _editingEntryId;
     private DateTime? _editingEndDate;
+    private DateTime _editingMonth;
+    private decimal _initialPaidAmount;
     private int? _editingCategoryId;
     private IReadOnlyList<FinancialCategory> _allCategories = [];
 
@@ -24,11 +26,14 @@ public partial class AddEntryViewModel : ObservableObject
     [ObservableProperty] FinancialEntryType entryType = FinancialEntryType.Outcome;
     [ObservableProperty] RecurrenceType? selectedRecurrence;
     [ObservableProperty] int? totalInstallments;
+    [ObservableProperty] bool isEstimated;
+    [ObservableProperty] decimal paidAmount;
 
     public bool HasRecurrence => SelectedRecurrence is not null;
     public bool IsInstallments => SelectedRecurrence == RecurrenceType.Installments;
     public decimal? InstallmentsTotal => IsInstallments && TotalInstallments is > 0 ? Amount * TotalInstallments : null;
     public bool IsIncome => EntryType == FinancialEntryType.Income;
+    public string PaidAmountLabel => IsIncome ? "Valor já recebido neste mês" : "Valor já pago neste mês";
     public bool IsEditing => _editingEntryId != 0;
     public double StructuralFieldsOpacity => IsEditing ? 0.4 : 1.0;
 
@@ -64,6 +69,7 @@ public partial class AddEntryViewModel : ObservableObject
     partial void OnEntryTypeChanged(FinancialEntryType value)
     {
         OnPropertyChanged(nameof(IsIncome));
+        OnPropertyChanged(nameof(PaidAmountLabel));
         FilterCategories();
     }
 
@@ -85,9 +91,15 @@ public partial class AddEntryViewModel : ObservableObject
         FilterCategories();
         SelectedRecurrence = null;
         TotalInstallments = null;
+        IsEstimated = false;
+        PaidAmount = 0;
+        _initialPaidAmount = 0;
     }
 
-    public async Task PrepareForEditAsync(FinancialEntry entry)
+    /// <summary>
+    /// Edits the template, plus the amount already paid in <paramref name="month"/> (defaults to the start month).
+    /// </summary>
+    public async Task PrepareForEditAsync(FinancialEntry entry, DateTime? month = null, decimal paidAmount = 0)
     {
         _editingEntryId = entry.Id;
         _editingEndDate = entry.EndDate;
@@ -105,6 +117,10 @@ public partial class AddEntryViewModel : ObservableObject
         SelectedCategory = Categories.FirstOrDefault(c => c.Id == entry.CategoryId);
         SelectedRecurrence = entry.Recurrence;
         TotalInstallments = entry.TotalInstallments;
+        IsEstimated = entry.IsEstimated;
+        _editingMonth = month ?? _targetMonth;
+        PaidAmount = paidAmount;
+        _initialPaidAmount = paidAmount;
     }
 
     [RelayCommand]
@@ -129,10 +145,15 @@ public partial class AddEntryViewModel : ObservableObject
             EndDate = _editingEndDate,
             EntryType = EntryType,
             Recurrence = recurrence,
-            TotalInstallments = TotalInstallments
+            TotalInstallments = TotalInstallments,
+            IsEstimated = IsEstimated
         };
 
         await _financeService.SaveEntryAsync(entry);
+
+        if (IsEditing && PaidAmount != _initialPaidAmount)
+            await _financeService.SetPaidAmountAsync(entry.Id, _editingMonth.Year, _editingMonth.Month, PaidAmount);
+
         _onSaved?.Invoke(entry);
     }
 

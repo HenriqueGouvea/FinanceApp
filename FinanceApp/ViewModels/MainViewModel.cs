@@ -218,6 +218,11 @@ public partial class MainViewModel : ObservableObject, IRecipient<CategoriesChan
                 foreach (var m in Months.Where(m => m != changedVm))
                     m.IsOutcomesExpanded = changedVm.IsOutcomesExpanded;
             }
+            else if (e.PropertyName == nameof(MonthViewModel.SummaryPage))
+            {
+                foreach (var m in Months.Where(m => m != changedVm))
+                    m.SummaryPage = changedVm.SummaryPage;
+            }
         }
         finally
         {

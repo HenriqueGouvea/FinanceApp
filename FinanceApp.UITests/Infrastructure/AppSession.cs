@@ -87,10 +87,49 @@ public sealed class AppSession : IDisposable
     /// </summary>
     public void ScrollToAndTap(string automationId)
     {
+        ScrollTo(automationId);
+        TapWhenSettled(AutomationId(automationId));
+    }
+
+    /// <summary>
+    /// Taps once the element stops moving, e.g. while a popup re-centers after the keyboard hides,
+    /// so the tap can't land where the element used to be.
+    /// </summary>
+    public void TapWhenSettled(By locator)
+    {
+        var last = Rectangle.Empty;
+        var element = WaitUntil(d =>
+        {
+            var current = d.FindElements(locator).FirstOrDefault(e => e.Displayed);
+            if (current is null)
+                return null;
+
+            var bounds = new Rectangle(current.Location, current.Size);
+            var settled = bounds == last;
+            last = bounds;
+            return settled ? current : null;
+        }, $"{locator} to stop moving", null)!;
+        element.Click();
+    }
+
+    public IWebElement ScrollTo(string automationId)
+    {
+        TryScrollTo(automationId);
+        return WaitForVisible(AutomationId(automationId));
+    }
+
+    /// <summary>
+    /// Scrolls until the element is on screen and returns it, or null without waiting when it doesn't exist.
+    /// The keyboard is hidden first: a scroll swipe over it would glide-type into the focused entry.
+    /// </summary>
+    public IWebElement? TryScrollTo(string automationId)
+    {
+        HideKeyboardIfShown();
+
         var selector = $"new UiSelector().resourceId(\"{E2ESettings.AppPackage}:id/{automationId}\")";
-        Driver.FindElements(MobileBy.AndroidUIAutomator(
-            $"new UiScrollable(new UiSelector().scrollable(true).packageName(\"{E2ESettings.AppPackage}\")).scrollIntoView({selector})"));
-        Tap(AutomationId(automationId));
+        return Driver.FindElements(MobileBy.AndroidUIAutomator(
+                $"new UiScrollable(new UiSelector().scrollable(true).packageName(\"{E2ESettings.AppPackage}\")).scrollIntoView({selector})"))
+            .FirstOrDefault(e => e.Displayed);
     }
 
     public void LongPress(IWebElement element, int durationMs = 1500)
@@ -105,21 +144,61 @@ public sealed class AppSession : IDisposable
     }
 
     /// <summary>
-    /// Swipes horizontally across the middle of the screen. "left" moves the finger to the left.
+    /// Scrolls the page content up until the element ends above <paramref name="limitY"/> (e.g. the top of floating buttons).
+    /// </summary>
+    public void ScrollAbove(Func<IWebElement> element, int limitY)
+    {
+        bool IsClear()
+        {
+            var e = element();
+            return e.Location.Y + e.Size.Height <= limitY;
+        }
+
+        if (IsClear())
+            return;
+
+        var size = Driver.Manage().Window.Size;
+        Driver.ExecuteScript("mobile: scrollGesture", new Dictionary<string, object>
+        {
+            ["left"] = size.Width / 10,
+            ["top"] = size.Height / 4,
+            ["width"] = size.Width * 8 / 10,
+            ["height"] = size.Height / 2,
+            ["direction"] = "down",
+            ["percent"] = 1.0
+        });
+        WaitFor(IsClear, "the element to scroll above the floating buttons");
+    }
+
+    /// <summary>
+    /// Swipes horizontally across the lower middle of the screen, below the month summary (which takes
+    /// sideways swipes for its own pages). "left" moves the finger to the left.
     /// </summary>
     public void SwipeHorizontally(string direction)
     {
         var size = Driver.Manage().Window.Size;
+        Swipe(new Rectangle(size.Width / 10, size.Height / 2, size.Width * 8 / 10, size.Height / 5), direction);
+    }
+
+    /// <summary>
+    /// Swipes horizontally across the middle of the element. "left" moves the finger to the left.
+    /// The swipe stays clear of the screen edges, where Android's gesture navigation would take it as "back".
+    /// </summary>
+    public void SwipeOn(IWebElement element, string direction) =>
+        Swipe(new Rectangle(
+            element.Location.X + element.Size.Width / 5, element.Location.Y,
+            element.Size.Width * 3 / 5, element.Size.Height), direction);
+
+    private void Swipe(Rectangle area, string direction) =>
         Driver.ExecuteScript("mobile: swipeGesture", new Dictionary<string, object>
         {
-            ["left"] = size.Width / 10,
-            ["top"] = size.Height / 3,
-            ["width"] = size.Width * 8 / 10,
-            ["height"] = size.Height / 5,
+            ["left"] = area.X,
+            ["top"] = area.Y,
+            ["width"] = area.Width,
+            ["height"] = area.Height,
             ["direction"] = direction,
             ["percent"] = 0.75
         });
-    }
 
     /// <summary>
     /// Decodes the element's on-screen pixels, for asserting on rendered colors.
@@ -129,10 +208,26 @@ public sealed class AppSession : IDisposable
 
     public void PressBack() => Driver.Navigate().Back();
 
+    /// <summary>
+    /// Closes the keyboard through its "Done" action. Unlike <see cref="HideKeyboardIfShown"/>, it can never fall
+    /// back to pressing Back, which would dismiss a popup without saving.
+    /// </summary>
+    public void CloseKeyboardWithDone()
+    {
+        if (!Driver.IsKeyboardShown())
+            return;
+
+        Driver.ExecuteScript("mobile: performEditorAction", new Dictionary<string, object> { ["action"] = "done" });
+        WaitFor(() => !Driver.IsKeyboardShown(), "the keyboard to close");
+    }
+
     public void HideKeyboardIfShown()
     {
-        if (Driver.IsKeyboardShown())
-            Driver.HideKeyboard();
+        if (!Driver.IsKeyboardShown())
+            return;
+
+        Driver.HideKeyboard();
+        WaitFor(() => !Driver.IsKeyboardShown(), "the keyboard to hide");
     }
 
     public void Dispose() => Driver.Quit();

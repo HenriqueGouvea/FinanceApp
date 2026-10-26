@@ -1,5 +1,6 @@
 using FinanceApp.Data;
 using FinanceApp.Models;
+using SQLite;
 
 namespace FinanceApp.Services;
 
@@ -40,17 +41,29 @@ public class FinanceService : IFinanceService
                 if (record.IsCancelled)
                     continue;
 
+                var plannedAmount = record.OverrideAmount ?? template.Amount;
+                var status = GetEffectiveStatus(record, plannedAmount);
+                // Paying more than planned (e.g. an estimated bill that came higher) raises the month's amount.
+                var effectiveAmount = Math.Max(plannedAmount, record.PaidAmount ?? 0);
+
                 projections.Add(new MonthlyEntryProjection(
                     FinancialEntryId: template.Id,
                     FinancialMonthlyEntryId: record.Id,
                     Description: template.Description,
-                    EffectiveAmount: record.OverrideAmount ?? template.Amount,
+                    EffectiveAmount: effectiveAmount,
                     EntryType: template.EntryType,
                     Category: category,
-                    Status: record.Status,
+                    Status: status,
                     IsProjected: false,
                     InstallmentLabel: BuildInstallmentLabel(template, year, month),
-                    InstallmentTotalAmount: BuildInstallmentTotal(template)
+                    InstallmentTotalAmount: BuildInstallmentTotal(template),
+                    PaidAmount: status switch
+                    {
+                        FinancialMonthlyEntryStatus.Paid => effectiveAmount,
+                        FinancialMonthlyEntryStatus.PartiallyPaid => record.PaidAmount ?? 0,
+                        _ => 0
+                    },
+                    IsEstimated: template.IsEstimated
                 ));
             }
             else
@@ -65,7 +78,8 @@ public class FinanceService : IFinanceService
                     Status: FinancialMonthlyEntryStatus.Pending,
                     IsProjected: true,
                     InstallmentLabel: BuildInstallmentLabel(template, year, month),
-                    InstallmentTotalAmount: BuildInstallmentTotal(template)
+                    InstallmentTotalAmount: BuildInstallmentTotal(template),
+                    IsEstimated: template.IsEstimated
                 ));
             }
         }
@@ -119,20 +133,47 @@ public class FinanceService : IFinanceService
         {
             var db = await _context.GetConnectionAsync();
 
-            var record = await db.Table<FinancialMonthlyEntry>()
-                .Where(r => r.FinancialEntryId == entryId && r.Year == year && r.Month == month)
-                .FirstOrDefaultAsync()
-                ?? new FinancialMonthlyEntry { FinancialEntryId = entryId, Year = year, Month = month };
+            var record = await GetOrCreateMonthlyRecordAsync(db, entryId, year, month);
             record.Status = status;
+            // Marking as paid or pending settles the whole amount, so a partial payment no longer applies.
+            record.PaidAmount = null;
 
-            if (record.Id != 0)
-                await db.UpdateAsync(record);
-            else
-                await db.InsertAsync(record);
+            await UpsertAsync(db, record);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error setting entry status: {ex.Message}");
+        }
+    }
+
+    public Task SetPaidAmountAsync(int entryId, int year, int month, decimal paidAmount) =>
+        UpdatePaidAmountAsync(entryId, year, month, (_, _) => paidAmount);
+
+    public Task AddPaidAmountAsync(int entryId, int year, int month, decimal amount) =>
+        UpdatePaidAmountAsync(entryId, year, month, (record, plannedAmount) =>
+            (record.PaidAmount ?? (record.Status == FinancialMonthlyEntryStatus.Paid ? plannedAmount : 0)) + amount);
+
+    private async Task UpdatePaidAmountAsync(int entryId, int year, int month, Func<FinancialMonthlyEntry, decimal, decimal> newPaidAmount)
+    {
+        try
+        {
+            var db = await _context.GetConnectionAsync();
+
+            var template = await db.Table<FinancialEntry>().Where(e => e.Id == entryId).FirstOrDefaultAsync();
+            if (template is null)
+                return;
+
+            var record = await GetOrCreateMonthlyRecordAsync(db, entryId, year, month);
+            var plannedAmount = record.OverrideAmount ?? template.Amount;
+            var paidAmount = newPaidAmount(record, plannedAmount);
+            record.PaidAmount = paidAmount > 0 ? paidAmount : null;
+            record.Status = GetEffectiveStatus(record, plannedAmount);
+
+            await UpsertAsync(db, record);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error setting paid amount: {ex.Message}");
         }
     }
 
@@ -205,6 +246,30 @@ public class FinanceService : IFinanceService
         {
             Console.WriteLine($"[DEBUG] Erro ao limpar banco: {ex.Message}");
         }
+    }
+
+    // A partial payment decides the status by itself, so it follows later changes to the month's amount.
+    private static FinancialMonthlyEntryStatus GetEffectiveStatus(FinancialMonthlyEntry record, decimal plannedAmount) =>
+        record.PaidAmount switch
+        {
+            > 0 and var paid when paid >= plannedAmount => FinancialMonthlyEntryStatus.Paid,
+            > 0 => FinancialMonthlyEntryStatus.PartiallyPaid,
+            null when record.Status == FinancialMonthlyEntryStatus.Paid => FinancialMonthlyEntryStatus.Paid,
+            _ => FinancialMonthlyEntryStatus.Pending
+        };
+
+    private static async Task<FinancialMonthlyEntry> GetOrCreateMonthlyRecordAsync(SQLiteAsyncConnection db, int entryId, int year, int month) =>
+        await db.Table<FinancialMonthlyEntry>()
+            .Where(r => r.FinancialEntryId == entryId && r.Year == year && r.Month == month)
+            .FirstOrDefaultAsync()
+        ?? new FinancialMonthlyEntry { FinancialEntryId = entryId, Year = year, Month = month };
+
+    private static async Task UpsertAsync(SQLiteAsyncConnection db, FinancialMonthlyEntry record)
+    {
+        if (record.Id != 0)
+            await db.UpdateAsync(record);
+        else
+            await db.InsertAsync(record);
     }
 
     private static bool IsActiveForMonth(FinancialEntry entry, DateTime targetDate)

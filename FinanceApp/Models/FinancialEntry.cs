@@ -14,6 +14,10 @@ public class FinancialEntry
     public FinancialEntryType EntryType { get; set; }
     public int? TotalInstallments { get; set; }
     public int? CategoryId { get; set; }
+    /// <summary>
+    /// The amount varies from month to month (e.g. energy bill, supermarket), so it is only an estimate.
+    /// </summary>
+    public bool IsEstimated { get; set; }
     public string Person { get; set; } = string.Empty;
     public bool IsPJ { get; set; }
 }

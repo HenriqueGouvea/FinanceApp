@@ -141,6 +141,16 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task MonthViewModel_WhenSummaryPageChanges_SyncsAllOtherMonths()
+    {
+        await _vm.InitializeAsync();
+
+        _vm.Months[3].SummaryPage = 2;
+
+        _vm.Months.Should().AllSatisfy(m => m.SummaryPage.Should().Be(2));
+    }
+
+    [Fact]
     public async Task MonthViewModel_WhenIsOutcomesExpandedChanges_SyncsAllOtherMonths()
     {
         await _vm.InitializeAsync();

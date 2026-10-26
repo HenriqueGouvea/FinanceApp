@@ -78,7 +78,7 @@ public partial class MainPage : ContentPage
         var popup = ResolvePopup<AddEntryPopup>();
         var vm = (AddEntryViewModel)popup.BindingContext;
 
-        await vm.PrepareForEditAsync(entry);
+        await vm.PrepareForEditAsync(entry, mainVm.SelectedMonth?.Date, projection.PaidAmount);
         vm.SetSaveCallback(async (_) =>
         {
             await popup.CloseAsync();
@@ -139,6 +139,26 @@ public partial class MainPage : ContentPage
         if (BindingContext is not MainViewModel mainVm) return;
 
         await mainVm.ToggleEntryStatusAsync(projection);
+    }
+
+    private async void OnPartialPaymentClicked(object? sender, TappedEventArgs e)
+    {
+        if (GetProjection(sender) is not { } projection) return;
+        if (BindingContext is not MainViewModel { SelectedMonth: { } month } mainVm) return;
+
+        month.HideEntryActions();
+
+        var popup = ResolvePopup<PartialPaymentPopup>();
+        var vm = (PartialPaymentViewModel)popup.BindingContext;
+
+        vm.Prepare(projection, month.Date);
+        vm.SetSaveCallback(async () =>
+        {
+            await popup.CloseAsync();
+            await mainVm.RefreshAllAsync();
+        });
+
+        await this.ShowPopupAsync(popup);
     }
 
     private async void OnMonthTitleTapped(object? sender, TappedEventArgs e)

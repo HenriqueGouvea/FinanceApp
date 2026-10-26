@@ -112,6 +112,35 @@
                        FontSize="12"
                        TextColor="Gray"
                        IsVisible="{Binding InstallmentsTotal, Converter={x:Static converters:IsNotNullConverter.Instance}}" />
+
+                <!-- Estimated: the amount changes every month (e.g. energy bill, supermarket) -->
+                <Grid ColumnDefinitions="*, Auto" Margin="0,6,0,0">
+                    <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
+                        <Label Text="Valor estimado" FontSize="14" />
+                        <Label Text="Varia a cada mês, como luz ou mercado" FontSize="11" TextColor="Gray" />
+                    </VerticalStackLayout>
+                    <Switch Grid.Column="1"
+                            AutomationId="EstimatedSwitch"
+                            IsToggled="{Binding IsEstimated}"
+                            OnColor="#B39DDB"
+                            ThumbColor="Purple"
+                            VerticalOptions="Center" />
+                </Grid>
+            </VerticalStackLayout>
+
+            <!-- Partial payment for the month the entry was opened from (e.g. supermarket spent so far) -->
+            <VerticalStackLayout Spacing="2" IsVisible="{Binding IsEditing}">
+                <Label AutomationId="PaidAmountLabel"
+                       Text="{Binding PaidAmountLabel}"
+                       FontSize="12"
+                       TextColor="Gray" />
+                <Entry AutomationId="PaidAmountEntry"
+                       Placeholder="{Binding PaidAmountLabel}"
+                       Keyboard="Numeric">
+                    <Entry.Behaviors>
+                        <behaviors:CurrencyMaskBehavior Value="{Binding PaidAmount}" />
+                    </Entry.Behaviors>
+                </Entry>
             </VerticalStackLayout>
 
             <Picker AutomationId="CategoryPicker"
