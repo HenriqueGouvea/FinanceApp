@@ -16,12 +16,15 @@ public class AddEntryViewModelTests
     private static readonly FinancialCategory Housing = new() { Id = 1, Name = "Moradia", Icon = "🏠", Color = "#1E88E5" };
     private static readonly FinancialCategory Education = new() { Id = 2, Name = "Educação", Icon = "🎓", Color = "#8E24AA" };
     private static readonly FinancialCategory Salary = new() { Id = 3, Name = "Salário", Icon = "💼", Color = "#00897B", EntryType = FinancialEntryType.Income };
+    private static readonly DateTime June = new(2026, 6, 1, 0, 0, 0, DateTimeKind.Local);
+    private static readonly DateTime JuneTenth = new(2026, 6, 10, 0, 0, 0, DateTimeKind.Local);
 
     public AddEntryViewModelTests()
     {
         _service = Substitute.For<IFinanceService>();
         _categoryService = Substitute.For<ICategoryService>();
         _categoryService.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<FinancialCategory>>([Housing, Education, Salary]));
+        _service.GetPaymentsAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>()).Returns([]);
         _vm = new AddEntryViewModel(_service, _categoryService);
         _vm.PrepareAsync(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local)).GetAwaiter().GetResult();
     }
@@ -645,6 +648,132 @@ public class AddEntryViewModelTests
         await _vm.SaveCommand.ExecuteAsync(null);
 
         await _service.DidNotReceive().SetPaidAmountAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<decimal>());
+    }
+
+    // --- Payments ---
+
+    [Fact]
+    public async Task PrepareForEdit_RecordedPayments_ListsThoseOfTheOpenedMonth()
+    {
+        _service.GetPaymentsAsync(42, 2026, 6).Returns([
+            new FinancialPayment { Id = 1, Amount = 100m, Date = JuneTenth, Description = "Groceries" },
+            new FinancialPayment { Id = 2, Amount = 50m, Date = JuneTenth.AddDays(2) }
+        ]);
+
+        await _vm.PrepareForEditAsync(MakeEntry(), June, 150m);
+
+        _vm.HasPayments.Should().BeTrue();
+        _vm.Payments.Should().Equal(
+            new PaymentItem(1, 100m, JuneTenth, "Groceries"),
+            new PaymentItem(2, 50m, JuneTenth.AddDays(2), string.Empty));
+        _vm.Payments[0].HasDescription.Should().BeTrue();
+        _vm.Payments[1].HasDescription.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PrepareForEdit_NoRecordedPayments_HasNoPayments()
+    {
+        _service.GetPaymentsAsync(42, 2026, 6).Returns([]);
+
+        await _vm.PrepareForEditAsync(MakeEntry(), June, 0m);
+
+        _vm.HasPayments.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Prepare_AfterEditingWithPayments_ClearsPayments()
+    {
+        _service.GetPaymentsAsync(42, 2026, 6).Returns([new FinancialPayment { Id = 1, Amount = 100m, Date = JuneTenth }]);
+        await _vm.PrepareForEditAsync(MakeEntry(), June, 100m);
+
+        await _vm.PrepareAsync(June);
+
+        _vm.Payments.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(FinancialEntryType.Outcome, "Pagamentos neste mês")]
+    [InlineData(FinancialEntryType.Income, "Recebimentos neste mês")]
+    public void PaymentsHeader_DependsOnEntryType(FinancialEntryType type, string expected)
+    {
+        _vm.EntryType = type;
+
+        _vm.PaymentsHeader.Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task DeletePaymentCommand_RemovesItFromListAndPaidAmountWithoutSaving()
+    {
+        _service.GetPaymentsAsync(42, 2026, 6).Returns([
+            new FinancialPayment { Id = 1, Amount = 100m, Date = JuneTenth },
+            new FinancialPayment { Id = 2, Amount = 50m, Date = JuneTenth }
+        ]);
+        await _vm.PrepareForEditAsync(MakeEntry(), June, 150m);
+
+        _vm.DeletePaymentCommand.Execute(_vm.Payments[1]);
+
+        _vm.Payments.Should().ContainSingle().Which.Id.Should().Be(1);
+        _vm.PaidAmount.Should().Be(100m);
+        await _service.DidNotReceive().DeletePaymentAsync(Arg.Any<int>());
+    }
+
+    [Fact]
+    public async Task DeletePaymentCommand_MoreThanPaidAmount_ClampsPaidAmountAtZero()
+    {
+        _service.GetPaymentsAsync(42, 2026, 6).Returns([new FinancialPayment { Id = 1, Amount = 300m, Date = JuneTenth }]);
+        await _vm.PrepareForEditAsync(MakeEntry(), June, 250m);
+
+        _vm.DeletePaymentCommand.Execute(_vm.Payments[0]);
+
+        _vm.PaidAmount.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task SaveCommand_AfterDeletingPayment_DeletesItWithoutSettingPaidAmount()
+    {
+        _service.GetPaymentsAsync(42, 2026, 6).Returns([
+            new FinancialPayment { Id = 1, Amount = 100m, Date = JuneTenth },
+            new FinancialPayment { Id = 2, Amount = 50m, Date = JuneTenth }
+        ]);
+        await _vm.PrepareForEditAsync(MakeEntry(), June, 150m);
+        _vm.DeletePaymentCommand.Execute(_vm.Payments[1]);
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).DeletePaymentAsync(2);
+        await _service.DidNotReceive().DeletePaymentAsync(1);
+        await _service.DidNotReceive().SetPaidAmountAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<decimal>());
+    }
+
+    [Fact]
+    public async Task SaveCommand_AfterDeletingPaymentAndChangingPaidAmount_DeletesThenSetsNewAmount()
+    {
+        _service.GetPaymentsAsync(42, 2026, 6).Returns([new FinancialPayment { Id = 1, Amount = 100m, Date = JuneTenth }]);
+        await _vm.PrepareForEditAsync(MakeEntry(), June, 300m);
+        _vm.DeletePaymentCommand.Execute(_vm.Payments[0]);
+        _vm.PaidAmount = 250m;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        Received.InOrder(() =>
+        {
+            _service.DeletePaymentAsync(1);
+            _service.SetPaidAmountAsync(42, 2026, 6, 250m);
+        });
+    }
+
+    [Fact]
+    public async Task PrepareForEdit_AfterUnsavedDeletion_ForgetsIt()
+    {
+        _service.GetPaymentsAsync(42, 2026, 6).Returns([new FinancialPayment { Id = 1, Amount = 100m, Date = JuneTenth }]);
+        await _vm.PrepareForEditAsync(MakeEntry(), June, 100m);
+        _vm.DeletePaymentCommand.Execute(_vm.Payments[0]);
+
+        await _vm.PrepareForEditAsync(MakeEntry(), June, 100m);
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        _vm.Payments.Should().ContainSingle();
+        await _service.DidNotReceive().DeletePaymentAsync(Arg.Any<int>());
     }
 
     private static FinancialEntry MakeEntry() => new()

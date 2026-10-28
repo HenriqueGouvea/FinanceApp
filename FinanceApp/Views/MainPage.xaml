@@ -17,6 +17,7 @@
         <!-- Same for incomes and outcomes: a paid outcome is good news, so it must not use the red outcome accent -->
         <Color x:Key="PaidAccent">#2E7D32</Color>
         <Color x:Key="PartialAccent">#EF6C00</Color>
+        <Color x:Key="PaidProgressFill">#81C784</Color>
         <Color x:Key="EstimatedAccent">#455A64</Color>
         <Color x:Key="EstimatedTint">#ECEFF1</Color>
         <Color x:Key="MonthNavAccent">#6A1B9A</Color>
@@ -82,7 +83,7 @@
                         </Border>
                     </Grid>
 
-                    <VerticalStackLayout Grid.Column="1">
+                    <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
                         <Label AutomationId="EntryDescriptionLabel" Text="{Binding Description}" FontAttributes="Bold"/>
                         <HorizontalStackLayout Spacing="4"
                                                IsVisible="{Binding Category, Converter={x:Static converters:IsNotNullConverter.Instance}}">
@@ -103,18 +104,6 @@
                                 </MultiBinding>
                             </Label.Text>
                         </Label>
-                        <Label AutomationId="EntryPartialLabel"
-                               FontSize="11"
-                               FontAttributes="Bold"
-                               TextColor="{StaticResource PartialAccent}"
-                               IsVisible="{Binding IsPartiallyPaid}">
-                            <Label.Text>
-                                <MultiBinding StringFormat="{}{0} {1}">
-                                    <Binding Path="PaidAmount" Converter="{x:Static converters:MoneyConverter.Instance}" />
-                                    <Binding Path="EntryType" Converter="{x:Static converters:EntryTypeToPartialPaidLabelConverter.Instance}" />
-                                </MultiBinding>
-                            </Label.Text>
-                        </Label>
                     </VerticalStackLayout>
                     <Label Grid.Column="2"
                            AutomationId="EntryStatusLabel"
@@ -124,29 +113,69 @@
                            FontAttributes="Bold"
                            VerticalOptions="Center"
                            IsVisible="{Binding IsPaid}"/>
-                    <HorizontalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
-                        <!-- Estimated amounts (±) vary each month (e.g. energy bill, supermarket) -->
-                        <Border AutomationId="EntryEstimatedIcon"
-                                BackgroundColor="{StaticResource EstimatedTint}"
-                                StrokeThickness="0"
-                                StrokeShape="RoundRectangle 9"
-                                WidthRequest="18"
-                                HeightRequest="18"
-                                VerticalOptions="Center"
-                                IsVisible="{Binding IsEstimated}">
-                            <Label Text="±"
-                                   FontSize="13"
+                    <!-- Everything about the amount stays on the right, the price first and the payment progress below it -->
+                    <VerticalStackLayout Grid.Column="3" Spacing="2" VerticalOptions="Center">
+                        <HorizontalStackLayout Spacing="4" HorizontalOptions="End">
+                            <!-- Estimated amounts (±) vary each month (e.g. energy bill, supermarket) -->
+                            <Border AutomationId="EntryEstimatedIcon"
+                                    BackgroundColor="{StaticResource EstimatedTint}"
+                                    StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 9"
+                                    WidthRequest="18"
+                                    HeightRequest="18"
+                                    VerticalOptions="Center"
+                                    IsVisible="{Binding IsEstimated}">
+                                <Label Text="±"
+                                       FontSize="13"
+                                       FontAttributes="Bold"
+                                       TextColor="{StaticResource EstimatedAccent}"
+                                       HorizontalOptions="Center"
+                                       VerticalOptions="Center" />
+                            </Border>
+                            <Label AutomationId="EntryAmountLabel"
+                                   Text="{Binding EffectiveAmount, Converter={x:Static converters:MoneyConverter.Instance}}"
+                                   TextColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
                                    FontAttributes="Bold"
-                                   TextColor="{StaticResource EstimatedAccent}"
-                                   HorizontalOptions="Center"
-                                   VerticalOptions="Center" />
-                        </Border>
-                        <Label AutomationId="EntryAmountLabel"
-                               Text="{Binding EffectiveAmount, Converter={x:Static converters:MoneyConverter.Instance}}"
-                               TextColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
+                                   VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+                        <Label AutomationId="EntryPartialLabel"
+                               Text="{Binding PaidAmount, Converter={x:Static converters:MoneyConverter.Instance}}"
+                               FontSize="11"
                                FontAttributes="Bold"
-                               VerticalOptions="Center"/>
-                    </HorizontalStackLayout>
+                               TextColor="{StaticResource PartialAccent}"
+                               HorizontalOptions="End"
+                               IsVisible="{Binding ShowsPaidSoFar}" />
+                        <!-- Paid beyond the planned amount (e.g. a supermarket above its estimate): the price above is what was paid -->
+                        <Label AutomationId="EntryPlannedAmountLabel"
+                               FontSize="11"
+                               HorizontalOptions="End"
+                               IsVisible="{Binding IsOverBudget}">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="▲ "
+                                          FontAttributes="Bold"
+                                          TextColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}" />
+                                    <Span Text="{Binding PlannedOrEffectiveAmount, Converter={x:Static converters:MoneyConverter.Instance}}"
+                                          TextColor="Gray"
+                                          TextDecorations="Strikethrough" />
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                        <controls:PaymentProgressBar AutomationId="EntryPaymentProgress"
+                                                     WidthRequest="96"
+                                                     HorizontalOptions="End"
+                                                     PaidAmount="{Binding PaidAmount}"
+                                                     PlannedAmount="{Binding PlannedOrEffectiveAmount}"
+                                                     FillColor="{StaticResource PartialAccent}"
+                                                     OverflowColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
+                                                     IsVisible="{Binding ShowsPaymentProgress}">
+                            <controls:PaymentProgressBar.Triggers>
+                                <DataTrigger TargetType="controls:PaymentProgressBar" Binding="{Binding IsPaid}" Value="True">
+                                    <Setter Property="FillColor" Value="{StaticResource PaidProgressFill}" />
+                                </DataTrigger>
+                            </controls:PaymentProgressBar.Triggers>
+                        </controls:PaymentProgressBar>
+                    </VerticalStackLayout>
                 </Grid>
 
                 <!-- Entry actions menu, slides in on long press -->
@@ -179,8 +208,7 @@
                                 BackgroundColor="{StaticResource PartialAccent}"
                                 StrokeThickness="0"
                                 StrokeShape="RoundRectangle 8"
-                                Padding="16,0"
-                                IsVisible="{Binding IsPaid, Converter={x:Static converters:InverseBoolConverter.Instance}}">
+                                Padding="16,0">
                             <Border.GestureRecognizers>
                                 <TapGestureRecognizer Tapped="OnPartialPaymentClicked" />
                             </Border.GestureRecognizers>

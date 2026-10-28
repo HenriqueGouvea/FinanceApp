@@ -36,6 +36,8 @@ public class MainPageObject
     private static readonly By EntryPartialIcon = AppSession.AutomationId("EntryPartialIcon");
     private static readonly By EntryPartial = AppSession.AutomationId("EntryPartialLabel");
     private static readonly By EntryEstimatedIcon = AppSession.AutomationId("EntryEstimatedIcon");
+    private static readonly By EntryPlannedAmount = AppSession.AutomationId("EntryPlannedAmountLabel");
+    private static readonly By EntryPaymentProgress = AppSession.AutomationId("EntryPaymentProgress");
     private static readonly By PartialPaymentAction = AppSession.AutomationId("PartialPaymentEntryAction");
     private static readonly By PagerDot = AppSession.AutomationId("PagerDot");
     private static readonly By MonthTitleButton = AppSession.AutomationId("MonthTitleButton");
@@ -251,13 +253,26 @@ public class MainPageObject
         FindRow(description).FindElements(EntryPartialIcon).Any(e => e.Displayed);
 
     /// <summary>
-    /// The row's partial payment line (e.g. "Pago R$ 250,00 · falta R$ 550,00"), or null when not partially paid.
+    /// The amount paid so far shown under the row's price (e.g. "R$ 250,00"), or null when not partially paid
+    /// or already beyond the planned amount.
     /// </summary>
     public string? EntryPartialText(string description) =>
         FindRow(description).FindElements(EntryPartial).FirstOrDefault(e => e.Displayed)?.Text;
 
     public string EntryAmountText(string description) =>
         FindRow(description).FindElements(EntryAmount).First(e => e.Displayed).Text;
+
+    /// <summary>
+    /// The "▲ R$ 800,00" line (planned amount, struck through) under the price of an entry paid beyond it, or null otherwise.
+    /// </summary>
+    public string? EntryPlannedAmountText(string description) =>
+        FindRow(description).FindElements(EntryPlannedAmount).FirstOrDefault(e => e.Displayed)?.Text;
+
+    /// <summary>
+    /// Whether the payment progress bar shows under the row's price.
+    /// </summary>
+    public bool IsEntryPaymentProgressVisible(string description) =>
+        FindRow(description).FindElements(EntryPaymentProgress).Any(e => e.Displayed);
 
     public string EntryEstimatedSymbol(string description) =>
         FindRow(description).FindElements(EntryEstimatedIcon).First(e => e.Displayed)
@@ -282,9 +297,12 @@ public class MainPageObject
     /// <summary>
     /// Adds a payment through the actions menu and waits for the row to show the new paid amount.
     /// </summary>
-    public MainPageObject AddPartialPayment(string description, decimal amount)
+    public MainPageObject AddPartialPayment(string description, decimal amount, string? paymentDescription = null)
     {
-        OpenPartialPayment(description).EnterAmount(amount).Save();
+        var popup = OpenPartialPayment(description).EnterAmount(amount);
+        if (paymentDescription is not null)
+            popup.EnterPaymentDescription(paymentDescription);
+        popup.Save();
         return WaitForEntry(description);
     }
 

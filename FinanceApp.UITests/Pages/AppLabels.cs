@@ -30,12 +30,12 @@ public static class AppLabels
     public const string PaidAmountOutcome = "Valor já pago neste mês";
     public const string PaidAmountIncome = "Valor já recebido neste mês";
 
-    public const string PartialPaidOutcome = "já gastos";
-    public const string PartialPaidIncome = "já recebidos";
     public const string MarkPartialPaid = "Pagar parcial";
     public const string MarkPartialReceived = "Receber parcial";
     public const string AlreadySpent = "Já gasto";
     public const string AlreadyReceived = "Já recebido";
+    public const string PaymentsOutcome = "Pagamentos neste mês";
+    public const string PaymentsIncome = "Recebimentos neste mês";
 
     public const string EstimatedSymbol = "±";
 

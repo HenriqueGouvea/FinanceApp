@@ -42,7 +42,7 @@ public class FinanceService : IFinanceService
                     continue;
 
                 var plannedAmount = record.OverrideAmount ?? template.Amount;
-                var status = GetEffectiveStatus(record, plannedAmount);
+                var status = GetEffectiveStatus(record);
                 // Paying more than planned (e.g. an estimated bill that came higher) raises the month's amount.
                 var effectiveAmount = Math.Max(plannedAmount, record.PaidAmount ?? 0);
 
@@ -63,7 +63,8 @@ public class FinanceService : IFinanceService
                         FinancialMonthlyEntryStatus.PartiallyPaid => record.PaidAmount ?? 0,
                         _ => 0
                     },
-                    IsEstimated: template.IsEstimated
+                    IsEstimated: template.IsEstimated,
+                    PlannedAmount: plannedAmount
                 ));
             }
             else
@@ -133,12 +134,21 @@ public class FinanceService : IFinanceService
         {
             var db = await _context.GetConnectionAsync();
 
+            var template = await db.Table<FinancialEntry>().Where(e => e.Id == entryId).FirstOrDefaultAsync();
             var record = await GetOrCreateMonthlyRecordAsync(db, entryId, year, month);
+            var plannedAmount = record.OverrideAmount ?? template?.Amount;
             record.Status = status;
-            // Marking as paid or pending settles the whole amount, so a partial payment no longer applies.
-            record.PaidAmount = null;
+            // Paying settles the whole planned amount, unless more than that was already paid (e.g. a bill that came higher).
+            // Reverting to pending resets the month.
+            record.PaidAmount = status == FinancialMonthlyEntryStatus.Paid && record.PaidAmount > plannedAmount
+                ? record.PaidAmount
+                : null;
 
             await UpsertAsync(db, record);
+
+            // Reverting to pending resets the month, while paying the rest keeps the history of what was paid so far.
+            if (status == FinancialMonthlyEntryStatus.Pending)
+                await DeletePaymentsAsync(db, record.Id);
         }
         catch (Exception ex)
         {
@@ -147,13 +157,67 @@ public class FinanceService : IFinanceService
     }
 
     public Task SetPaidAmountAsync(int entryId, int year, int month, decimal paidAmount) =>
-        UpdatePaidAmountAsync(entryId, year, month, (_, _) => paidAmount);
+        // Typing a total below the planned amount reopens a settled month.
+        UpdatePaidAmountAsync(entryId, year, month, (_, _) => paidAmount, reopensBelowPlanned: true);
 
-    public Task AddPaidAmountAsync(int entryId, int year, int month, decimal amount) =>
-        UpdatePaidAmountAsync(entryId, year, month, (record, plannedAmount) =>
-            (record.PaidAmount ?? (record.Status == FinancialMonthlyEntryStatus.Paid ? plannedAmount : 0)) + amount);
+    public Task AddPaymentAsync(int entryId, int year, int month, decimal amount, DateTime date, string description) =>
+        UpdatePaidAmountAsync(entryId, year, month,
+            (record, plannedAmount) => GetAlreadyPaid(record, plannedAmount) + amount,
+            (db, record) => db.InsertAsync(new FinancialPayment
+            {
+                FinancialMonthlyEntryId = record.Id,
+                Amount = amount,
+                Date = date.Date,
+                Description = description
+            }));
 
-    private async Task UpdatePaidAmountAsync(int entryId, int year, int month, Func<FinancialMonthlyEntry, decimal, decimal> newPaidAmount)
+    public async Task<IReadOnlyList<FinancialPayment>> GetPaymentsAsync(int entryId, int year, int month)
+    {
+        var db = await _context.GetConnectionAsync();
+
+        var record = await db.Table<FinancialMonthlyEntry>()
+            .Where(r => r.FinancialEntryId == entryId && r.Year == year && r.Month == month)
+            .FirstOrDefaultAsync();
+        if (record is null)
+            return [];
+
+        var payments = await db.Table<FinancialPayment>()
+            .Where(p => p.FinancialMonthlyEntryId == record.Id)
+            .ToListAsync();
+
+        return [.. payments.OrderBy(p => p.Date).ThenBy(p => p.Id)];
+    }
+
+    public async Task DeletePaymentAsync(int paymentId)
+    {
+        try
+        {
+            var db = await _context.GetConnectionAsync();
+
+            var payment = await db.Table<FinancialPayment>().Where(p => p.Id == paymentId).FirstOrDefaultAsync();
+            if (payment is null)
+                return;
+
+            await db.DeleteAsync(payment);
+
+            var record = await db.Table<FinancialMonthlyEntry>()
+                .Where(r => r.Id == payment.FinancialMonthlyEntryId)
+                .FirstOrDefaultAsync();
+            if (record is not null)
+                await UpdatePaidAmountAsync(record.FinancialEntryId, record.Year, record.Month,
+                    (r, plannedAmount) => GetAlreadyPaid(r, plannedAmount) - payment.Amount);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting payment: {ex.Message}");
+        }
+    }
+
+    private async Task UpdatePaidAmountAsync(
+        int entryId, int year, int month,
+        Func<FinancialMonthlyEntry, decimal, decimal> newPaidAmount,
+        Func<SQLiteAsyncConnection, FinancialMonthlyEntry, Task>? afterSave = null,
+        bool reopensBelowPlanned = false)
     {
         try
         {
@@ -166,16 +230,41 @@ public class FinanceService : IFinanceService
             var record = await GetOrCreateMonthlyRecordAsync(db, entryId, year, month);
             var plannedAmount = record.OverrideAmount ?? template.Amount;
             var paidAmount = newPaidAmount(record, plannedAmount);
-            record.PaidAmount = paidAmount > 0 ? paidAmount : null;
-            record.Status = GetEffectiveStatus(record, plannedAmount);
+            var isCleared = paidAmount <= 0;
+
+            if (isCleared)
+            {
+                record.PaidAmount = null;
+                record.Status = FinancialMonthlyEntryStatus.Pending;
+            }
+            else
+            {
+                if (reopensBelowPlanned && paidAmount < plannedAmount)
+                    record.Status = FinancialMonthlyEntryStatus.PartiallyPaid;
+
+                // A settled month within its planned amount is just "the whole amount paid".
+                record.PaidAmount = record.Status == FinancialMonthlyEntryStatus.Paid && paidAmount <= plannedAmount
+                    ? null
+                    : paidAmount;
+                record.Status = GetEffectiveStatus(record);
+            }
 
             await UpsertAsync(db, record);
+
+            if (isCleared)
+                await DeletePaymentsAsync(db, record.Id);
+            else if (afterSave is not null)
+                await afterSave(db, record);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error setting paid amount: {ex.Message}");
         }
     }
+
+    // An entry marked as paid without partial payments counts as having its whole amount paid.
+    private static decimal GetAlreadyPaid(FinancialMonthlyEntry record, decimal plannedAmount) =>
+        record.PaidAmount ?? (record.Status == FinancialMonthlyEntryStatus.Paid ? plannedAmount : 0);
 
     public async Task DeleteEntryAsync(int entryId, int year, int month, EntryDeleteScope scope)
     {
@@ -216,12 +305,12 @@ public class FinanceService : IFinanceService
                     await db.UpdateAsync(template);
 
                     foreach (var r in monthlyRecords.Where(r => r.Year * 12 + r.Month >= year * 12 + month))
-                        await db.DeleteAsync(r);
+                        await DeleteMonthlyRecordAsync(db, r);
                     break;
 
                 case EntryDeleteScope.All:
                     foreach (var r in monthlyRecords)
-                        await db.DeleteAsync(r);
+                        await DeleteMonthlyRecordAsync(db, r);
 
                     await db.DeleteAsync(template);
                     break;
@@ -241,6 +330,7 @@ public class FinanceService : IFinanceService
 
             await db.DeleteAllAsync<FinancialEntry>();
             await db.DeleteAllAsync<FinancialMonthlyEntry>();
+            await db.DeleteAllAsync<FinancialPayment>();
         }
         catch (Exception ex)
         {
@@ -248,13 +338,13 @@ public class FinanceService : IFinanceService
         }
     }
 
-    // A partial payment decides the status by itself, so it follows later changes to the month's amount.
-    private static FinancialMonthlyEntryStatus GetEffectiveStatus(FinancialMonthlyEntry record, decimal plannedAmount) =>
-        record.PaidAmount switch
+    // Only an explicit "Pagar" settles the month: payments that reach or pass the planned amount keep it partially paid,
+    // since an estimated expense (e.g. supermarket) can keep growing until the month ends.
+    private static FinancialMonthlyEntryStatus GetEffectiveStatus(FinancialMonthlyEntry record) =>
+        record switch
         {
-            > 0 and var paid when paid >= plannedAmount => FinancialMonthlyEntryStatus.Paid,
-            > 0 => FinancialMonthlyEntryStatus.PartiallyPaid,
-            null when record.Status == FinancialMonthlyEntryStatus.Paid => FinancialMonthlyEntryStatus.Paid,
+            { Status: FinancialMonthlyEntryStatus.Paid } => FinancialMonthlyEntryStatus.Paid,
+            { PaidAmount: > 0 } => FinancialMonthlyEntryStatus.PartiallyPaid,
             _ => FinancialMonthlyEntryStatus.Pending
         };
 
@@ -271,6 +361,15 @@ public class FinanceService : IFinanceService
         else
             await db.InsertAsync(record);
     }
+
+    private static async Task DeleteMonthlyRecordAsync(SQLiteAsyncConnection db, FinancialMonthlyEntry record)
+    {
+        await DeletePaymentsAsync(db, record.Id);
+        await db.DeleteAsync(record);
+    }
+
+    private static Task DeletePaymentsAsync(SQLiteAsyncConnection db, int monthlyEntryId) =>
+        db.Table<FinancialPayment>().DeleteAsync(p => p.FinancialMonthlyEntryId == monthlyEntryId);
 
     private static bool IsActiveForMonth(FinancialEntry entry, DateTime targetDate)
     {

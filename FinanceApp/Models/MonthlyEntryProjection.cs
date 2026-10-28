@@ -16,6 +16,7 @@ namespace FinanceApp.Models;
 /// <param name="InstallmentTotalAmount">Full amount of all installments (template amount × total installments), or null for other types.</param>
 /// <param name="PaidAmount">Amount already paid (or received) in the month: the whole amount once paid, zero while pending.</param>
 /// <param name="IsEstimated">True when the template amount is only an estimate.</param>
+/// <param name="PlannedAmount">The month's amount before payments (the template amount or the monthly override), or null when equal to <paramref name="EffectiveAmount"/>.</param>
 public record MonthlyEntryProjection(
     int FinancialEntryId,
     int? FinancialMonthlyEntryId,
@@ -28,11 +29,23 @@ public record MonthlyEntryProjection(
     string? InstallmentLabel,
     decimal? InstallmentTotalAmount,
     decimal PaidAmount = 0,
-    bool IsEstimated = false
+    bool IsEstimated = false,
+    decimal? PlannedAmount = null
 )
 {
     public bool IsPaid => Status == FinancialMonthlyEntryStatus.Paid;
     public bool IsPartiallyPaid => Status == FinancialMonthlyEntryStatus.PartiallyPaid;
     public bool IsPending => Status == FinancialMonthlyEntryStatus.Pending;
     public decimal PendingAmount => Math.Max(0, EffectiveAmount - PaidAmount);
+    /// <summary>
+    /// How much more than planned was paid (or received) in the month, e.g. a supermarket bill above its estimate.
+    /// </summary>
+    public decimal OverBudgetAmount => Math.Max(0, PaidAmount - (PlannedAmount ?? EffectiveAmount));
+    public bool IsOverBudget => OverBudgetAmount > 0;
+    /// <summary>
+    /// The row shows the amount paid so far under its price (above the planned amount it shows the struck planned amount instead).
+    /// </summary>
+    public bool ShowsPaidSoFar => IsPartiallyPaid && !IsOverBudget;
+    public bool ShowsPaymentProgress => IsPartiallyPaid || IsOverBudget;
+    public decimal PlannedOrEffectiveAmount => PlannedAmount ?? EffectiveAmount;
 }

@@ -16,6 +16,7 @@ public partial class AddEntryViewModel : ObservableObject
     private DateTime? _editingEndDate;
     private DateTime _editingMonth;
     private decimal _initialPaidAmount;
+    private readonly List<PaymentItem> _deletedPayments = [];
     private int? _editingCategoryId;
     private IReadOnlyList<FinancialCategory> _allCategories = [];
 
@@ -34,16 +35,24 @@ public partial class AddEntryViewModel : ObservableObject
     public decimal? InstallmentsTotal => IsInstallments && TotalInstallments is > 0 ? Amount * TotalInstallments : null;
     public bool IsIncome => EntryType == FinancialEntryType.Income;
     public string PaidAmountLabel => IsIncome ? "Valor já recebido neste mês" : "Valor já pago neste mês";
+    public string PaymentsHeader => IsIncome ? "Recebimentos neste mês" : "Pagamentos neste mês";
+    public bool HasPayments => Payments.Count > 0;
     public bool IsEditing => _editingEntryId != 0;
     public double StructuralFieldsOpacity => IsEditing ? 0.4 : 1.0;
 
     public ObservableCollection<FinancialCategory> Categories { get; } = [];
+
+    /// <summary>
+    /// Partial payments recorded in the month being edited. Deleting one only takes effect on save.
+    /// </summary>
+    public ObservableCollection<PaymentItem> Payments { get; } = [];
     public List<RecurrenceType> RecurrenceTypes { get; } = [RecurrenceType.OneTime, RecurrenceType.Recurrent, RecurrenceType.Installments];
 
     public AddEntryViewModel(IFinanceService financeService, ICategoryService categoryService)
     {
         _financeService = financeService;
         _categoryService = categoryService;
+        Payments.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasPayments));
     }
 
     partial void OnSelectedRecurrenceChanged(RecurrenceType? value)
@@ -70,6 +79,7 @@ public partial class AddEntryViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(IsIncome));
         OnPropertyChanged(nameof(PaidAmountLabel));
+        OnPropertyChanged(nameof(PaymentsHeader));
         FilterCategories();
     }
 
@@ -94,6 +104,8 @@ public partial class AddEntryViewModel : ObservableObject
         IsEstimated = false;
         PaidAmount = 0;
         _initialPaidAmount = 0;
+        Payments.Clear();
+        _deletedPayments.Clear();
     }
 
     /// <summary>
@@ -121,6 +133,19 @@ public partial class AddEntryViewModel : ObservableObject
         _editingMonth = month ?? _targetMonth;
         PaidAmount = paidAmount;
         _initialPaidAmount = paidAmount;
+
+        _deletedPayments.Clear();
+        Payments.Clear();
+        foreach (var payment in await _financeService.GetPaymentsAsync(entry.Id, _editingMonth.Year, _editingMonth.Month))
+            Payments.Add(PaymentItem.From(payment));
+    }
+
+    [RelayCommand]
+    void DeletePayment(PaymentItem payment)
+    {
+        Payments.Remove(payment);
+        _deletedPayments.Add(payment);
+        PaidAmount = Math.Max(0, PaidAmount - payment.Amount);
     }
 
     [RelayCommand]
@@ -151,8 +176,16 @@ public partial class AddEntryViewModel : ObservableObject
 
         await _financeService.SaveEntryAsync(entry);
 
-        if (IsEditing && PaidAmount != _initialPaidAmount)
-            await _financeService.SetPaidAmountAsync(entry.Id, _editingMonth.Year, _editingMonth.Month, PaidAmount);
+        if (IsEditing)
+        {
+            foreach (var payment in _deletedPayments)
+                await _financeService.DeletePaymentAsync(payment.Id);
+
+            // Deleting payments already lowers the month's paid amount; only a further manual change is saved on top.
+            var paidAfterDeletes = Math.Max(0, _initialPaidAmount - _deletedPayments.Sum(p => p.Amount));
+            if (PaidAmount != paidAfterDeletes)
+                await _financeService.SetPaidAmountAsync(entry.Id, _editingMonth.Year, _editingMonth.Month, PaidAmount);
+        }
 
         _onSaved?.Invoke(entry);
     }

@@ -29,6 +29,15 @@ public class FinancialMonthlyEntryRow
     public bool IsCancelled { get; set; }
 }
 
+public class FinancialPaymentRow
+{
+    public int Id { get; set; }
+    public int FinancialMonthlyEntryId { get; set; }
+    public decimal Amount { get; set; }
+    public DateTime Date { get; set; }
+    public string Description { get; set; } = string.Empty;
+}
+
 public class FinancialCategoryRow
 {
     public int Id { get; set; }

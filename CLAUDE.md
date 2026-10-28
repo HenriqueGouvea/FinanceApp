@@ -45,7 +45,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 2. `dotnet test FinanceApp.UITests/FinanceApp.UITests.csproj` (single class: `--filter "FullyQualifiedName~DeleteEntryTests"`). The full suite takes ~10 minutes.
 
 **Structure:**
-- `Tests/` — one class per feature area (`AddEntryTests`, `EditEntryTests`, `DeleteEntryTests`, `EntryActionsMenuTests`, `EntryStatusTests`, `MonthSummaryTests`, `PartialPaymentTests`, `EstimatedAmountTests`, `MonthNavigationTests`, `SectionToggleTests`, `CategoryTests`). Each class derives from `E2ETestBase` and must carry `[Collection(E2ECollection.Name)]` and `[Trait("Category", "E2E")]`. Shared arrange steps (e.g. creating the entry under test) go in the constructor.
+- `Tests/` — one class per feature area (`AddEntryTests`, `EditEntryTests`, `DeleteEntryTests`, `EntryActionsMenuTests`, `EntryStatusTests`, `MonthSummaryTests`, `PartialPaymentTests`, `PaymentRecordsTests`, `OverBudgetTests`, `EstimatedAmountTests`, `MonthNavigationTests`, `SectionToggleTests`, `CategoryTests`). Each class derives from `E2ETestBase` and must carry `[Collection(E2ECollection.Name)]` and `[Trait("Category", "E2E")]`. Shared arrange steps (e.g. creating the entry under test) go in the constructor.
 - `Pages/` — page objects (`MainPageObject`, `AddEntryPopupObject`, `CategoriesPageObject`, `MonthPickerPopupObject`, `PartialPaymentPopupObject`). Tests never call Appium directly; add a page object method instead. User-facing pt-BR texts the tests select by live in `AppLabels`.
 - `Infrastructure/` — `AppSession` (driver, waits, gestures, diagnostics), `DeviceDatabase` + `TableRows` (DB assertions), `AppFormat` (expected money/month/count strings and enum values).
 
@@ -60,7 +60,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Git & Pull Request Workflow
 - **Default branch:** `master` (there is no `dev` branch). Never commit directly to `master`.
 - **Branches:** one branch per roadmap task, named `feature/<short-kebab-name>` (bug fixes: `fix/<short-kebab-name>`).
-- **Finishing a task:** once the code is done and the required tests pass (see "Definition of done"), mark the task done in the README roadmap, commit, push the branch, and **open the pull request yourself** with the GitHub CLI. Don't leave it for the user. Use `gh pr create --base master --head <branch> --title "<title>" --body-file <file>`, with the body file in the scratchpad.
+- **Finishing a task:** once the code is done and the required tests pass (see "Definition of done"), mark the task done in the roadmap (`ROADMAP.md`), commit, push the branch, and **open the pull request yourself** with the GitHub CLI. Don't leave it for the user. Use `gh pr create --base master --head <branch> --title "<title>" --body-file <file>`, with the body file in the scratchpad.
   - **Title:** imperative, describes the change (e.g. "Add entry deletion via long-press actions menu"), never the branch name.
   - **Body:** follow `.github/pull_request_template.md`: a Summary bullet list, Testing (which suites ran and their pass counts; new tests added), and the Roadmap item. End with the Claude Code attribution line.
   - If a PR for the branch already exists (`gh pr view`), push the new commits and update the description with `gh pr edit` instead of opening a second PR.
@@ -71,7 +71,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Structure
 - **Data/:** `DatabaseContext.cs` — SQLite singleton connection + table creation via `GetConnectionAsync()`. `IDatabaseContext` is the interface used for DI and test substitution.
-- **Models/:** Clean POCOs (no persistence attributes). `FinancialEntry` is the template/parent; `FinancialMonthlyEntry` is the physical override; `MonthlyEntryProjection` is the non-persisted read model returned to ViewModels.
+- **Models/:** Clean POCOs (no persistence attributes). `FinancialEntry` is the template/parent; `FinancialMonthlyEntry` is the physical override; `FinancialPayment` is one partial payment recorded against a `FinancialMonthlyEntry`; `MonthlyEntryProjection` is the non-persisted read model returned to ViewModels.
 - **Services/:** All DB access is mediated by `IFinanceService` / `FinanceService`. Business logic lives here, not in ViewModels.
 - **ViewModels/:** UI state only. Depend on `IFinanceService` via constructor injection.
 - **Views/:** XAML pages and `CommunityToolkit.Maui.Views.Popup` subclasses.
