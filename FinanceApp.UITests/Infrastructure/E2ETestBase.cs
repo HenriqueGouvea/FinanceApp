@@ -31,6 +31,9 @@ public abstract class E2ETestBase : IDisposable
     protected Task<List<FinancialMonthlyEntryRow>> GetMonthlyEntryRowsAsync() =>
         Session.Database.QueryAsync<FinancialMonthlyEntryRow>("SELECT * FROM FinancialMonthlyEntry");
 
+    protected Task<List<FinancialPaymentRow>> GetPaymentRowsAsync() =>
+        Session.Database.QueryAsync<FinancialPaymentRow>("SELECT * FROM FinancialPayment ORDER BY Id");
+
     protected Task<List<FinancialCategoryRow>> GetCategoryRowsAsync() =>
         Session.Database.QueryAsync<FinancialCategoryRow>("SELECT * FROM FinancialCategory");
 

@@ -30,10 +30,6 @@ public static class AppFormat
 
     public static string EntryCount(int count) => $"{count} lançamento(s)";
 
-    /// <summary>
-    /// Partial payment line of an entry row (e.g. "R$ 250,00 já gastos").
-    /// </summary>
-    public static string PartialPayment(decimal paid, string suffix) => $"{Money(paid)} {suffix}";
 
     /// <summary>
     /// Progress line of the partial payment popup (e.g. "Já gasto: R$ 250,00 de R$ 800,00").
@@ -42,6 +38,21 @@ public static class AppFormat
         $"{paidLabel}: {Money(paid)} de {Money(total)}";
 
     public static string PartialPaymentNewTotal(decimal total) => $"Novo total: {Money(total)}";
+
+    /// <summary>
+    /// Warning of the partial payment popup when the new total passes the planned amount (e.g. "▲ R$ 100,00 acima do previsto").
+    /// </summary>
+    public static string OverBudget(decimal excess) => $"▲ {Money(excess)} acima do previsto";
+
+    /// <summary>
+    /// Line under an entry's price once paid beyond its planned amount: ▲ and the planned amount, struck through.
+    /// </summary>
+    public static string StruckPlanned(decimal planned) => $"▲ {Money(planned)}";
+
+    /// <summary>
+    /// Date of a recorded payment in the partial payment popup (e.g. "27/10").
+    /// </summary>
+    public static string PaymentDate(DateTime date) => date.ToString("dd/MM", Culture);
 
     public static string MonthTitle(DateTime month)
     {

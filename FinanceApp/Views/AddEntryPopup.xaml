@@ -141,6 +141,48 @@
                         <behaviors:CurrencyMaskBehavior Value="{Binding PaidAmount}" />
                     </Entry.Behaviors>
                 </Entry>
+
+                <!-- Partial payments recorded this month; a deleted one is only removed on save -->
+                <VerticalStackLayout Spacing="2" Margin="0,8,0,0" IsVisible="{Binding HasPayments}">
+                    <Label AutomationId="PaymentsHeaderLabel" Text="{Binding PaymentsHeader}" FontSize="12" TextColor="Gray" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Payments}" Spacing="2">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PaymentItem">
+                                <Grid AutomationId="PaymentRow" ColumnDefinitions="Auto, *, Auto, 36" ColumnSpacing="8">
+                                    <Label Grid.Column="0"
+                                           AutomationId="PaymentDateLabel"
+                                           Text="{Binding Date, StringFormat='{0:dd/MM}'}"
+                                           FontSize="13"
+                                           TextColor="Gray"
+                                           VerticalOptions="Center" />
+                                    <Label Grid.Column="1"
+                                           AutomationId="PaymentDescriptionLabel"
+                                           Text="{Binding Description}"
+                                           FontSize="13"
+                                           LineBreakMode="TailTruncation"
+                                           VerticalOptions="Center"
+                                           IsVisible="{Binding HasDescription}" />
+                                    <Label Grid.Column="2"
+                                           AutomationId="PaymentAmountLabel"
+                                           Text="{Binding Amount, Converter={x:Static converters:MoneyConverter.Instance}}"
+                                           FontSize="13"
+                                           FontAttributes="Bold"
+                                           VerticalOptions="Center" />
+                                    <Button Grid.Column="3"
+                                            AutomationId="DeletePaymentButton"
+                                            Text="✕"
+                                            FontSize="14"
+                                            Padding="0"
+                                            HeightRequest="36"
+                                            BackgroundColor="Transparent"
+                                            TextColor="#D32F2F"
+                                            Command="{Binding DeletePaymentCommand, Source={RelativeSource AncestorType={x:Type vm:AddEntryViewModel}}, x:DataType=vm:AddEntryViewModel}"
+                                            CommandParameter="{Binding .}" />
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
             </VerticalStackLayout>
 
             <Picker AutomationId="CategoryPicker"

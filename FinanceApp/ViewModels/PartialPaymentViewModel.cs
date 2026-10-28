@@ -6,7 +6,7 @@ using FinanceApp.Services;
 namespace FinanceApp.ViewModels;
 
 /// <summary>
-/// Adds a payment (e.g. today's supermarket bill) to what an entry already has paid in one month.
+/// Records a payment (e.g. today's supermarket bill) on top of what an entry already has paid in one month.
 /// </summary>
 public partial class PartialPaymentViewModel : ObservableObject
 {
@@ -17,11 +17,26 @@ public partial class PartialPaymentViewModel : ObservableObject
 
     [ObservableProperty] string description = string.Empty;
     [ObservableProperty] FinancialEntryType entryType;
-    [ObservableProperty] decimal paidAmount;
-    [ObservableProperty] decimal totalAmount;
+    [ObservableProperty] string paymentDescription = string.Empty;
+    [ObservableProperty] DateTime paymentDate = DateTime.Today;
+    [ObservableProperty] DateTime minimumDate = DateTime.Today;
+    [ObservableProperty] DateTime maximumDate = DateTime.Today;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewPaidAmount))]
+    [NotifyPropertyChangedFor(nameof(NewOverBudgetAmount))]
+    [NotifyPropertyChangedFor(nameof(IsNewTotalOverBudget))]
+    decimal paidAmount;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewOverBudgetAmount))]
+    [NotifyPropertyChangedFor(nameof(IsNewTotalOverBudget))]
+    decimal totalAmount;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewPaidAmount))]
+    [NotifyPropertyChangedFor(nameof(NewOverBudgetAmount))]
+    [NotifyPropertyChangedFor(nameof(IsNewTotalOverBudget))]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     decimal amount;
 
@@ -30,6 +45,8 @@ public partial class PartialPaymentViewModel : ObservableObject
     public string PaidAmountLabel => IsIncome ? "Já recebido" : "Já gasto";
     public string AmountLabel => IsIncome ? "Valor recebido agora" : "Valor gasto agora";
     public decimal NewPaidAmount => PaidAmount + Amount;
+    public decimal NewOverBudgetAmount => Math.Max(0, NewPaidAmount - TotalAmount);
+    public bool IsNewTotalOverBudget => NewOverBudgetAmount > 0;
 
     public PartialPaymentViewModel(IFinanceService financeService)
     {
@@ -44,17 +61,23 @@ public partial class PartialPaymentViewModel : ObservableObject
         OnPropertyChanged(nameof(AmountLabel));
     }
 
-    partial void OnPaidAmountChanged(decimal value) => OnPropertyChanged(nameof(NewPaidAmount));
-
-    public void Prepare(MonthlyEntryProjection projection, DateTime month)
+    /// <summary>
+    /// The payment date defaults to today, kept within <paramref name="month"/> when another month is shown.
+    /// </summary>
+    public void Prepare(MonthlyEntryProjection projection, DateTime month, DateTime? today = null)
     {
         _entryId = projection.FinancialEntryId;
         _month = new DateTime(month.Year, month.Month, 1);
         Description = projection.Description;
         EntryType = projection.EntryType;
         PaidAmount = projection.PaidAmount;
-        TotalAmount = projection.EffectiveAmount;
+        TotalAmount = projection.PlannedAmount ?? projection.EffectiveAmount;
         Amount = 0;
+        PaymentDescription = string.Empty;
+        MinimumDate = _month;
+        MaximumDate = _month.AddMonths(1).AddDays(-1);
+        var date = (today ?? DateTime.Today).Date;
+        PaymentDate = date < MinimumDate ? MinimumDate : date > MaximumDate ? MaximumDate : date;
     }
 
     public void SetSaveCallback(Action onSaved)
@@ -65,7 +88,7 @@ public partial class PartialPaymentViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task Save()
     {
-        await _financeService.AddPaidAmountAsync(_entryId, _month.Year, _month.Month, Amount);
+        await _financeService.AddPaymentAsync(_entryId, _month.Year, _month.Month, Amount, PaymentDate, PaymentDescription.Trim());
         _onSaved?.Invoke();
     }
 

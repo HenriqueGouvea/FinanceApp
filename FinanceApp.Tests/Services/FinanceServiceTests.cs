@@ -11,6 +11,8 @@ public class FinanceServiceTests
     private readonly TestDatabaseContext _context;
     private readonly FinanceService _service;
 
+    private static readonly DateTime AprilTenth = new(2026, 4, 10, 0, 0, 0, DateTimeKind.Local);
+
     public FinanceServiceTests()
     {
         _context = new TestDatabaseContext();
@@ -478,6 +480,39 @@ public class FinanceServiceTests
     }
 
     [Fact]
+    public async Task SetEntryStatusAsync_PaidAfterPayingMoreThanPlanned_KeepsPaidAmount()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 130m, AprilTenth, string.Empty);
+
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+        projection.IsPaid.Should().BeTrue();
+        projection.EffectiveAmount.Should().Be(130m);
+        projection.PaidAmount.Should().Be(130m);
+        projection.OverBudgetAmount.Should().Be(30m);
+    }
+
+    [Fact]
+    public async Task DeletePaymentAsync_SettledEntry_StaysPaid()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 80m, AprilTenth, string.Empty);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 50m, AprilTenth, "Extra");
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+        var extra = (await _service.GetPaymentsAsync(entry.Id, 2026, 4)).Single(p => p.Description == "Extra");
+
+        await _service.DeletePaymentAsync(extra.Id);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+        projection.IsPaid.Should().BeTrue();
+        projection.EffectiveAmount.Should().Be(100m, "back within the planned amount, the whole planned amount is settled");
+        projection.IsOverBudget.Should().BeFalse();
+        (await _service.GetPaymentsAsync(entry.Id, 2026, 4)).Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task SetPaidAmountAsync_LessThanAmount_PersistsPartiallyPaidRecord()
     {
         var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
@@ -511,17 +546,17 @@ public class FinanceServiceTests
     }
 
     [Fact]
-    public async Task SetPaidAmountAsync_EqualToAmount_MarksEntryAsPaid()
+    public async Task SetPaidAmountAsync_EqualToAmount_StaysPartiallyPaidUntilSettled()
     {
         var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
 
         await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 100m);
 
         var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
-        projection.IsPaid.Should().BeTrue();
+        projection.IsPartiallyPaid.Should().BeTrue("only \"Pagar\" settles a month");
         projection.PendingAmount.Should().Be(0m);
         var db = await _context.GetConnectionAsync();
-        (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Single().Status.Should().Be(FinancialMonthlyEntryStatus.Paid);
+        (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Single().Status.Should().Be(FinancialMonthlyEntryStatus.PartiallyPaid);
     }
 
     [Fact]
@@ -532,7 +567,7 @@ public class FinanceServiceTests
         await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 130m);
 
         var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
-        projection.IsPaid.Should().BeTrue();
+        projection.IsPartiallyPaid.Should().BeTrue();
         projection.EffectiveAmount.Should().Be(130m);
         projection.PaidAmount.Should().Be(130m);
         (await _service.GetMergedEntriesForMonthAsync(2026, 5)).Single().EffectiveAmount.Should().Be(100m);
@@ -565,24 +600,65 @@ public class FinanceServiceTests
             OverrideAmount = 50m
         });
 
-        await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 50m);
+        await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 70m);
 
         var db = await _context.GetConnectionAsync();
         var record = (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Should().ContainSingle().Subject;
-        record.Status.Should().Be(FinancialMonthlyEntryStatus.Paid);
+        record.PaidAmount.Should().Be(70m);
         record.OverrideAmount.Should().Be(50m);
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single().PlannedAmount.Should().Be(50m);
     }
 
     [Fact]
-    public async Task SetPaidAmountAsync_TemplateAmountLoweredBelowPaidAmount_ProjectionBecomesPaid()
+    public async Task SetPaidAmountAsync_TemplateAmountLoweredBelowPaidAmount_StaysPartiallyPaidAndOverBudget()
     {
         var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
-        await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 40m);
+        await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 60m);
 
         entry.Amount = 40m;
         await _service.SaveEntryAsync(entry);
 
-        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single().IsPaid.Should().BeTrue();
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+        projection.IsPartiallyPaid.Should().BeTrue();
+        projection.OverBudgetAmount.Should().Be(20m);
+    }
+
+    [Fact]
+    public async Task SetPaidAmountAsync_SettledEntryBelowPlannedAmount_ReopensAsPartiallyPaid()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 40m);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+        projection.IsPartiallyPaid.Should().BeTrue();
+        projection.PaidAmount.Should().Be(40m);
+    }
+
+    [Fact]
+    public async Task SetPaidAmountAsync_SettledEntryAbovePlannedAmount_StaysPaid()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 130m);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+        projection.IsPaid.Should().BeTrue();
+        projection.PaidAmount.Should().Be(130m);
+        projection.IsOverBudget.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SetPaidAmountAsync_SettledEntryCleared_RevertsToPending()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 0m);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single().IsPending.Should().BeTrue();
     }
 
     [Fact]
@@ -595,11 +671,11 @@ public class FinanceServiceTests
     }
 
     [Fact]
-    public async Task AddPaidAmountAsync_ProjectedEntry_PersistsPartiallyPaidRecord()
+    public async Task AddPaymentAsync_ProjectedEntry_PersistsPartiallyPaidRecord()
     {
         var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
 
-        await _service.AddPaidAmountAsync(entry.Id, 2026, 5, 30m);
+        await _service.AddPaymentAsync(entry.Id, 2026, 5, 30m, AprilTenth, string.Empty);
 
         var db = await _context.GetConnectionAsync();
         var record = (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Should().ContainSingle().Subject;
@@ -609,12 +685,12 @@ public class FinanceServiceTests
     }
 
     [Fact]
-    public async Task AddPaidAmountAsync_PartiallyPaidEntry_AddsToPaidAmount()
+    public async Task AddPaymentAsync_PartiallyPaidEntry_AddsToPaidAmount()
     {
         var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
         await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 30m);
 
-        await _service.AddPaidAmountAsync(entry.Id, 2026, 4, 25m);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 25m, AprilTenth, string.Empty);
 
         var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
         projection.IsPartiallyPaid.Should().BeTrue();
@@ -623,23 +699,39 @@ public class FinanceServiceTests
     }
 
     [Fact]
-    public async Task AddPaidAmountAsync_ReachingAmount_MarksEntryAsPaid()
+    public async Task AddPaymentAsync_ReachingAmount_StaysPartiallyPaidUntilSettled()
     {
         var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
         await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 60m);
 
-        await _service.AddPaidAmountAsync(entry.Id, 2026, 4, 40m);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 40m, AprilTenth, string.Empty);
 
-        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single().IsPaid.Should().BeTrue();
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+        projection.IsPartiallyPaid.Should().BeTrue();
+        projection.PaidAmount.Should().Be(100m);
     }
 
     [Fact]
-    public async Task AddPaidAmountAsync_PaidEntry_AddsOnTopOfWholeAmount()
+    public async Task AddPaymentAsync_BeyondAmount_StaysPartiallyPaidAndRaisesAmount()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 80m, AprilTenth, string.Empty);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 50m, AprilTenth, string.Empty);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+        projection.IsPartiallyPaid.Should().BeTrue();
+        projection.EffectiveAmount.Should().Be(130m);
+        projection.PendingAmount.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task AddPaymentAsync_PaidEntry_AddsOnTopOfWholeAmount()
     {
         var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
         await _service.SetEntryStatusAsync(entry.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
 
-        await _service.AddPaidAmountAsync(entry.Id, 2026, 4, 20m);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 20m, AprilTenth, string.Empty);
 
         var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
         projection.IsPaid.Should().BeTrue();
@@ -647,12 +739,210 @@ public class FinanceServiceTests
     }
 
     [Fact]
-    public async Task AddPaidAmountAsync_UnknownEntry_DoesNotPersistRecord()
+    public async Task AddPaymentAsync_UnknownEntry_DoesNotPersistRecord()
     {
-        await _service.AddPaidAmountAsync(999, 2026, 4, 40m);
+        await _service.AddPaymentAsync(999, 2026, 4, 40m, AprilTenth, string.Empty);
 
         var db = await _context.GetConnectionAsync();
         (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Should().BeEmpty();
+        (await db.Table<FinancialPayment>().ToListAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AddPaymentAsync_ProjectedEntry_RecordsPaymentWithDateAndDescription()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 30m, AprilTenth.AddHours(15), "Weekly groceries");
+
+        var db = await _context.GetConnectionAsync();
+        var record = (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Single();
+        var payment = (await db.Table<FinancialPayment>().ToListAsync()).Should().ContainSingle().Subject;
+        payment.FinancialMonthlyEntryId.Should().Be(record.Id);
+        payment.Amount.Should().Be(30m);
+        payment.Date.Should().Be(AprilTenth);
+        payment.Description.Should().Be("Weekly groceries");
+    }
+
+    [Fact]
+    public async Task GetPaymentsAsync_SeveralPayments_ReturnsThatMonthsPaymentsByDate()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 30m, AprilTenth.AddDays(5), "Second");
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 20m, AprilTenth, "First");
+        await _service.AddPaymentAsync(entry.Id, 2026, 5, 10m, AprilTenth.AddMonths(1), "Other month");
+
+        var payments = await _service.GetPaymentsAsync(entry.Id, 2026, 4);
+
+        payments.Select(p => p.Description).Should().Equal("First", "Second");
+    }
+
+    [Fact]
+    public async Task GetPaymentsAsync_NoMonthlyRecord_ReturnsEmpty()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        (await _service.GetPaymentsAsync(entry.Id, 2026, 4)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DeletePaymentAsync_PartiallyPaidEntry_RemovesPaymentAndSubtractsIt()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 30m, AprilTenth, "Kept");
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 20m, AprilTenth, "Deleted");
+        var deleted = (await _service.GetPaymentsAsync(entry.Id, 2026, 4)).Single(p => p.Description == "Deleted");
+
+        await _service.DeletePaymentAsync(deleted.Id);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+        projection.IsPartiallyPaid.Should().BeTrue();
+        projection.PaidAmount.Should().Be(30m);
+        (await _service.GetPaymentsAsync(entry.Id, 2026, 4)).Should().ContainSingle().Which.Description.Should().Be("Kept");
+    }
+
+    [Fact]
+    public async Task DeletePaymentAsync_PaidEntryBelowAmountAfterwards_BecomesPartiallyPaid()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 60m, AprilTenth, string.Empty);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 40m, AprilTenth, string.Empty);
+        var last = (await _service.GetPaymentsAsync(entry.Id, 2026, 4)).Last();
+
+        await _service.DeletePaymentAsync(last.Id);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+        projection.IsPartiallyPaid.Should().BeTrue();
+        projection.PaidAmount.Should().Be(60m);
+    }
+
+    [Fact]
+    public async Task DeletePaymentAsync_OnlyPayment_RevertsToPending()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 30m, AprilTenth, string.Empty);
+        var payment = (await _service.GetPaymentsAsync(entry.Id, 2026, 4)).Single();
+
+        await _service.DeletePaymentAsync(payment.Id);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single().IsPending.Should().BeTrue();
+        var db = await _context.GetConnectionAsync();
+        (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Single().PaidAmount.Should().BeNull();
+        (await db.Table<FinancialPayment>().ToListAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DeletePaymentAsync_UnknownPayment_DoesNothing()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 30m, AprilTenth, string.Empty);
+
+        await _service.DeletePaymentAsync(999);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single().PaidAmount.Should().Be(30m);
+    }
+
+    [Fact]
+    public async Task SetPaidAmountAsync_Zero_RemovesThatMonthsPayments()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 30m, AprilTenth, string.Empty);
+        await _service.AddPaymentAsync(entry.Id, 2026, 5, 30m, AprilTenth.AddMonths(1), string.Empty);
+
+        await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 0m);
+
+        (await _service.GetPaymentsAsync(entry.Id, 2026, 4)).Should().BeEmpty();
+        (await _service.GetPaymentsAsync(entry.Id, 2026, 5)).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task SetPaidAmountAsync_NewTotal_KeepsRecordedPayments()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 30m, AprilTenth, string.Empty);
+
+        await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 50m);
+
+        (await _service.GetPaymentsAsync(entry.Id, 2026, 4)).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task SetEntryStatusAsync_Pending_RemovesThatMonthsPayments()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 30m, AprilTenth, string.Empty);
+
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 4, FinancialMonthlyEntryStatus.Pending);
+
+        (await _service.GetPaymentsAsync(entry.Id, 2026, 4)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SetEntryStatusAsync_Paid_KeepsRecordedPayments()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 30m, AprilTenth, string.Empty);
+
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        (await _service.GetPaymentsAsync(entry.Id, 2026, 4)).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_PaidMoreThanPlanned_ProjectionIsOverBudget()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 80m, AprilTenth, string.Empty);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 50m, AprilTenth, string.Empty);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.PlannedAmount.Should().Be(100m);
+        projection.EffectiveAmount.Should().Be(130m);
+        projection.IsOverBudget.Should().BeTrue();
+        projection.OverBudgetAmount.Should().Be(30m);
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_PaidMoreThanOverrideAmount_UsesOverrideAsPlannedAmount()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveMonthlyEntryAsync(new FinancialMonthlyEntry
+        {
+            FinancialEntryId = entry.Id,
+            Year = 2026,
+            Month = 4,
+            OverrideAmount = 50m
+        });
+
+        await _service.SetPaidAmountAsync(entry.Id, 2026, 4, 70m);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+        projection.PlannedAmount.Should().Be(50m);
+        projection.OverBudgetAmount.Should().Be(20m);
+    }
+
+    [Theory]
+    [InlineData(40)]
+    [InlineData(100)]
+    public async Task GetMergedEntries_PaidUpToPlanned_ProjectionIsNotOverBudget(decimal paidAmount)
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SetPaidAmountAsync(entry.Id, 2026, 4, paidAmount);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.IsOverBudget.Should().BeFalse();
+        projection.OverBudgetAmount.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_MarkedPaidWithoutPayments_ProjectionIsNotOverBudget()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single().IsOverBudget.Should().BeFalse();
     }
 
     [Fact]
@@ -734,6 +1024,31 @@ public class FinanceServiceTests
         var db = await _context.GetConnectionAsync();
         var records = await db.Table<FinancialMonthlyEntry>().ToListAsync();
         records.Should().ContainSingle().Which.Month.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task DeleteEntryAsync_ThisAndFuture_RemovesPaymentsOfDeletedMonthsOnly()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 30m, AprilTenth, "Kept");
+        await _service.AddPaymentAsync(entry.Id, 2026, 6, 30m, AprilTenth.AddMonths(2), "Deleted");
+
+        await _service.DeleteEntryAsync(entry.Id, 2026, 5, EntryDeleteScope.ThisAndFuture);
+
+        var db = await _context.GetConnectionAsync();
+        (await db.Table<FinancialPayment>().ToListAsync()).Should().ContainSingle().Which.Description.Should().Be("Kept");
+    }
+
+    [Fact]
+    public async Task DeleteEntryAsync_All_RemovesPayments()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.AddPaymentAsync(entry.Id, 2026, 4, 30m, AprilTenth, string.Empty);
+
+        await _service.DeleteEntryAsync(entry.Id, 2026, 4, EntryDeleteScope.All);
+
+        var db = await _context.GetConnectionAsync();
+        (await db.Table<FinancialPayment>().ToListAsync()).Should().BeEmpty();
     }
 
     [Fact]

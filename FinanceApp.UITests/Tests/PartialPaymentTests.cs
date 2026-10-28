@@ -36,7 +36,9 @@ public sealed class PartialPaymentTests : E2ETestBase
         MainPage.SetPaidAmount("Mercado E2E", 250m);
 
         MainPage.WaitFor(() => MainPage.IsEntryPartiallyPaid("Mercado E2E"));
-        MainPage.EntryPartialText("Mercado E2E").Should().Be(AppFormat.PartialPayment(250, AppLabels.PartialPaidOutcome));
+        MainPage.EntryPartialText("Mercado E2E").Should().Be(AppFormat.Money(250));
+        MainPage.IsEntryPaymentProgressVisible("Mercado E2E").Should().BeTrue();
+        MainPage.EntryPlannedAmountText("Mercado E2E").Should().BeNull();
         MainPage.EntryAmountText("Mercado E2E").Should().Be(AppFormat.Money(800));
         MainPage.IsEntryPaid("Mercado E2E").Should().BeFalse();
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(250));
@@ -46,6 +48,7 @@ public sealed class PartialPaymentTests : E2ETestBase
         MainPage.GoToNextMonth().WaitForEntry("Mercado E2E");
         MainPage.IsEntryPartiallyPaid("Mercado E2E").Should().BeFalse();
         MainPage.EntryPartialText("Mercado E2E").Should().BeNull();
+        MainPage.IsEntryPaymentProgressVisible("Mercado E2E").Should().BeFalse();
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(0));
 
         var entry = (await GetEntryRowsAsync()).Single();
@@ -68,30 +71,45 @@ public sealed class PartialPaymentTests : E2ETestBase
     }
 
     [Fact]
-    public async Task SetPaidAmount_WholeAmount_MarksEntryAsPaid()
+    public async Task SetPaidAmount_WholeAmount_StaysPartiallyPaidUntilMarkedPaid()
     {
         MainPage.SetPaidAmount("Mercado E2E", 800m);
 
-        MainPage.WaitFor(() => MainPage.IsEntryPaid("Mercado E2E"));
-        MainPage.EntryPartialText("Mercado E2E").Should().BeNull();
-        MainPage.VisibleEntryStatuses.Should().ContainSingle().Which.Should().Be(AppLabels.Paid);
+        MainPage.WaitFor(() => MainPage.IsEntryPartiallyPaid("Mercado E2E"));
+        MainPage.IsEntryPaid("Mercado E2E").Should().BeFalse("only \"Pagar\" settles the month");
+        MainPage.EntryPartialText("Mercado E2E").Should().Be(AppFormat.Money(800));
+        MainPage.VisibleEntryStatuses.Should().BeEmpty();
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(800));
         MainPage.SummaryToPayText.Should().Be(AppFormat.Money(0));
+        (await GetMonthlyEntryRowsAsync()).Should().ContainSingle().Which.Status.Should().Be(AppFormat.PartiallyPaid);
 
+        MainPage.MarkPaid("Mercado E2E");
+
+        MainPage.VisibleEntryStatuses.Should().ContainSingle().Which.Should().Be(AppLabels.Paid);
+        MainPage.IsEntryPaymentProgressVisible("Mercado E2E").Should().BeFalse();
+        MainPage.SummaryPaidText.Should().Be(AppFormat.Money(800));
         var record = (await GetMonthlyEntryRowsAsync()).Should().ContainSingle().Subject;
         record.Status.Should().Be(AppFormat.Paid);
-        record.PaidAmount.Should().Be(800m);
+        record.PaidAmount.Should().BeNull();
     }
 
     [Fact]
-    public async Task SetPaidAmount_MoreThanAmount_RaisesThatMonthsAmount()
+    public async Task SetPaidAmount_MoreThanAmount_RaisesThatMonthsAmountAndKeepsItWhenMarkedPaid()
     {
         MainPage.SetPaidAmount("Mercado E2E", 850m);
 
-        MainPage.WaitFor(() => MainPage.IsEntryPaid("Mercado E2E"));
+        MainPage.WaitFor(() => MainPage.IsEntryPartiallyPaid("Mercado E2E"));
+        MainPage.IsEntryPaid("Mercado E2E").Should().BeFalse();
         MainPage.EntryAmountText("Mercado E2E").Should().Be(AppFormat.Money(850));
         MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(850));
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(850));
+
+        MainPage.MarkPaid("Mercado E2E");
+
+        MainPage.EntryAmountText("Mercado E2E").Should().Be(AppFormat.Money(850), "settling keeps what was really paid");
+        var record = (await GetMonthlyEntryRowsAsync()).Should().ContainSingle().Subject;
+        record.Status.Should().Be(AppFormat.Paid);
+        record.PaidAmount.Should().Be(850m);
 
         MainPage.GoToNextMonth().WaitForEntry("Mercado E2E");
         MainPage.EntryAmountText("Mercado E2E").Should().Be(AppFormat.Money(800));
@@ -130,6 +148,7 @@ public sealed class PartialPaymentTests : E2ETestBase
         MainPage.MarkPaid("Mercado E2E");
 
         MainPage.EntryPartialText("Mercado E2E").Should().BeNull();
+        MainPage.IsEntryPaymentProgressVisible("Mercado E2E").Should().BeFalse();
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(800));
         MainPage.SummaryToPayText.Should().Be(AppFormat.Money(0));
 
@@ -149,7 +168,7 @@ public sealed class PartialPaymentTests : E2ETestBase
         MainPage.SetPaidAmount("Freela E2E", 400m);
 
         MainPage.WaitFor(() => MainPage.IsEntryPartiallyPaid("Freela E2E"));
-        MainPage.EntryPartialText("Freela E2E").Should().Be(AppFormat.PartialPayment(400, AppLabels.PartialPaidIncome));
+        MainPage.EntryPartialText("Freela E2E").Should().Be(AppFormat.Money(400));
         MainPage.SummaryReceivedText.Should().Be(AppFormat.Money(400));
         MainPage.SummaryToReceiveText.Should().Be(AppFormat.Money(600));
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(0), "outcomes are untouched");
@@ -170,7 +189,7 @@ public sealed class PartialPaymentTests : E2ETestBase
         MainPage.GoToNextMonth().SetPaidAmount("Notebook E2E", 100m);
 
         MainPage.WaitFor(() => MainPage.IsEntryPartiallyPaid("Notebook E2E"));
-        MainPage.EntryPartialText("Notebook E2E").Should().Be(AppFormat.PartialPayment(100, AppLabels.PartialPaidOutcome));
+        MainPage.EntryPartialText("Notebook E2E").Should().Be(AppFormat.Money(100));
         MainPage.GoToPreviousMonth().WaitForEntry("Notebook E2E");
         MainPage.IsEntryPartiallyPaid("Notebook E2E").Should().BeFalse();
 
@@ -198,7 +217,7 @@ public sealed class PartialPaymentTests : E2ETestBase
         popup.NewTotalText.Should().Be(AppFormat.PartialPaymentNewTotal(150));
         popup.Save();
 
-        MainPage.WaitFor(() => MainPage.EntryPartialText("Mercado E2E") == AppFormat.PartialPayment(150, AppLabels.PartialPaidOutcome));
+        MainPage.WaitFor(() => MainPage.EntryPartialText("Mercado E2E") == AppFormat.Money(150));
         MainPage.IsEntryPartiallyPaid("Mercado E2E").Should().BeTrue();
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(150));
         MainPage.SummaryToPayText.Should().Be(AppFormat.Money(650));
@@ -221,26 +240,28 @@ public sealed class PartialPaymentTests : E2ETestBase
         popup.NewTotalText.Should().Be(AppFormat.PartialPaymentNewTotal(250));
         popup.Save();
 
-        MainPage.WaitFor(() => MainPage.EntryPartialText("Mercado E2E") == AppFormat.PartialPayment(250, AppLabels.PartialPaidOutcome));
+        MainPage.WaitFor(() => MainPage.EntryPartialText("Mercado E2E") == AppFormat.Money(250));
         (await GetMonthlyEntryRowsAsync()).Should().ContainSingle().Which.PaidAmount.Should().Be(250m);
     }
 
     [Fact]
-    public async Task PartialPaymentAction_ReachingAmount_MarksPaidAndNoLongerOffersPartialPayment()
+    public async Task PartialPaymentAction_ReachingAmount_StaysPartiallyPaidUntilMarkedPaid()
     {
         MainPage.AddPartialPayment("Mercado E2E", 300m);
         MainPage.WaitFor(() => MainPage.IsEntryPartiallyPaid("Mercado E2E"));
 
         MainPage.AddPartialPayment("Mercado E2E", 500m);
 
-        MainPage.WaitFor(() => MainPage.IsEntryPaid("Mercado E2E"));
-        MainPage.EntryPartialText("Mercado E2E").Should().BeNull();
+        MainPage.WaitFor(() => MainPage.EntryPartialText("Mercado E2E") == AppFormat.Money(800));
+        MainPage.IsEntryPaid("Mercado E2E").Should().BeFalse("the month may not be over yet");
+        MainPage.IsEntryPaymentProgressVisible("Mercado E2E").Should().BeTrue();
+        MainPage.EntryPlannedAmountText("Mercado E2E").Should().BeNull("exactly the planned amount was paid");
         MainPage.RevealActions("Mercado E2E");
-        MainPage.RevealedPartialPaymentActionText.Should().BeNull("a paid entry has nothing left to pay");
-        MainPage.RevealedStatusActionText.Should().Be(AppLabels.MarkPending);
+        MainPage.RevealedPartialPaymentActionText.Should().Be(AppLabels.MarkPartialPaid);
+        MainPage.RevealedStatusActionText.Should().Be(AppLabels.MarkPaid);
 
         var record = (await GetMonthlyEntryRowsAsync()).Should().ContainSingle().Subject;
-        record.Status.Should().Be(AppFormat.Paid);
+        record.Status.Should().Be(AppFormat.PartiallyPaid);
         record.PaidAmount.Should().Be(800m);
     }
 
@@ -258,7 +279,7 @@ public sealed class PartialPaymentTests : E2ETestBase
         popup.ProgressText.Should().Be(AppFormat.PartialPaymentProgress(AppLabels.AlreadyReceived, 0, 1000));
         popup.EnterAmount(400m).Save();
 
-        MainPage.WaitFor(() => MainPage.EntryPartialText("Freela E2E") == AppFormat.PartialPayment(400, AppLabels.PartialPaidIncome));
+        MainPage.WaitFor(() => MainPage.EntryPartialText("Freela E2E") == AppFormat.Money(400));
         MainPage.SummaryReceivedText.Should().Be(AppFormat.Money(400));
         MainPage.SummaryToReceiveText.Should().Be(AppFormat.Money(600));
 

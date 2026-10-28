@@ -14,6 +14,8 @@ public class PartialPaymentPopupObject
     private static readonly By Progress = AppSession.AutomationId("PartialPaymentProgressLabel");
     private static readonly By NewTotal = AppSession.AutomationId("PartialPaymentNewTotalLabel");
     private static readonly By AmountEntry = AppSession.AutomationId("PartialPaymentAmountEntry");
+    private static readonly By OverBudget = AppSession.AutomationId("PartialPaymentOverBudgetLabel");
+    private const string PaymentDescriptionEntryId = "PartialPaymentDescriptionEntry";
     private const string SaveButtonId = "SavePartialPaymentButton";
     private const string CancelButtonId = "CancelPartialPaymentButton";
 
@@ -35,6 +37,21 @@ public class PartialPaymentPopupObject
     public string ProgressText => _session.WaitForVisible(Progress).Text;
     public string NewTotalText => _session.WaitForVisible(NewTotal).Text;
     public bool IsSaveEnabled => _session.WaitForVisible(AppSession.AutomationId(SaveButtonId)).Enabled;
+
+    /// <summary>
+    /// The "▲ R$ 50,00 acima do previsto" warning under the new total, or null while within the planned amount.
+    /// </summary>
+    public string? OverBudgetText => _session.Driver.FindElements(OverBudget).FirstOrDefault(e => e.Displayed)?.Text;
+
+    public PartialPaymentPopupObject EnterPaymentDescription(string description)
+    {
+        var entry = _session.ScrollTo(PaymentDescriptionEntryId);
+        entry.Clear();
+        entry.SendKeys(description);
+        _session.WaitForText(AppSession.AutomationId(PaymentDescriptionEntryId), description);
+        _session.CloseKeyboardWithDone();
+        return this;
+    }
 
     /// <summary>
     /// Masked as currency: typed digits are read as cents.

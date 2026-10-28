@@ -21,6 +21,12 @@ public class AddEntryPopupObject
     private const string EstimatedSwitchId = "EstimatedSwitch";
     private const string PaidAmountEntryId = "PaidAmountEntry";
     private const string PaidAmountLabelId = "PaidAmountLabel";
+    private const string PaymentsHeaderId = "PaymentsHeaderLabel";
+    private static readonly By PaymentRow = AppSession.AutomationId("PaymentRow");
+    private static readonly By PaymentDate = AppSession.AutomationId("PaymentDateLabel");
+    private static readonly By PaymentDescription = AppSession.AutomationId("PaymentDescriptionLabel");
+    private static readonly By PaymentAmount = AppSession.AutomationId("PaymentAmountLabel");
+    private static readonly By DeletePaymentButton = AppSession.AutomationId("DeletePaymentButton");
     private static readonly By PickerDialogOption = MobileBy.Id("android:id/text1");
     private const string SaveButtonId = "SaveEntryButton";
     private const string CancelButtonId = "CancelEntryButton";
@@ -144,6 +150,50 @@ public class AddEntryPopupObject
         _session.WaitForText(AppSession.AutomationId(PaidAmountEntryId), AppFormat.Money(amount));
         _session.HideKeyboardIfShown();
         return this;
+    }
+
+    /// <summary>
+    /// Header of the month's partial payments list, or null when the month has none.
+    /// </summary>
+    public string? PaymentsHeaderText => _session.TryScrollTo(PaymentsHeaderId)?.Text;
+
+    /// <summary>
+    /// The month's partial payments as shown: date, description (null when left empty) and amount.
+    /// </summary>
+    public IReadOnlyList<(string Date, string? Description, string Amount)> Payments
+    {
+        get
+        {
+            ScrollPaymentsIntoView();
+            return _session.Driver.FindElements(PaymentRow)
+                .Where(r => r.Displayed)
+                .Select(r => (
+                    r.FindElement(PaymentDate).Text,
+                    r.FindElements(PaymentDescription).FirstOrDefault(d => d.Displayed)?.Text,
+                    r.FindElement(PaymentAmount).Text))
+                .ToList();
+        }
+    }
+
+    /// <summary>
+    /// Taps the ✕ of the payment with that description and waits for it to leave the list (it is only deleted on save).
+    /// </summary>
+    public AddEntryPopupObject DeletePayment(string description)
+    {
+        var count = Payments.Count;
+        _session.Driver.FindElements(PaymentRow)
+            .First(r => r.Displayed && r.FindElements(PaymentDescription).Any(d => d.Displayed && d.Text == description))
+            .FindElement(DeletePaymentButton)
+            .Click();
+        _session.WaitFor(() => Payments.Count == count - 1, $"the payment \"{description}\" to leave the list");
+        return this;
+    }
+
+    // The list sits between the paid amount field and the category picker, so showing both shows the whole list.
+    private void ScrollPaymentsIntoView()
+    {
+        _session.TryScrollTo(PaymentsHeaderId);
+        _session.TryScrollTo(CategoryPickerId);
     }
 
     public AddEntryPopupObject ClearPaidAmount()

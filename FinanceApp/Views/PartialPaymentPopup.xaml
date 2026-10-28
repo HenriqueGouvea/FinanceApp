@@ -52,7 +52,31 @@
                        Text="{Binding NewPaidAmount, Converter={x:Static converters:MoneyConverter.Instance}, StringFormat='Novo total: {0}'}"
                        FontSize="12"
                        TextColor="Gray" />
+                <Label AutomationId="PartialPaymentOverBudgetLabel"
+                       Text="{Binding NewOverBudgetAmount, Converter={x:Static converters:MoneyConverter.Instance}, StringFormat='▲ {0} acima do previsto'}"
+                       FontSize="12"
+                       FontAttributes="Bold"
+                       TextColor="#EF6C00"
+                       IsVisible="{Binding IsNewTotalOverBudget}" />
             </VerticalStackLayout>
+
+            <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10">
+                <VerticalStackLayout Grid.Column="0" Spacing="2">
+                    <Label Text="Data" FontSize="12" TextColor="Gray" />
+                    <DatePicker AutomationId="PartialPaymentDatePicker"
+                                Date="{Binding PaymentDate}"
+                                MinimumDate="{Binding MinimumDate}"
+                                MaximumDate="{Binding MaximumDate}"
+                                Format="dd/MM/yyyy" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Grid.Column="1" Spacing="2">
+                    <Label Text="Descrição (opcional)" FontSize="12" TextColor="Gray" />
+                    <Entry AutomationId="PartialPaymentDescriptionEntry"
+                           Text="{Binding PaymentDescription}"
+                           Placeholder="Ex.: feira da semana"
+                           MaxLength="60" />
+                </VerticalStackLayout>
+            </Grid>
 
             <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,8,0,0">
                 <Button Grid.Column="0" AutomationId="CancelPartialPaymentButton" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />

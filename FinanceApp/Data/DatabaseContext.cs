@@ -44,6 +44,7 @@ public class DatabaseContext : IDatabaseContext
 
         await connection.CreateTableAsync<FinancialEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
         await connection.CreateTableAsync<FinancialMonthlyEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
+        await connection.CreateTableAsync<FinancialPayment>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
         var categoryColumns = await connection.GetTableInfoAsync(nameof(FinancialCategory));
         var hadCategoryType = categoryColumns.Any(c => c.Name == nameof(FinancialCategory.EntryType));
         var categoryTable = await connection.CreateTableAsync<FinancialCategory>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
