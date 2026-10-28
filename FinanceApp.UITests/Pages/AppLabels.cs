@@ -32,6 +32,8 @@ public static class AppLabels
 
     public const string MarkPartialPaid = "Pagar parcial";
     public const string MarkPartialReceived = "Receber parcial";
+    public const string PartialPaymentOutcome = "Pagamento parcial";
+    public const string PartialPaymentIncome = "Recebimento parcial";
     public const string AlreadySpent = "Já gasto";
     public const string AlreadyReceived = "Já recebido";
     public const string PaymentsOutcome = "Pagamentos neste mês";

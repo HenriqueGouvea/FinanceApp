@@ -64,7 +64,8 @@ public class FinanceService : IFinanceService
                         _ => 0
                     },
                     IsEstimated: template.IsEstimated,
-                    PlannedAmount: plannedAmount
+                    PlannedAmount: plannedAmount,
+                    AllowsPartialPayment: template.AllowsPartialPayment
                 ));
             }
             else
@@ -80,7 +81,8 @@ public class FinanceService : IFinanceService
                     IsProjected: true,
                     InstallmentLabel: BuildInstallmentLabel(template, year, month),
                     InstallmentTotalAmount: BuildInstallmentTotal(template),
-                    IsEstimated: template.IsEstimated
+                    IsEstimated: template.IsEstimated,
+                    AllowsPartialPayment: template.AllowsPartialPayment
                 ));
             }
         }

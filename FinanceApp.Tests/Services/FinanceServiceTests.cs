@@ -965,6 +965,35 @@ public class FinanceServiceTests
     }
 
     [Fact]
+    public async Task GetMergedEntries_PartialPaymentTemplate_ProjectionAllowsPartialPayment()
+    {
+        var entry = new FinancialEntry
+        {
+            Description = "Supermarket",
+            Amount = 900m,
+            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
+            Recurrence = RecurrenceType.Recurrent,
+            EntryType = FinancialEntryType.Outcome,
+            AllowsPartialPayment = true
+        };
+        await _service.SaveEntryAsync(entry);
+        await _service.AddPaymentAsync(entry.Id, 2026, 5, 100m, new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Local), string.Empty);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single().AllowsPartialPayment.Should().BeTrue();
+        (await _service.GetMergedEntriesForMonthAsync(2026, 5)).Single().AllowsPartialPayment.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_RegularTemplate_ProjectionDoesNotAllowPartialPayment()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 5, FinancialMonthlyEntryStatus.Paid);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single().AllowsPartialPayment.Should().BeFalse();
+        (await _service.GetMergedEntriesForMonthAsync(2026, 5)).Single().AllowsPartialPayment.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task DeleteEntryAsync_OneTimeEntry_RemovesTemplate()
     {
         var entry = await SaveTemplateAsync(RecurrenceType.OneTime);

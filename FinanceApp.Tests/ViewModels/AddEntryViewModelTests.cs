@@ -547,6 +547,102 @@ public class AddEntryViewModelTests
         await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.IsEstimated));
     }
 
+    // --- Partial payment flag ---
+
+    [Fact]
+    public async Task Prepare_ResetsAllowsPartialPayment()
+    {
+        _vm.AllowsPartialPayment = true;
+
+        await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+
+        _vm.AllowsPartialPayment.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PrepareForEdit_PartialPaymentEntry_PrefillsAllowsPartialPayment()
+    {
+        var entry = MakeEntry();
+        entry.AllowsPartialPayment = true;
+
+        await _vm.PrepareForEditAsync(entry);
+
+        _vm.AllowsPartialPayment.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SaveCommand_WithAllowsPartialPayment_PassesItToService()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Recurrent;
+        _vm.AllowsPartialPayment = true;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.AllowsPartialPayment));
+    }
+
+    [Fact]
+    public void PartialPaymentLabel_FollowsEntryType()
+    {
+        _vm.PartialPaymentLabel.Should().Be("Pagamento parcial");
+
+        _vm.EntryType = FinancialEntryType.Income;
+
+        _vm.PartialPaymentLabel.Should().Be("Recebimento parcial");
+    }
+
+    [Fact]
+    public void ShowsPaidAmount_NewEntry_IsFalseEvenWhenFlagged()
+    {
+        _vm.AllowsPartialPayment = true;
+
+        _vm.ShowsPaidAmount.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ShowsPaidAmount_EditingWithoutFlag_IsFalse()
+    {
+        await _vm.PrepareForEditAsync(MakeEntry(), June, 800m);
+
+        _vm.ShowsPaidAmount.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ShowsPaidAmount_EditingFlaggedEntry_IsTrue()
+    {
+        var entry = MakeEntry();
+        entry.AllowsPartialPayment = true;
+
+        await _vm.PrepareForEditAsync(entry, June);
+
+        _vm.ShowsPaidAmount.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ShowsPaidAmount_TogglingFlagWhileEditing_RaisesPropertyChanged()
+    {
+        await _vm.PrepareForEditAsync(MakeEntry(), June);
+        var raised = new List<string?>();
+        _vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        _vm.AllowsPartialPayment = true;
+
+        _vm.ShowsPaidAmount.Should().BeTrue();
+        raised.Should().Contain(nameof(AddEntryViewModel.ShowsPaidAmount));
+    }
+
+    [Fact]
+    public async Task ShowsPaidAmount_FlagOffWithRecordedPayments_IsTrueSoTheyCanBeRemoved()
+    {
+        _service.GetPaymentsAsync(42, 2026, 6).Returns([
+            new FinancialPayment { Id = 1, Amount = 100m, Date = JuneTenth }
+        ]);
+
+        await _vm.PrepareForEditAsync(MakeEntry(), June, 100m);
+
+        _vm.ShowsPaidAmount.Should().BeTrue();
+    }
+
     // --- Paid amount ---
 
     [Fact]

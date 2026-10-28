@@ -126,10 +126,24 @@
                             ThumbColor="Purple"
                             VerticalOptions="Center" />
                 </Grid>
+
+                <!-- Partial payment: enables "Pagar parcial" for entries paid little by little (e.g. supermarket) -->
+                <Grid ColumnDefinitions="*, Auto" Margin="0,6,0,0">
+                    <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
+                        <Label AutomationId="PartialPaymentSwitchLabel" Text="{Binding PartialPaymentLabel}" FontSize="14" />
+                        <Label Text="{Binding PartialPaymentHint}" FontSize="11" TextColor="Gray" />
+                    </VerticalStackLayout>
+                    <Switch Grid.Column="1"
+                            AutomationId="PartialPaymentSwitch"
+                            IsToggled="{Binding AllowsPartialPayment}"
+                            OnColor="#FFCC80"
+                            ThumbColor="#EF6C00"
+                            VerticalOptions="Center" />
+                </Grid>
             </VerticalStackLayout>
 
             <!-- Partial payment for the month the entry was opened from (e.g. supermarket spent so far) -->
-            <VerticalStackLayout Spacing="2" IsVisible="{Binding IsEditing}">
+            <VerticalStackLayout Spacing="2" IsVisible="{Binding ShowsPaidAmount}">
                 <Label AutomationId="PaidAmountLabel"
                        Text="{Binding PaidAmountLabel}"
                        FontSize="12"

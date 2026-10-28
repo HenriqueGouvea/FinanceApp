@@ -17,6 +17,7 @@ namespace FinanceApp.Models;
 /// <param name="PaidAmount">Amount already paid (or received) in the month: the whole amount once paid, zero while pending.</param>
 /// <param name="IsEstimated">True when the template amount is only an estimate.</param>
 /// <param name="PlannedAmount">The month's amount before payments (the template amount or the monthly override), or null when equal to <paramref name="EffectiveAmount"/>.</param>
+/// <param name="AllowsPartialPayment">True when the template accepts partial payments.</param>
 public record MonthlyEntryProjection(
     int FinancialEntryId,
     int? FinancialMonthlyEntryId,
@@ -30,7 +31,8 @@ public record MonthlyEntryProjection(
     decimal? InstallmentTotalAmount,
     decimal PaidAmount = 0,
     bool IsEstimated = false,
-    decimal? PlannedAmount = null
+    decimal? PlannedAmount = null,
+    bool AllowsPartialPayment = false
 )
 {
     public bool IsPaid => Status == FinancialMonthlyEntryStatus.Paid;

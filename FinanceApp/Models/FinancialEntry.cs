@@ -18,6 +18,10 @@ public class FinancialEntry
     /// The amount varies from month to month (e.g. energy bill, supermarket), so it is only an estimate.
     /// </summary>
     public bool IsEstimated { get; set; }
+    /// <summary>
+    /// The entry is paid (or received) little by little within a month (e.g. supermarket), so it accepts partial payments.
+    /// </summary>
+    public bool AllowsPartialPayment { get; set; }
     public string Person { get; set; } = string.Empty;
     public bool IsPJ { get; set; }
 }
