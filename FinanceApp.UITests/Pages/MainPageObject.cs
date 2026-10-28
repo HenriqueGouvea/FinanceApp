@@ -148,7 +148,8 @@ public class MainPageObject
         bool isIncome = false,
         string? installments = null,
         string? category = null,
-        bool isEstimated = false)
+        bool isEstimated = false,
+        bool allowsPartialPayment = false)
     {
         var popup = OpenAddEntry().EnterDescription(description);
 
@@ -164,6 +165,9 @@ public class MainPageObject
 
         if (isEstimated)
             popup.SetEstimated(true);
+
+        if (allowsPartialPayment)
+            popup.SetAllowsPartialPayment(true);
 
         if (category is not null)
             popup.SelectCategory(category);

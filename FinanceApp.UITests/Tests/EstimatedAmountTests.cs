@@ -10,7 +10,7 @@ public sealed class EstimatedAmountTests : E2ETestBase
 {
     public EstimatedAmountTests(AppiumServerFixture server) : base(server)
     {
-        MainPage.AddEntry("Luz E2E", AppLabels.Recurrent, 200m, isEstimated: true);
+        MainPage.AddEntry("Luz E2E", AppLabels.Recurrent, 200m, isEstimated: true, allowsPartialPayment: true);
         MainPage.AddEntry("Aluguel E2E", AppLabels.Recurrent, 1500m);
     }
 
@@ -64,7 +64,7 @@ public sealed class EstimatedAmountTests : E2ETestBase
     {
         MainPage.SetPaidAmount("Luz E2E", 230m);
 
-        MainPage.WaitFor(() => MainPage.IsEntryPaid("Luz E2E"));
+        MainPage.WaitFor(() => MainPage.IsEntryPartiallyPaid("Luz E2E"));
         MainPage.IsEntryEstimated("Luz E2E").Should().BeTrue();
         MainPage.EntryAmountText("Luz E2E").Should().Be(AppFormat.Money(230), "the actual bill came higher than estimated");
     }

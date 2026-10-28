@@ -42,9 +42,15 @@ public class DatabaseContext : IDatabaseContext
     {
         var connection = new SQLiteAsyncConnection(_databasePath);
 
+        var entryColumns = await connection.GetTableInfoAsync(nameof(FinancialEntry));
+        var hadPartialPaymentFlag = entryColumns.Any(c => c.Name == nameof(FinancialEntry.AllowsPartialPayment));
         await connection.CreateTableAsync<FinancialEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
         await connection.CreateTableAsync<FinancialMonthlyEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
         await connection.CreateTableAsync<FinancialPayment>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
+
+        if (entryColumns.Count > 0 && !hadPartialPaymentFlag)
+            await MigratePartialPaymentFlagAsync(connection);
+
         var categoryColumns = await connection.GetTableInfoAsync(nameof(FinancialCategory));
         var hadCategoryType = categoryColumns.Any(c => c.Name == nameof(FinancialCategory.EntryType));
         var categoryTable = await connection.CreateTableAsync<FinancialCategory>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
@@ -78,6 +84,13 @@ public class DatabaseContext : IDatabaseContext
             (int)FinancialEntryType.Outcome);
         await InsertCopiesAsync(db, DefaultIncomeCategories);
     }
+
+    // Before the flag every entry accepted partial payments: keep it on for entries that already received some.
+    private static Task MigratePartialPaymentFlagAsync(SQLiteAsyncConnection db) =>
+        db.ExecuteAsync(
+            $"UPDATE {nameof(FinancialEntry)} SET {nameof(FinancialEntry.AllowsPartialPayment)} = 1 " +
+            $"WHERE {nameof(FinancialEntry.Id)} IN (SELECT {nameof(FinancialMonthlyEntry.FinancialEntryId)} FROM {nameof(FinancialMonthlyEntry)} " +
+            $"WHERE {nameof(FinancialMonthlyEntry.PaidAmount)} IS NOT NULL)");
 
     private static Task InsertCopiesAsync(SQLiteAsyncConnection db, IEnumerable<FinancialCategory> categories) =>
         db.InsertAllAsync(categories.Select(c => new FinancialCategory

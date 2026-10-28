@@ -10,7 +10,7 @@ public sealed class PartialPaymentTests : E2ETestBase
 {
     public PartialPaymentTests(AppiumServerFixture server) : base(server)
     {
-        MainPage.AddEntry("Mercado E2E", AppLabels.Recurrent, 800m);
+        MainPage.AddEntry("Mercado E2E", AppLabels.Recurrent, 800m, allowsPartialPayment: true);
     }
 
     [Fact]
@@ -160,7 +160,7 @@ public sealed class PartialPaymentTests : E2ETestBase
     [Fact]
     public async Task SetPaidAmount_Income_UsesReceivedLabels()
     {
-        MainPage.AddEntry("Freela E2E", AppLabels.OneTime, 1000m, isIncome: true);
+        MainPage.AddEntry("Freela E2E", AppLabels.OneTime, 1000m, isIncome: true, allowsPartialPayment: true);
         var popup = MainPage.OpenEntry("Freela E2E");
         popup.PaidAmountLabelText.Should().Be(AppLabels.PaidAmountIncome);
         popup.Cancel();
@@ -183,7 +183,7 @@ public sealed class PartialPaymentTests : E2ETestBase
     [Fact]
     public async Task SetPaidAmount_InstallmentInNextMonth_AppliesToThatInstallmentOnly()
     {
-        MainPage.AddEntry("Notebook E2E", AppLabels.Installments, 300m, installments: "3");
+        MainPage.AddEntry("Notebook E2E", AppLabels.Installments, 300m, installments: "3", allowsPartialPayment: true);
         var nextMonth = AppFormat.CurrentMonth.AddMonths(1);
 
         MainPage.GoToNextMonth().SetPaidAmount("Notebook E2E", 100m);
@@ -268,7 +268,7 @@ public sealed class PartialPaymentTests : E2ETestBase
     [Fact]
     public async Task PartialPaymentAction_Income_UsesReceiveLabels()
     {
-        MainPage.AddEntry("Freela E2E", AppLabels.OneTime, 1000m, isIncome: true);
+        MainPage.AddEntry("Freela E2E", AppLabels.OneTime, 1000m, isIncome: true, allowsPartialPayment: true);
         MainPage.RevealActions("Freela E2E");
         MainPage.RevealedPartialPaymentActionText.Should().Be(AppLabels.MarkPartialReceived);
         MainPage.TapSummaryBar();

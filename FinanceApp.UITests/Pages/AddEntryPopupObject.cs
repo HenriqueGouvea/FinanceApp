@@ -19,6 +19,8 @@ public class AddEntryPopupObject
     private static readonly By InstallmentsTotal = AppSession.AutomationId("InstallmentsTotalLabel");
     private const string CategoryPickerId = "CategoryPicker";
     private const string EstimatedSwitchId = "EstimatedSwitch";
+    private const string PartialPaymentSwitchId = "PartialPaymentSwitch";
+    private const string PartialPaymentSwitchLabelId = "PartialPaymentSwitchLabel";
     private const string PaidAmountEntryId = "PaidAmountEntry";
     private const string PaidAmountLabelId = "PaidAmountLabel";
     private const string PaymentsHeaderId = "PaymentsHeaderLabel";
@@ -119,6 +121,20 @@ public class AddEntryPopupObject
         if (IsEstimated != isEstimated)
             _session.ScrollTo(EstimatedSwitchId).Click();
         _session.WaitFor(() => IsEstimated == isEstimated, $"the estimated switch to be {(isEstimated ? "on" : "off")}");
+        return this;
+    }
+
+    public bool AllowsPartialPayment => _session.ScrollTo(PartialPaymentSwitchId).GetAttribute("checked") == "true";
+
+    public string PartialPaymentSwitchText => _session.ScrollTo(PartialPaymentSwitchLabelId).Text;
+
+    public AddEntryPopupObject SetAllowsPartialPayment(bool allowsPartialPayment)
+    {
+        _session.HideKeyboardIfShown();
+        if (AllowsPartialPayment != allowsPartialPayment)
+            _session.ScrollTo(PartialPaymentSwitchId).Click();
+        _session.WaitFor(() => AllowsPartialPayment == allowsPartialPayment,
+            $"the partial payment switch to be {(allowsPartialPayment ? "on" : "off")}");
         return this;
     }
 

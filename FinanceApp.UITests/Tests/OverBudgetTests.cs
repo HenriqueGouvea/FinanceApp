@@ -10,7 +10,7 @@ public sealed class OverBudgetTests : E2ETestBase
 {
     public OverBudgetTests(AppiumServerFixture server) : base(server)
     {
-        MainPage.AddEntry("Mercado E2E", AppLabels.Recurrent, 800m, isEstimated: true);
+        MainPage.AddEntry("Mercado E2E", AppLabels.Recurrent, 800m, isEstimated: true, allowsPartialPayment: true);
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public sealed class OverBudgetTests : E2ETestBase
     [Fact]
     public async Task PartialPaymentAction_IncomeBeyondPlannedAmount_ShowsStruckPlannedAmount()
     {
-        MainPage.AddEntry("Freela E2E", AppLabels.OneTime, 1000m, isIncome: true);
+        MainPage.AddEntry("Freela E2E", AppLabels.OneTime, 1000m, isIncome: true, allowsPartialPayment: true);
 
         MainPage.AddPartialPayment("Freela E2E", 1200m);
 

@@ -10,7 +10,7 @@ public sealed class PaymentRecordsTests : E2ETestBase
 {
     public PaymentRecordsTests(AppiumServerFixture server) : base(server)
     {
-        MainPage.AddEntry("Mercado E2E", AppLabels.Recurrent, 800m);
+        MainPage.AddEntry("Mercado E2E", AppLabels.Recurrent, 800m, allowsPartialPayment: true);
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public sealed class PaymentRecordsTests : E2ETestBase
     [Fact]
     public async Task OpenEntry_IncomeWithReceipts_ListsThem()
     {
-        MainPage.AddEntry("Freela E2E", AppLabels.OneTime, 1000m, isIncome: true);
+        MainPage.AddEntry("Freela E2E", AppLabels.OneTime, 1000m, isIncome: true, allowsPartialPayment: true);
         MainPage.AddPartialPayment("Freela E2E", 400m, "Adiantamento");
 
         var popup = MainPage.OpenEntry("Freela E2E");

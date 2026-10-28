@@ -28,6 +28,7 @@ public partial class AddEntryViewModel : ObservableObject
     [ObservableProperty] RecurrenceType? selectedRecurrence;
     [ObservableProperty] int? totalInstallments;
     [ObservableProperty] bool isEstimated;
+    [ObservableProperty] bool allowsPartialPayment;
     [ObservableProperty] decimal paidAmount;
 
     public bool HasRecurrence => SelectedRecurrence is not null;
@@ -36,7 +37,13 @@ public partial class AddEntryViewModel : ObservableObject
     public bool IsIncome => EntryType == FinancialEntryType.Income;
     public string PaidAmountLabel => IsIncome ? "Valor já recebido neste mês" : "Valor já pago neste mês";
     public string PaymentsHeader => IsIncome ? "Recebimentos neste mês" : "Pagamentos neste mês";
+    public string PartialPaymentLabel => IsIncome ? "Recebimento parcial" : "Pagamento parcial";
+    public string PartialPaymentHint => IsIncome ? "Recebido aos poucos durante o mês" : "Pago aos poucos durante o mês, como mercado";
     public bool HasPayments => Payments.Count > 0;
+    /// <summary>
+    /// The month's paid amount is only edited for entries paid little by little, or to remove payments recorded before the flag was turned off.
+    /// </summary>
+    public bool ShowsPaidAmount => IsEditing && (AllowsPartialPayment || HasPayments);
     public bool IsEditing => _editingEntryId != 0;
     public double StructuralFieldsOpacity => IsEditing ? 0.4 : 1.0;
 
@@ -52,7 +59,11 @@ public partial class AddEntryViewModel : ObservableObject
     {
         _financeService = financeService;
         _categoryService = categoryService;
-        Payments.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasPayments));
+        Payments.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasPayments));
+            OnPropertyChanged(nameof(ShowsPaidAmount));
+        };
     }
 
     partial void OnSelectedRecurrenceChanged(RecurrenceType? value)
@@ -70,6 +81,11 @@ public partial class AddEntryViewModel : ObservableObject
         OnPropertyChanged(nameof(InstallmentsTotal));
     }
 
+    partial void OnAllowsPartialPaymentChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowsPaidAmount));
+    }
+
     partial void OnTotalInstallmentsChanged(int? value)
     {
         OnPropertyChanged(nameof(InstallmentsTotal));
@@ -80,6 +96,8 @@ public partial class AddEntryViewModel : ObservableObject
         OnPropertyChanged(nameof(IsIncome));
         OnPropertyChanged(nameof(PaidAmountLabel));
         OnPropertyChanged(nameof(PaymentsHeader));
+        OnPropertyChanged(nameof(PartialPaymentLabel));
+        OnPropertyChanged(nameof(PartialPaymentHint));
         FilterCategories();
     }
 
@@ -92,6 +110,7 @@ public partial class AddEntryViewModel : ObservableObject
 
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(StructuralFieldsOpacity));
+        OnPropertyChanged(nameof(ShowsPaidAmount));
         _targetMonth = new DateTime(targetMonth.Year, targetMonth.Month, 1);
         PopupTitle = "Novo Lançamento";
         Description = string.Empty;
@@ -102,6 +121,7 @@ public partial class AddEntryViewModel : ObservableObject
         SelectedRecurrence = null;
         TotalInstallments = null;
         IsEstimated = false;
+        AllowsPartialPayment = false;
         PaidAmount = 0;
         _initialPaidAmount = 0;
         Payments.Clear();
@@ -120,6 +140,7 @@ public partial class AddEntryViewModel : ObservableObject
 
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(StructuralFieldsOpacity));
+        OnPropertyChanged(nameof(ShowsPaidAmount));
         _targetMonth = new DateTime(entry.StartDate.Year, entry.StartDate.Month, 1);
         PopupTitle = "Editar Lançamento";
         Description = entry.Description;
@@ -130,6 +151,7 @@ public partial class AddEntryViewModel : ObservableObject
         SelectedRecurrence = entry.Recurrence;
         TotalInstallments = entry.TotalInstallments;
         IsEstimated = entry.IsEstimated;
+        AllowsPartialPayment = entry.AllowsPartialPayment;
         _editingMonth = month ?? _targetMonth;
         PaidAmount = paidAmount;
         _initialPaidAmount = paidAmount;
@@ -171,7 +193,8 @@ public partial class AddEntryViewModel : ObservableObject
             EntryType = EntryType,
             Recurrence = recurrence,
             TotalInstallments = TotalInstallments,
-            IsEstimated = IsEstimated
+            IsEstimated = IsEstimated,
+            AllowsPartialPayment = AllowsPartialPayment
         };
 
         await _financeService.SaveEntryAsync(entry);

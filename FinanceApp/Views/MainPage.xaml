@@ -208,7 +208,8 @@
                                 BackgroundColor="{StaticResource PartialAccent}"
                                 StrokeThickness="0"
                                 StrokeShape="RoundRectangle 8"
-                                Padding="16,0">
+                                Padding="16,0"
+                                IsVisible="{Binding AllowsPartialPayment}">
                             <Border.GestureRecognizers>
                                 <TapGestureRecognizer Tapped="OnPartialPaymentClicked" />
                             </Border.GestureRecognizers>
