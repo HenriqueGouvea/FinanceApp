@@ -547,6 +547,79 @@ public class AddEntryViewModelTests
         await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.IsEstimated));
     }
 
+    // --- Due date ---
+
+    [Fact]
+    public void DueDays_OfferNoDueDayThenEveryDayOfTheMonth()
+    {
+        _vm.DueDays.Should().Equal([AddEntryViewModel.NoDueDay, .. Enumerable.Range(1, 31)]);
+    }
+
+    [Fact]
+    public async Task Prepare_ResetsDueDay()
+    {
+        _vm.SelectedDueDay = 10;
+
+        await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
+
+        _vm.SelectedDueDay.Should().Be(AddEntryViewModel.NoDueDay);
+    }
+
+    [Fact]
+    public async Task PrepareForEdit_EntryWithDueDay_PrefillsDueDay()
+    {
+        var entry = MakeEntry();
+        entry.DueDay = 10;
+
+        await _vm.PrepareForEditAsync(entry);
+
+        _vm.SelectedDueDay.Should().Be(10);
+    }
+
+    [Fact]
+    public async Task PrepareForEdit_EntryWithoutDueDay_SelectsNoDueDay()
+    {
+        _vm.SelectedDueDay = 10;
+
+        await _vm.PrepareForEditAsync(MakeEntry());
+
+        _vm.SelectedDueDay.Should().Be(AddEntryViewModel.NoDueDay);
+    }
+
+    [Fact]
+    public async Task SaveCommand_WithDueDay_PassesItToService()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Recurrent;
+        _vm.SelectedDueDay = 10;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.DueDay == 10));
+    }
+
+    [Fact]
+    public async Task SaveCommand_NoDueDay_SavesNullDueDay()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Recurrent;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.DueDay == null));
+    }
+
+    [Fact]
+    public async Task SaveCommand_EditClearsDueDay_SavesNullDueDay()
+    {
+        var entry = MakeEntry();
+        entry.DueDay = 10;
+        await _vm.PrepareForEditAsync(entry);
+
+        _vm.SelectedDueDay = AddEntryViewModel.NoDueDay;
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Id == entry.Id && e.DueDay == null));
+    }
+
     // --- Partial payment flag ---
 
     [Fact]

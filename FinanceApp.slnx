@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/Solution Items/">
     <File Path="CLAUDE.md" />
+    <File Path="ROADMAP.md" />
   </Folder>
   <Project Path="FinanceApp/FinanceApp.csproj">
     <Deploy Solution="Debug|*" />

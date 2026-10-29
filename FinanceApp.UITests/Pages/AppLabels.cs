@@ -41,6 +41,10 @@ public static class AppLabels
 
     public const string EstimatedSymbol = "±";
 
+    public const string NoDueDay = "Sem vencimento";
+    public const string DueToday = "Vence hoje";
+    public static string DueDay(int day) => $"Dia {day}";
+
     public const string GoToCurrentMonthBackward = "‹ Mês atual";
     public const string GoToCurrentMonthForward = "Mês atual ›";
     public const string SwipeHint = "Toque no mês para escolher ou deslize para os lados";

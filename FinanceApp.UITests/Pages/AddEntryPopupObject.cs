@@ -18,6 +18,7 @@ public class AddEntryPopupObject
     private static readonly By AmountEntry = AppSession.AutomationId("AmountEntry");
     private static readonly By InstallmentsTotal = AppSession.AutomationId("InstallmentsTotalLabel");
     private const string CategoryPickerId = "CategoryPicker";
+    private const string DueDayPickerId = "DueDayPicker";
     private const string EstimatedSwitchId = "EstimatedSwitch";
     private const string PartialPaymentSwitchId = "PartialPaymentSwitch";
     private const string PartialPaymentSwitchLabelId = "PartialPaymentSwitchLabel";
@@ -234,6 +235,22 @@ public class AddEntryPopupObject
     public IReadOnlyList<string> RecurrenceOptions() => PickerOptions(RecurrencePickerId);
 
     public string CategoryText => _session.ScrollTo(CategoryPickerId).Text;
+
+    public string DueDayText => _session.ScrollTo(DueDayPickerId).Text;
+
+    /// <summary>
+    /// Picks a due day (1–31), or <see cref="AppLabels.NoDueDay"/> when null. The options outgrow the dialog, so it is scrolled.
+    /// </summary>
+    public AddEntryPopupObject SelectDueDay(int? day)
+    {
+        var label = day is { } d ? AppLabels.DueDay(d) : AppLabels.NoDueDay;
+
+        _session.HideKeyboardIfShown();
+        _session.ScrollTo(DueDayPickerId).Click();
+        _session.ScrollDialogListTo(label).Click();
+        _session.WaitForText(AppSession.AutomationId(DueDayPickerId), label);
+        return this;
+    }
 
     public void Save()
     {

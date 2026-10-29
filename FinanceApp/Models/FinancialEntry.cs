@@ -22,6 +22,11 @@ public class FinancialEntry
     /// The entry is paid (or received) little by little within a month (e.g. supermarket), so it accepts partial payments.
     /// </summary>
     public bool AllowsPartialPayment { get; set; }
+    /// <summary>
+    /// Day of the month (1–31) the entry falls due in every month it is active, or null when it has no due date.
+    /// Days past the end of a month fall on its last day (e.g. 31 is February 28th).
+    /// </summary>
+    public int? DueDay { get; set; }
     public string Person { get; set; } = string.Empty;
     public bool IsPJ { get; set; }
 }

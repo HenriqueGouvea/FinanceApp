@@ -994,6 +994,59 @@ public class FinanceServiceTests
     }
 
     [Fact]
+    public async Task GetMergedEntries_RecurrentWithDueDay_DueDateFallsOnThatDayEveryMonth()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent, dueDay: 10);
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 5, FinancialMonthlyEntryStatus.Paid);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single().DueDate
+            .Should().Be(new DateTime(2026, 4, 10, 0, 0, 0, DateTimeKind.Local));
+        (await _service.GetMergedEntriesForMonthAsync(2026, 5)).Single().DueDate
+            .Should().Be(new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Local), "a persisted month keeps the template's due day");
+        (await _service.GetMergedEntriesForMonthAsync(2026, 6)).Single().DueDate
+            .Should().Be(new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Local));
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_DueDayPastEndOfMonth_DueDateFallsOnLastDay()
+    {
+        await SaveTemplateAsync(RecurrenceType.Recurrent, dueDay: 31);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single().DueDate
+            .Should().Be(new DateTime(2026, 4, 30, 0, 0, 0, DateTimeKind.Local));
+        (await _service.GetMergedEntriesForMonthAsync(2027, 2)).Single().DueDate
+            .Should().Be(new DateTime(2027, 2, 28, 0, 0, 0, DateTimeKind.Local));
+        (await _service.GetMergedEntriesForMonthAsync(2028, 2)).Single().DueDate
+            .Should().Be(new DateTime(2028, 2, 29, 0, 0, 0, DateTimeKind.Local), "2028 is a leap year");
+        (await _service.GetMergedEntriesForMonthAsync(2026, 5)).Single().DueDate
+            .Should().Be(new DateTime(2026, 5, 31, 0, 0, 0, DateTimeKind.Local));
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_WithoutDueDay_HasNoDueDate()
+    {
+        await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.DueDate.Should().BeNull();
+        projection.HasDueDate.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_ChangeDueDay_PersistsNewDueDay()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Installments, totalInstallments: 3, dueDay: 5);
+
+        entry.DueDay = 20;
+        await _service.SaveEntryAsync(entry);
+
+        (await _service.GetEntryByIdAsync(entry.Id))!.DueDay.Should().Be(20);
+        (await _service.GetMergedEntriesForMonthAsync(2026, 5)).Single().DueDate
+            .Should().Be(new DateTime(2026, 5, 20, 0, 0, 0, DateTimeKind.Local));
+    }
+
+    [Fact]
     public async Task DeleteEntryAsync_OneTimeEntry_RemovesTemplate()
     {
         var entry = await SaveTemplateAsync(RecurrenceType.OneTime);
@@ -1127,7 +1180,7 @@ public class FinanceServiceTests
             .Should().ContainSingle().Which.FinancialEntryId.Should().Be(kept.Id);
     }
 
-    private async Task<FinancialEntry> SaveTemplateAsync(RecurrenceType recurrence, int? totalInstallments = null)
+    private async Task<FinancialEntry> SaveTemplateAsync(RecurrenceType recurrence, int? totalInstallments = null, int? dueDay = null)
     {
         var entry = new FinancialEntry
         {
@@ -1136,7 +1189,8 @@ public class FinanceServiceTests
             StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
             Recurrence = recurrence,
             TotalInstallments = totalInstallments,
-            EntryType = FinancialEntryType.Outcome
+            EntryType = FinancialEntryType.Outcome,
+            DueDay = dueDay
         };
         await _service.SaveEntryAsync(entry);
         return entry;

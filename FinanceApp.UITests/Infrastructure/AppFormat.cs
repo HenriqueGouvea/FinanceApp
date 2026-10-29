@@ -54,6 +54,11 @@ public static class AppFormat
     /// </summary>
     public static string PaymentDate(DateTime date) => date.ToString("dd/MM", Culture);
 
+    /// <summary>
+    /// Due date line of an entry row on any day but today (e.g. "Vence 05/11"), which reads "Vence hoje" instead.
+    /// </summary>
+    public static string DueDate(DateTime date) => $"Vence {date.ToString("dd/MM", Culture)}";
+
     public static string MonthTitle(DateTime month)
     {
         var name = month.ToString("MMMM yyyy", Culture);

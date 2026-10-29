@@ -132,6 +132,14 @@ public sealed class AppSession : IDisposable
             .FirstOrDefault(e => e.Displayed);
     }
 
+    /// <summary>
+    /// Scrolls the open picker dialog's list until the option with that exact text is on screen, for lists
+    /// longer than the dialog (e.g. the 31 due days).
+    /// </summary>
+    public IWebElement ScrollDialogListTo(string text) =>
+        WaitForVisible(MobileBy.AndroidUIAutomator(
+            $"new UiScrollable(new UiSelector().className(\"android.widget.ListView\")).scrollIntoView(new UiSelector().text(\"{text}\"))"));
+
     public void LongPress(IWebElement element, int durationMs = 1500)
     {
         var center = Center(element.Location, element.Size);

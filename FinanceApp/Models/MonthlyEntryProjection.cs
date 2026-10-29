@@ -18,6 +18,7 @@ namespace FinanceApp.Models;
 /// <param name="IsEstimated">True when the template amount is only an estimate.</param>
 /// <param name="PlannedAmount">The month's amount before payments (the template amount or the monthly override), or null when equal to <paramref name="EffectiveAmount"/>.</param>
 /// <param name="AllowsPartialPayment">True when the template accepts partial payments.</param>
+/// <param name="DueDate">The day the entry falls due in the month, or null when it has no due date.</param>
 public record MonthlyEntryProjection(
     int FinancialEntryId,
     int? FinancialMonthlyEntryId,
@@ -32,9 +33,15 @@ public record MonthlyEntryProjection(
     decimal PaidAmount = 0,
     bool IsEstimated = false,
     decimal? PlannedAmount = null,
-    bool AllowsPartialPayment = false
+    bool AllowsPartialPayment = false,
+    DateTime? DueDate = null
 )
 {
+    public bool HasDueDate => DueDate is not null;
+    /// <summary>
+    /// Falls due today and is still unpaid (or not fully received), so the row highlights it.
+    /// </summary>
+    public bool IsDueToday => DueDate?.Date == DateTime.Today && !IsPaid;
     public bool IsPaid => Status == FinancialMonthlyEntryStatus.Paid;
     public bool IsPartiallyPaid => Status == FinancialMonthlyEntryStatus.PartiallyPaid;
     public bool IsPending => Status == FinancialMonthlyEntryStatus.Pending;
