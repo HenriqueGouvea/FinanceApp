@@ -10,10 +10,12 @@ public partial class AddEntryPage : ContentPage
         BindingContext = viewModel;
     }
 
-    protected override void OnAppearing()
+    protected override void OnNavigatedTo(NavigatedToEventArgs args)
     {
-        base.OnAppearing();
-        DescriptionEntry.Focus();
+        base.OnNavigatedTo(args);
+
+        // On Android a focus requested while the page is still being pushed is lost, so it waits for the navigation to end.
+        Dispatcher.Dispatch(() => DescriptionEntry.Focus());
     }
 
     private async void OnBackClicked(object? sender, EventArgs e)

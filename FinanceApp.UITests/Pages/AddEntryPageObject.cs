@@ -54,6 +54,16 @@ public class AddEntryPageObject
 
     public string DescriptionText => _session.WaitForVisible(DescriptionEntry).Text;
 
+    /// <summary>
+    /// Waits for the description field to take the focus, which the page requests once its navigation ends.
+    /// </summary>
+    public AddEntryPageObject WaitForDescriptionFocus()
+    {
+        _session.WaitFor(() => _session.WaitForVisible(DescriptionEntry).GetAttribute("focused") == "true",
+            "the description field to be focused");
+        return this;
+    }
+
     public string AmountText => _session.WaitForVisible(AmountEntry).Text;
 
     public string RecurrenceText => _session.WaitForVisible(RecurrencePicker).Text;

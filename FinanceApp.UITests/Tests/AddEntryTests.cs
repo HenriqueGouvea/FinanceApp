@@ -162,6 +162,14 @@ public sealed class AddEntryTests : E2ETestBase
     }
 
     [Fact]
+    public void AddEntry_OpenPage_FocusesDescriptionWithoutTapping()
+    {
+        var page = MainPage.OpenAddEntry().WaitForDescriptionFocus();
+
+        page.TitleText.Should().Be(AppLabels.NewEntryTitle);
+    }
+
+    [Fact]
     public async Task AddEntry_BackButtonAfterScrollingToEnd_DiscardsAndReturnsToMonth()
     {
         var month = AppFormat.CurrentMonth.AddMonths(1);

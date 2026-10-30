@@ -48,7 +48,7 @@ When a wait times out, the page source and a screenshot are saved under `Finance
 
 | Class | Flows |
 |---|---|
-| `AddEntryTests` | One-time outcome, income, recurrent (start month onwards), installments (exactly N months, labels, total), category chip, cancel; header back button (visible after scrolling to the end) and system back discard the entry and return to the same month; saving from another month returns to it |
+| `AddEntryTests` | Description focused on open; one-time outcome, income, recurrent (start month onwards), installments (exactly N months, labels, total), category chip, cancel; header back button (visible after scrolling to the end) and system back discard the entry and return to the same month; saving from another month returns to it |
 | `EditEntryTests` | Pre-filled entry page with locked structural fields; description/amount change across months; header back button and system back discard changes |
 | `DeleteEntryTests` | One-time; recurrent *this month only*, *this and future*, *all months*; cancelled action sheet |
 | `EntryActionsMenuTests` | Long-press reveals menu (with the status action); tapping outside or on the entry hides it without opening the editor |
