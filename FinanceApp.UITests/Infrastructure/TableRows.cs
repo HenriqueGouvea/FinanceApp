@@ -16,6 +16,7 @@ public class FinancialEntryRow
     public int? CategoryId { get; set; }
     public bool IsEstimated { get; set; }
     public bool AllowsPartialPayment { get; set; }
+    public int? DueDay { get; set; }
 }
 
 public class FinancialMonthlyEntryRow

@@ -62,8 +62,45 @@ public class MonthlyEntryProjectionTests
             .PlannedOrEffectiveAmount.Should().Be(800m);
     }
 
+    [Theory]
+    [InlineData(FinancialMonthlyEntryStatus.Pending)]
+    [InlineData(FinancialMonthlyEntryStatus.PartiallyPaid)]
+    public void DueTodayAndNotPaid_IsDueToday(FinancialMonthlyEntryStatus status)
+    {
+        Make(status, effectiveAmount: 800m, paidAmount: 0m, dueDate: DateTime.Today).IsDueToday.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DueTodayButPaid_IsNotDueToday()
+    {
+        Make(FinancialMonthlyEntryStatus.Paid, effectiveAmount: 800m, paidAmount: 800m, dueDate: DateTime.Today)
+            .IsDueToday.Should().BeFalse("a settled entry no longer needs attention");
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(1)]
+    public void DueAnotherDay_IsNotDueToday(int daysFromToday)
+    {
+        var projection = Make(FinancialMonthlyEntryStatus.Pending, effectiveAmount: 800m, paidAmount: 0m,
+            dueDate: DateTime.Today.AddDays(daysFromToday));
+
+        projection.IsDueToday.Should().BeFalse();
+        projection.HasDueDate.Should().BeTrue();
+    }
+
+    [Fact]
+    public void WithoutDueDate_IsNotDueToday()
+    {
+        var projection = Make(FinancialMonthlyEntryStatus.Pending, effectiveAmount: 800m, paidAmount: 0m);
+
+        projection.IsDueToday.Should().BeFalse();
+        projection.HasDueDate.Should().BeFalse();
+    }
+
     private static MonthlyEntryProjection Make(
-        FinancialMonthlyEntryStatus status, decimal effectiveAmount, decimal paidAmount, decimal? plannedAmount = null) =>
+        FinancialMonthlyEntryStatus status, decimal effectiveAmount, decimal paidAmount, decimal? plannedAmount = null,
+        DateTime? dueDate = null) =>
         new(
             FinancialEntryId: 1,
             FinancialMonthlyEntryId: null,
@@ -76,6 +113,7 @@ public class MonthlyEntryProjectionTests
             InstallmentLabel: null,
             InstallmentTotalAmount: null,
             PaidAmount: paidAmount,
-            PlannedAmount: plannedAmount
+            PlannedAmount: plannedAmount,
+            DueDate: dueDate
         );
 }

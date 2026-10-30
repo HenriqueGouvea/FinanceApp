@@ -28,6 +28,7 @@ public class MainPageObject
     private static readonly By EntryAmount = AppSession.AutomationId("EntryAmountLabel");
     private static readonly By EntryCategory = AppSession.AutomationId("EntryCategoryLabel");
     private static readonly By EntryInstallment = AppSession.AutomationId("EntryInstallmentLabel");
+    private static readonly By EntryDueDate = AppSession.AutomationId("EntryDueDateLabel");
     private static readonly By DeleteAction = AppSession.AutomationId("DeleteEntryAction");
     private static readonly By MarkPaidAction = AppSession.AutomationId("MarkPaidEntryAction");
     private static readonly By MarkPendingAction = AppSession.AutomationId("MarkPendingEntryAction");
@@ -149,7 +150,8 @@ public class MainPageObject
         string? installments = null,
         string? category = null,
         bool isEstimated = false,
-        bool allowsPartialPayment = false)
+        bool allowsPartialPayment = false,
+        int? dueDay = null)
     {
         var popup = OpenAddEntry().EnterDescription(description);
 
@@ -168,6 +170,9 @@ public class MainPageObject
 
         if (allowsPartialPayment)
             popup.SetAllowsPartialPayment(true);
+
+        if (dueDay is not null)
+            popup.SelectDueDay(dueDay);
 
         if (category is not null)
             popup.SelectCategory(category);
@@ -278,6 +283,12 @@ public class MainPageObject
     public bool IsEntryPaymentProgressVisible(string description) =>
         FindRow(description).FindElements(EntryPaymentProgress).Any(e => e.Displayed);
 
+    /// <summary>
+    /// The due date line under the description ("Vence hoje" or e.g. "Vence 05/11"), or null when the entry has no due date.
+    /// </summary>
+    public string? EntryDueDateText(string description) =>
+        FindRow(description).FindElements(EntryDueDate).FirstOrDefault(e => e.Displayed)?.Text;
+
     public string EntryEstimatedSymbol(string description) =>
         FindRow(description).FindElements(EntryEstimatedIcon).First(e => e.Displayed)
             .FindElement(By.ClassName("android.widget.TextView")).Text;
@@ -325,6 +336,8 @@ public class MainPageObject
     public PngImage CaptureEntryPaidIcon(string description) => CaptureInRow(description, EntryPaidIcon);
 
     public PngImage CaptureEntryStatusLabel(string description) => CaptureInRow(description, EntryStatus);
+
+    public PngImage CaptureEntryDueDateLabel(string description) => CaptureInRow(description, EntryDueDate);
 
     /// <summary>
     /// Long-presses the entry, taps "Excluir" and picks the option in the native action sheet.

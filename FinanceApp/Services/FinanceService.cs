@@ -65,7 +65,8 @@ public class FinanceService : IFinanceService
                     },
                     IsEstimated: template.IsEstimated,
                     PlannedAmount: plannedAmount,
-                    AllowsPartialPayment: template.AllowsPartialPayment
+                    AllowsPartialPayment: template.AllowsPartialPayment,
+                    DueDate: BuildDueDate(template, year, month)
                 ));
             }
             else
@@ -82,7 +83,8 @@ public class FinanceService : IFinanceService
                     InstallmentLabel: BuildInstallmentLabel(template, year, month),
                     InstallmentTotalAmount: BuildInstallmentTotal(template),
                     IsEstimated: template.IsEstimated,
-                    AllowsPartialPayment: template.AllowsPartialPayment
+                    AllowsPartialPayment: template.AllowsPartialPayment,
+                    DueDate: BuildDueDate(template, year, month)
                 ));
             }
         }
@@ -405,6 +407,11 @@ public class FinanceService : IFinanceService
         int n = (year - entry.StartDate.Year) * 12 + (month - entry.StartDate.Month) + 1;
         return $"{n}/{entry.TotalInstallments}";
     }
+
+    private static DateTime? BuildDueDate(FinancialEntry entry, int year, int month) =>
+        entry.DueDay is { } day
+            ? new DateTime(year, month, Math.Clamp(day, 1, DateTime.DaysInMonth(year, month)), 0, 0, 0, DateTimeKind.Local)
+            : null;
 
     private static decimal? BuildInstallmentTotal(FinancialEntry entry) =>
         entry.Recurrence == RecurrenceType.Installments

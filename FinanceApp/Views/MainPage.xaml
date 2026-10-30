@@ -93,6 +93,19 @@
                                    FontSize="11"
                                    TextColor="{Binding Category.Color, Converter={x:Static converters:HexToColorConverter.Instance}}"/>
                         </HorizontalStackLayout>
+                        <!-- Turns red while it is due today and not yet paid/received -->
+                        <Label AutomationId="EntryDueDateLabel"
+                               Text="{Binding DueDate, Converter={x:Static converters:DueDateToLabelConverter.Instance}}"
+                               FontSize="11"
+                               TextColor="Gray"
+                               IsVisible="{Binding HasDueDate}">
+                            <Label.Triggers>
+                                <DataTrigger TargetType="Label" Binding="{Binding IsDueToday}" Value="True">
+                                    <Setter Property="TextColor" Value="{StaticResource OutcomeAccent}" />
+                                    <Setter Property="FontAttributes" Value="Bold" />
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
                         <Label AutomationId="EntryInstallmentLabel"
                                FontSize="11"
                                TextColor="Gray"

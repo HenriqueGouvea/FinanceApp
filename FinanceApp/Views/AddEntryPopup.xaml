@@ -199,6 +199,16 @@
                 </VerticalStackLayout>
             </VerticalStackLayout>
 
+            <!-- Due day, repeated every month for recurrent and installment entries -->
+            <VerticalStackLayout Spacing="2">
+                <Label Text="Vencimento" FontSize="12" TextColor="Gray" />
+                <Picker AutomationId="DueDayPicker"
+                        Title="Vencimento"
+                        ItemsSource="{Binding DueDays}"
+                        ItemDisplayBinding="{Binding ., Converter={x:Static converters:DueDayToLabelConverter.Instance}, x:DataType=x:Int32}"
+                        SelectedItem="{Binding SelectedDueDay}" />
+            </VerticalStackLayout>
+
             <Picker AutomationId="CategoryPicker"
                     Title="Categoria"
                     ItemsSource="{Binding Categories}"

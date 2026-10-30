@@ -30,6 +30,12 @@ public partial class AddEntryViewModel : ObservableObject
     [ObservableProperty] bool isEstimated;
     [ObservableProperty] bool allowsPartialPayment;
     [ObservableProperty] decimal paidAmount;
+    /// <summary>
+    /// Day of the month the entry falls due, or <see cref="NoDueDay"/>.
+    /// </summary>
+    [ObservableProperty] int selectedDueDay = NoDueDay;
+
+    public const int NoDueDay = 0;
 
     public bool HasRecurrence => SelectedRecurrence is not null;
     public bool IsInstallments => SelectedRecurrence == RecurrenceType.Installments;
@@ -54,6 +60,7 @@ public partial class AddEntryViewModel : ObservableObject
     /// </summary>
     public ObservableCollection<PaymentItem> Payments { get; } = [];
     public List<RecurrenceType> RecurrenceTypes { get; } = [RecurrenceType.OneTime, RecurrenceType.Recurrent, RecurrenceType.Installments];
+    public List<int> DueDays { get; } = [NoDueDay, .. Enumerable.Range(1, 31)];
 
     public AddEntryViewModel(IFinanceService financeService, ICategoryService categoryService)
     {
@@ -122,6 +129,7 @@ public partial class AddEntryViewModel : ObservableObject
         TotalInstallments = null;
         IsEstimated = false;
         AllowsPartialPayment = false;
+        SelectedDueDay = NoDueDay;
         PaidAmount = 0;
         _initialPaidAmount = 0;
         Payments.Clear();
@@ -152,6 +160,7 @@ public partial class AddEntryViewModel : ObservableObject
         TotalInstallments = entry.TotalInstallments;
         IsEstimated = entry.IsEstimated;
         AllowsPartialPayment = entry.AllowsPartialPayment;
+        SelectedDueDay = entry.DueDay ?? NoDueDay;
         _editingMonth = month ?? _targetMonth;
         PaidAmount = paidAmount;
         _initialPaidAmount = paidAmount;
@@ -194,7 +203,8 @@ public partial class AddEntryViewModel : ObservableObject
             Recurrence = recurrence,
             TotalInstallments = TotalInstallments,
             IsEstimated = IsEstimated,
-            AllowsPartialPayment = AllowsPartialPayment
+            AllowsPartialPayment = AllowsPartialPayment,
+            DueDay = SelectedDueDay == NoDueDay ? null : SelectedDueDay
         };
 
         await _financeService.SaveEntryAsync(entry);
