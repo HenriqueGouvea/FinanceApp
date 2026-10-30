@@ -17,6 +17,7 @@ public partial class MainPage : ContentPage
 
     private readonly IFinanceService _financeService;
     private bool _isLongPressInProgress;
+    private bool _isOpeningEntryPage;
 
     public MainPage(MainViewModel viewModel, IFinanceService financeService)
     {
@@ -35,21 +36,10 @@ public partial class MainPage : ContentPage
 
     private async void OnAddClicked(object sender, EventArgs e)
     {
-        var popup = ResolvePopup<AddEntryPopup>();
-        var vm = (AddEntryViewModel)popup.BindingContext;
-
         if (BindingContext is not MainViewModel mainVm) return;
 
         mainVm.SelectedMonth?.HideEntryActions();
-        await vm.PrepareAsync(mainVm.SelectedMonth?.Date ?? DateTime.Today);
-        vm.SetSaveCallback(async (_) =>
-        {
-            await popup.CloseAsync();
-            if (mainVm.RefreshAllCommand.CanExecute(null))
-                await mainVm.RefreshAllCommand.ExecuteAsync(null);
-        });
-
-        await this.ShowPopupAsync(popup);
+        await OpenEntryPageAsync(mainVm, vm => vm.PrepareAsync(mainVm.SelectedMonth?.Date ?? DateTime.Today));
     }
 
     private async void OnEntryTapped(object? sender, TouchGestureCompletedEventArgs e)
@@ -75,18 +65,34 @@ public partial class MainPage : ContentPage
         var entry = await _financeService.GetEntryByIdAsync(projection.FinancialEntryId);
         if (entry is null) return;
 
-        var popup = ResolvePopup<AddEntryPopup>();
-        var vm = (AddEntryViewModel)popup.BindingContext;
+        await OpenEntryPageAsync(mainVm, vm => vm.PrepareForEditAsync(entry, mainVm.SelectedMonth?.Date, projection.PaidAmount));
+    }
 
-        await vm.PrepareForEditAsync(entry, mainVm.SelectedMonth?.Date, projection.PaidAmount);
-        vm.SetSaveCallback(async (_) =>
+    private async Task OpenEntryPageAsync(MainViewModel mainVm, Func<AddEntryViewModel, Task> prepare)
+    {
+        // A quick double tap would otherwise push the page twice.
+        if (_isOpeningEntryPage) return;
+        _isOpeningEntryPage = true;
+
+        try
         {
-            await popup.CloseAsync();
-            if (mainVm.RefreshAllCommand.CanExecute(null))
-                await mainVm.RefreshAllCommand.ExecuteAsync(null);
-        });
+            var page = Resolve<AddEntryPage>();
+            var vm = (AddEntryViewModel)page.BindingContext;
 
-        await this.ShowPopupAsync(popup);
+            await prepare(vm);
+            vm.SetSaveCallback(async (_) =>
+            {
+                // Refreshing first means the list is already up to date when the page slides away.
+                await mainVm.RefreshAllAsync();
+                await Navigation.PopAsync();
+            });
+
+            await Navigation.PushAsync(page);
+        }
+        finally
+        {
+            _isOpeningEntryPage = false;
+        }
     }
 
     private void OnEntryLongPressed(object? sender, LongPressCompletedEventArgs e)
@@ -148,7 +154,7 @@ public partial class MainPage : ContentPage
 
         month.HideEntryActions();
 
-        var popup = ResolvePopup<PartialPaymentPopup>();
+        var popup = Resolve<PartialPaymentPopup>();
         var vm = (PartialPaymentViewModel)popup.BindingContext;
 
         vm.Prepare(projection, month.Date);
@@ -167,7 +173,7 @@ public partial class MainPage : ContentPage
 
         month.HideEntryActions();
 
-        var popup = ResolvePopup<MonthPickerPopup>();
+        var popup = Resolve<MonthPickerPopup>();
         var vm = (MonthPickerViewModel)popup.BindingContext;
 
         vm.Prepare(month.Date, mainVm.CurrentMonthDate, mainVm.FirstMonthDate, mainVm.LastMonthDate);
@@ -183,7 +189,7 @@ public partial class MainPage : ContentPage
     private static MonthlyEntryProjection? GetProjection(object? sender) =>
         (sender as BindableObject)?.BindingContext as MonthlyEntryProjection;
 
-    private T ResolvePopup<T>() where T : Popup =>
+    private T Resolve<T>() where T : class =>
         Handler?.MauiContext?.Services.GetService<T>()
             ?? throw new InvalidOperationException($"{typeof(T).Name} not found.");
 }

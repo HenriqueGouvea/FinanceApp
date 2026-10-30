@@ -91,7 +91,7 @@ public class AddEntryViewModelTests
     {
         await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
 
-        _vm.PopupTitle.Should().Be("Novo Lançamento");
+        _vm.PageTitle.Should().Be("Novo Lançamento");
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public class AddEntryViewModelTests
     {
         await _vm.PrepareForEditAsync(MakeEntry());
 
-        _vm.PopupTitle.Should().Be("Editar Lançamento");
+        _vm.PageTitle.Should().Be("Editar Lançamento");
     }
 
     [Fact]

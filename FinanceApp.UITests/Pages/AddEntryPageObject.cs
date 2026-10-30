@@ -5,9 +5,10 @@ using OpenQA.Selenium.Appium;
 
 namespace FinanceApp.UITests.Pages;
 
-public class AddEntryPopupObject
+public class AddEntryPageObject
 {
-    private static readonly By Title = AppSession.AutomationId("EntryPopupTitleLabel");
+    private static readonly By Title = AppSession.AutomationId("EntryPageTitleLabel");
+    private static readonly By BackButton = AppSession.AutomationId("BackButton");
     private static readonly By DescriptionEntry = AppSession.AutomationId("DescriptionEntry");
     private static readonly By EntryTypeToggle = AppSession.AutomationId("EntryTypeToggle");
     private static readonly By SelectIncomeButton = AppSession.AutomationId("SelectIncomeButton");
@@ -36,12 +37,12 @@ public class AddEntryPopupObject
 
     private readonly AppSession _session;
 
-    public AddEntryPopupObject(AppSession session)
+    public AddEntryPageObject(AppSession session)
     {
         _session = session;
     }
 
-    public AddEntryPopupObject WaitUntilOpen()
+    public AddEntryPageObject WaitUntilOpen()
     {
         _session.WaitForVisible(DescriptionEntry);
         return this;
@@ -67,13 +68,13 @@ public class AddEntryPopupObject
 
     public string InstallmentsTotalText => _session.WaitForVisible(InstallmentsTotal).Text;
 
-    public AddEntryPopupObject EnterDescription(string description)
+    public AddEntryPageObject EnterDescription(string description)
     {
         Type(DescriptionEntry, description);
         return this;
     }
 
-    public AddEntryPopupObject SelectIncome()
+    public AddEntryPageObject SelectIncome()
     {
         _session.HideKeyboardIfShown();
         _session.Tap(SelectIncomeButton);
@@ -81,7 +82,7 @@ public class AddEntryPopupObject
         return this;
     }
 
-    public AddEntryPopupObject SelectOutcome()
+    public AddEntryPageObject SelectOutcome()
     {
         _session.HideKeyboardIfShown();
         _session.Tap(SelectOutcomeButton);
@@ -92,13 +93,13 @@ public class AddEntryPopupObject
     /// <summary>
     /// The MAUI Picker renders as a native dialog on Android, so the option is located by its label.
     /// </summary>
-    public AddEntryPopupObject SelectRecurrence(string recurrenceLabel)
+    public AddEntryPageObject SelectRecurrence(string recurrenceLabel)
     {
         PickOption(RecurrencePickerId, recurrenceLabel);
         return this;
     }
 
-    public AddEntryPopupObject EnterInstallments(string installments)
+    public AddEntryPageObject EnterInstallments(string installments)
     {
         Type(InstallmentsEntry, installments);
         return this;
@@ -107,7 +108,7 @@ public class AddEntryPopupObject
     /// <summary>
     /// The amount field is masked as currency and reads typed digits as cents, so 1500 is typed as "150000".
     /// </summary>
-    public AddEntryPopupObject EnterAmount(decimal amount)
+    public AddEntryPageObject EnterAmount(decimal amount)
     {
         Type(AmountEntry, decimal.ToInt64(amount * 100).ToString(CultureInfo.InvariantCulture));
         _session.WaitForText(AmountEntry, AppFormat.Money(amount));
@@ -116,7 +117,7 @@ public class AddEntryPopupObject
 
     public bool IsEstimated => _session.ScrollTo(EstimatedSwitchId).GetAttribute("checked") == "true";
 
-    public AddEntryPopupObject SetEstimated(bool isEstimated)
+    public AddEntryPageObject SetEstimated(bool isEstimated)
     {
         _session.HideKeyboardIfShown();
         if (IsEstimated != isEstimated)
@@ -129,7 +130,7 @@ public class AddEntryPopupObject
 
     public string PartialPaymentSwitchText => _session.ScrollTo(PartialPaymentSwitchLabelId).Text;
 
-    public AddEntryPopupObject SetAllowsPartialPayment(bool allowsPartialPayment)
+    public AddEntryPageObject SetAllowsPartialPayment(bool allowsPartialPayment)
     {
         _session.HideKeyboardIfShown();
         if (AllowsPartialPayment != allowsPartialPayment)
@@ -140,7 +141,7 @@ public class AddEntryPopupObject
     }
 
     /// <summary>
-    /// The paid amount field only exists when editing and may sit below the fold, so the popup is scrolled to look for it.
+    /// The paid amount field only exists when editing and may sit below the fold, so the page is scrolled to look for it.
     /// </summary>
     public bool IsPaidAmountVisible
     {
@@ -158,7 +159,7 @@ public class AddEntryPopupObject
     /// <summary>
     /// Masked like the amount field: typed digits are read as cents.
     /// </summary>
-    public AddEntryPopupObject EnterPaidAmount(decimal amount)
+    public AddEntryPageObject EnterPaidAmount(decimal amount)
     {
         _session.HideKeyboardIfShown();
         var entry = _session.ScrollTo(PaidAmountEntryId);
@@ -195,7 +196,7 @@ public class AddEntryPopupObject
     /// <summary>
     /// Taps the ✕ of the payment with that description and waits for it to leave the list (it is only deleted on save).
     /// </summary>
-    public AddEntryPopupObject DeletePayment(string description)
+    public AddEntryPageObject DeletePayment(string description)
     {
         var count = Payments.Count;
         _session.Driver.FindElements(PaymentRow)
@@ -213,7 +214,7 @@ public class AddEntryPopupObject
         _session.TryScrollTo(CategoryPickerId);
     }
 
-    public AddEntryPopupObject ClearPaidAmount()
+    public AddEntryPageObject ClearPaidAmount()
     {
         _session.HideKeyboardIfShown();
         _session.ScrollTo(PaidAmountEntryId).Clear();
@@ -221,7 +222,7 @@ public class AddEntryPopupObject
         return this;
     }
 
-    public AddEntryPopupObject SelectCategory(string categoryName)
+    public AddEntryPageObject SelectCategory(string categoryName)
     {
         PickOption(CategoryPickerId, categoryName);
         return this;
@@ -241,7 +242,7 @@ public class AddEntryPopupObject
     /// <summary>
     /// Picks a due day (1–31), or <see cref="AppLabels.NoDueDay"/> when null. The options outgrow the dialog, so it is scrolled.
     /// </summary>
-    public AddEntryPopupObject SelectDueDay(int? day)
+    public AddEntryPageObject SelectDueDay(int? day)
     {
         var label = day is { } d ? AppLabels.DueDay(d) : AppLabels.NoDueDay;
 
@@ -264,6 +265,38 @@ public class AddEntryPopupObject
         _session.HideKeyboardIfShown();
         _session.ScrollToAndTap(CancelButtonId);
         _session.WaitForGone(AppSession.AutomationId(CancelButtonId));
+    }
+
+    public bool IsBackButtonVisible => _session.IsVisible(BackButton);
+
+    /// <summary>
+    /// Scrolls the form down to its last row, the "Cancelar"/"Salvar" buttons.
+    /// </summary>
+    public AddEntryPageObject ScrollToEnd()
+    {
+        _session.HideKeyboardIfShown();
+        _session.ScrollTo(SaveButtonId);
+        return this;
+    }
+
+    /// <summary>
+    /// Leaves through the header's back button, which stays on screen however far the form is scrolled.
+    /// </summary>
+    public void GoBack()
+    {
+        _session.HideKeyboardIfShown();
+        _session.Tap(BackButton);
+        _session.WaitForGone(DescriptionEntry);
+    }
+
+    /// <summary>
+    /// Leaves with the Android system back button.
+    /// </summary>
+    public void PressSystemBack()
+    {
+        _session.HideKeyboardIfShown();
+        _session.PressBack();
+        _session.WaitForGone(DescriptionEntry);
     }
 
     private void Type(By locator, string text)

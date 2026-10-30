@@ -42,6 +42,6 @@ public sealed class EntryActionsMenuTests : E2ETestBase
         MainPage.TapEntry("Farmácia E2E");
 
         MainPage.WaitForActionsHidden();
-        new AddEntryPopupObject(Session).IsOpen.Should().BeFalse();
+        new AddEntryPageObject(Session).IsOpen.Should().BeFalse();
     }
 }

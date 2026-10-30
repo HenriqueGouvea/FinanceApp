@@ -136,10 +136,10 @@ public class MainPageObject
         return this;
     }
 
-    public AddEntryPopupObject OpenAddEntry()
+    public AddEntryPageObject OpenAddEntry()
     {
         _session.Tap(AddEntryButton);
-        return new AddEntryPopupObject(_session).WaitUntilOpen();
+        return new AddEntryPageObject(_session).WaitUntilOpen();
     }
 
     public MainPageObject AddEntry(
@@ -153,38 +153,38 @@ public class MainPageObject
         bool allowsPartialPayment = false,
         int? dueDay = null)
     {
-        var popup = OpenAddEntry().EnterDescription(description);
+        var entryPage = OpenAddEntry().EnterDescription(description);
 
         if (isIncome)
-            popup.SelectIncome();
+            entryPage.SelectIncome();
 
-        popup.SelectRecurrence(recurrence);
+        entryPage.SelectRecurrence(recurrence);
 
         if (installments is not null)
-            popup.EnterInstallments(installments);
+            entryPage.EnterInstallments(installments);
 
-        popup.EnterAmount(amount);
+        entryPage.EnterAmount(amount);
 
         if (isEstimated)
-            popup.SetEstimated(true);
+            entryPage.SetEstimated(true);
 
         if (allowsPartialPayment)
-            popup.SetAllowsPartialPayment(true);
+            entryPage.SetAllowsPartialPayment(true);
 
         if (dueDay is not null)
-            popup.SelectDueDay(dueDay);
+            entryPage.SelectDueDay(dueDay);
 
         if (category is not null)
-            popup.SelectCategory(category);
+            entryPage.SelectCategory(category);
 
-        popup.Save();
+        entryPage.Save();
         return WaitForEntry(description);
     }
 
-    public AddEntryPopupObject OpenEntry(string description)
+    public AddEntryPageObject OpenEntry(string description)
     {
         _session.Tap(EntryByDescription(description));
-        return new AddEntryPopupObject(_session).WaitUntilOpen();
+        return new AddEntryPageObject(_session).WaitUntilOpen();
     }
 
     public void TapEntry(string description) => _session.Tap(EntryByDescription(description));

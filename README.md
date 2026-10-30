@@ -45,7 +45,7 @@ However, **structural fields must not be edited on the template once entries exi
 - **EntryType (Income/Outcome):** Stored only on the template. Changing it retroactively flips the type for every month, including past months where a user already recorded a "Paid" state. Historical balances silently corrupt.
 - **Recurrence / TotalInstallments:** Controls which months the entry is active in. Reducing `TotalInstallments` orphans physical `FinancialMonthlyEntry` records in the now-excluded months — those paid states disappear from projections even though they exist in the DB. Changing recurrence type (e.g. `Installments` → `Recurrent`) reshuffles the entire spread.
 
-**Current mitigation:** The edit popup disables the EntryType toggle and Recurrence picker when editing an existing entry.
+**Current mitigation:** The edit page disables the EntryType toggle and Recurrence picker when editing an existing entry.
 
 **Future solution:** Implement a two-scope edit:
 1. **Edit this month only** → Creates/updates a `FinancialMonthlyEntry` override for that specific period (status, partial amount, cancellation). This is the planned "custom monthly entry" system.

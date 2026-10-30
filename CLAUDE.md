@@ -46,7 +46,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Structure:**
 - `Tests/` — one class per feature area (`AddEntryTests`, `EditEntryTests`, `DeleteEntryTests`, `EntryActionsMenuTests`, `EntryStatusTests`, `MonthSummaryTests`, `PartialPaymentTests`, `PartialPaymentFlagTests`, `PaymentRecordsTests`, `OverBudgetTests`, `EstimatedAmountTests`, `DueDateTests`, `MonthNavigationTests`, `SectionToggleTests`, `CategoryTests`). Each class derives from `E2ETestBase` and must carry `[Collection(E2ECollection.Name)]` and `[Trait("Category", "E2E")]`. Shared arrange steps (e.g. creating the entry under test) go in the constructor.
-- `Pages/` — page objects (`MainPageObject`, `AddEntryPopupObject`, `CategoriesPageObject`, `MonthPickerPopupObject`, `PartialPaymentPopupObject`). Tests never call Appium directly; add a page object method instead. User-facing pt-BR texts the tests select by live in `AppLabels`.
+- `Pages/` — page objects (`MainPageObject`, `AddEntryPageObject`, `CategoriesPageObject`, `MonthPickerPopupObject`, `PartialPaymentPopupObject`). Tests never call Appium directly; add a page object method instead. User-facing pt-BR texts the tests select by live in `AppLabels`.
 - `Infrastructure/` — `AppSession` (driver, waits, gestures, diagnostics), `DeviceDatabase` + `TableRows` (DB assertions), `AppFormat` (expected money/month/count strings and enum values).
 
 **Rules:**
@@ -84,7 +84,7 @@ All registrations are in `MauiProgram.cs`:
 - `IDatabaseContext` → Singleton (resolved by `DatabaseContext`)
 - `IFinanceService`, `ICategoryService`, `IPreferencesService` → Singleton
 - `IMessenger` → Singleton (`WeakReferenceMessenger.Default`), used to broadcast `CategoriesChangedMessage` so `MainViewModel` refreshes
-- `MainViewModel`, `AddEntryViewModel`, `CategoriesViewModel`, `CategoryEditViewModel`, `MonthPickerViewModel`, `PartialPaymentViewModel`, `MainPage`, `AddEntryPopup`, `CategoriesPage`, `CategoryEditPopup`, `MonthPickerPopup`, `PartialPaymentPopup` → Transient
+- `MainViewModel`, `AddEntryViewModel`, `CategoriesViewModel`, `CategoryEditViewModel`, `MonthPickerViewModel`, `PartialPaymentViewModel`, `MainPage`, `AddEntryPage`, `CategoriesPage`, `CategoryEditPopup`, `MonthPickerPopup`, `PartialPaymentPopup` → Transient
 
 Never manually instantiate services or ViewModels. If a new service or VM is added, register it in `MauiProgram.cs`.
 
@@ -94,16 +94,16 @@ SQLite (FinanceDataV3.db3)
   └─ DatabaseContext (Singleton, lazy-init connection)
        └─ FinanceService (all queries via GetConnectionAsync())
             └─ MainViewModel / MonthViewModel (no direct DB access)
-                 └─ MainPage / AddEntryPopup (XAML binding only)
+                 └─ MainPage / AddEntryPage (XAML binding only)
 ```
 
 ## Key Architectural Patterns
 
 **Observable Properties:** Use `[ObservableProperty]` from CommunityToolkit.Mvvm. The backing field uses `camelCase` with NO `_` prefix (e.g., `[ObservableProperty] string title;` generates `Title`). The `_` prefix is reserved for non-observable private fields injected via constructor.
 
-**Popup → ViewModel Communication:** `AddEntryPopup` receives `AddEntryViewModel` via DI. After a save, the ViewModel invokes a callback delegate (`SetSaveCallback`) that the parent ViewModel registered, so `MainViewModel` refreshes the active `MonthViewModel` without coupling Views to ViewModels.
+**Page/Popup → ViewModel Communication:** `AddEntryPage` receives `AddEntryViewModel` via DI. After a save, the ViewModel invokes a callback delegate (`SetSaveCallback`) that the parent ViewModel registered, so `MainViewModel` refreshes the active `MonthViewModel` without coupling Views to ViewModels.
 
-**Popup Resolution at Runtime:** Popups are resolved from the DI container in code-behind via `Handler?.MauiContext?.Services.GetService<T>()`, not via constructor injection into the page. This is the required pattern because `MainPage` is Transient and the popup must be a fresh instance each open.
+**Popup and Page Resolution at Runtime:** Popups and pushed pages (e.g. `AddEntryPage`, opened with `Navigation.PushAsync`) are resolved from the DI container in code-behind via `Handler?.MauiContext?.Services.GetService<T>()`, not via constructor injection into the page. This is the required pattern because `MainPage` is Transient and the popup/page must be a fresh instance each open.
 
 **Table Creation:** Use `CreateFlags.ImplicitPK | CreateFlags.AutoIncPK` in `DatabaseContext.GetConnectionAsync()` so domain models stay free of SQLite attributes.
 
