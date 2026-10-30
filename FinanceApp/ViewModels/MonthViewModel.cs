@@ -33,10 +33,10 @@ public partial class MonthViewModel : ObservableObject
     public DateTime Date { get; set; }
 
     public IEnumerable<MonthlyEntryProjection> OutcomeEntries =>
-        Entries.Where(e => e.EntryType == FinancialEntryType.Outcome);
+        WithAlternatingRows(Entries.Where(e => e.EntryType == FinancialEntryType.Outcome));
 
     public IEnumerable<MonthlyEntryProjection> IncomeEntries =>
-        Entries.Where(e => e.EntryType == FinancialEntryType.Income);
+        WithAlternatingRows(Entries.Where(e => e.EntryType == FinancialEntryType.Income));
 
     public decimal TotalIncomes => Entries
         .Where(e => e.EntryType == FinancialEntryType.Income)
@@ -90,4 +90,7 @@ public partial class MonthViewModel : ObservableObject
 
     [RelayCommand]
     public void HideEntryActions() => RevealedEntryId = null;
+
+    private static IEnumerable<MonthlyEntryProjection> WithAlternatingRows(IEnumerable<MonthlyEntryProjection> entries) =>
+        entries.Select((entry, index) => entry with { IsAlternateRow = index % 2 == 1 });
 }

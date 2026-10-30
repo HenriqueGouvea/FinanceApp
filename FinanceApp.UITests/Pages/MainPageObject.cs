@@ -340,6 +340,17 @@ public class MainPageObject
     public PngImage CaptureEntryDueDateLabel(string description) => CaptureInRow(description, EntryDueDate);
 
     /// <summary>
+    /// The row's background color, sampled at its top-left corner, inside the padding where no content is drawn.
+    /// </summary>
+    public (byte R, byte G, byte B) EntryRowBackground(string description)
+    {
+        IWebElement Find() => FindRow(description);
+
+        _session.ScrollAbove(Find, _session.WaitForVisible(AddEntryButton).Location.Y);
+        return AppSession.Capture(Find()).GetPixel(3, 3);
+    }
+
+    /// <summary>
     /// Long-presses the entry, taps "Excluir" and picks the option in the native action sheet.
     /// </summary>
     public MainPageObject DeleteEntry(string description, string option)
