@@ -347,6 +347,17 @@ public class MainPageObject
         IWebElement Find() => FindRow(description);
 
         _session.ScrollAbove(Find, _session.WaitForVisible(AddEntryButton).Location.Y);
+
+        // Without UiAutomator2's idle wait the list may still be gliding, and the capture would catch a neighbouring row.
+        var last = Point.Empty;
+        _session.WaitFor(() =>
+        {
+            var current = Find().Location;
+            var settled = current == last;
+            last = current;
+            return settled;
+        }, $"the \"{description}\" row to stop moving");
+
         return AppSession.Capture(Find()).GetPixel(3, 3);
     }
 
