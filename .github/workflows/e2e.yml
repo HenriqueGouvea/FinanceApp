@@ -13,8 +13,8 @@ jobs:
   e2e-android:
     # Linux runners expose KVM, so the x86_64 emulator runs hardware-accelerated (Windows/macOS hosted runners do not).
     runs-on: ubuntu-latest
-    # Safety net only: the suite takes about half of this. A hung run is cancelled instead of burning hours.
-    timeout-minutes: 60
+    # Safety net only (the suite takes 35-45 min): a hung run is cancelled instead of burning hours.
+    timeout-minutes: 75
 
     steps:
     - uses: actions/checkout@v4
