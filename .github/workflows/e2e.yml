@@ -13,7 +13,8 @@ jobs:
   e2e-android:
     # Linux runners expose KVM, so the x86_64 emulator runs hardware-accelerated (Windows/macOS hosted runners do not).
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Safety net only: the suite takes about half of this. A hung run is cancelled instead of burning hours.
+    timeout-minutes: 60
 
     steps:
     - uses: actions/checkout@v4
@@ -85,11 +86,14 @@ jobs:
         force-avd-creation: false
         emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
         disable-animations: true
-        script: dotnet test FinanceApp.UITests/FinanceApp.UITests.csproj --no-build --logger "trx;LogFileName=e2e.trx" --results-directory TestResults
+        script: dotnet test FinanceApp.UITests/FinanceApp.UITests.csproj --no-build --logger "trx;LogFileName=e2e.trx" --logger "console;verbosity=normal" --results-directory TestResults
 
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: e2e-results
-        path: TestResults
+        # The TRX is only written when the run completes; diagnostics (screenshot + page source per timeout) are saved as they happen.
+        path: |
+          TestResults
+          FinanceApp.UITests/TestResults/diagnostics

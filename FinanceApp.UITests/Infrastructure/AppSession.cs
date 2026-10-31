@@ -9,7 +9,8 @@ using OpenQA.Selenium.Support.UI;
 namespace FinanceApp.UITests.Infrastructure;
 
 /// <summary>
-/// One Appium session per test. App data is wiped at session start (noReset=false), so every test starts with a fresh database.
+/// One Appium session shared by the whole run (see <see cref="AppiumServerFixture.StartApp"/>). App data is wiped
+/// before every test, so each one starts with a fresh database.
 /// </summary>
 public sealed class AppSession : IDisposable
 {
@@ -35,10 +36,27 @@ public sealed class AppSession : IDisposable
         options.AddAdditionalAppiumOption("appium:autoGrantPermissions", true);
         options.AddAdditionalAppiumOption("appium:newCommandTimeout", 120);
         options.AddAdditionalAppiumOption("appium:enforceAppInstall", !server.IsAppInstalled);
+        // The device setup and the UiAutomator2 server install only need to happen for the first session of a run.
+        options.AddAdditionalAppiumOption("appium:skipDeviceInitialization", server.IsAppInstalled);
+        options.AddAdditionalAppiumOption("appium:skipServerInstallation", server.IsAppInstalled);
+        options.AddAdditionalAppiumOption("appium:disableWindowAnimation", true);
+        // UiAutomator2 waits up to 10 s for the UI to go idle before every command. Tests always wait for the
+        // state they expect, so that idle wait only adds latency.
+        options.AddAdditionalAppiumOption("appium:settings[waitForIdleTimeout]", 0);
 
         Driver = new AndroidDriver(server.ServerUri, options, TimeSpan.FromMinutes(3));
         server.IsAppInstalled = true;
         Database = new DeviceDatabase();
+    }
+
+    /// <summary>
+    /// Wipes the app's data (which also stops it) and launches it again, as a new session would but without
+    /// the cost of starting one.
+    /// </summary>
+    public void RestartWithEmptyData()
+    {
+        Driver.ExecuteScript("mobile: clearApp", new Dictionary<string, object> { ["appId"] = E2ESettings.AppPackage });
+        Driver.ActivateApp(E2ESettings.AppPackage);
     }
 
     public static By AutomationId(string automationId) => MobileBy.Id(automationId);
@@ -245,7 +263,10 @@ public sealed class AppSession : IDisposable
 
     private TResult WaitUntil<TResult>(Func<IWebDriver, TResult> condition, string description, TimeSpan? timeout)
     {
-        var wait = new WebDriverWait(Driver, timeout ?? E2ESettings.DefaultTimeout);
+        var wait = new WebDriverWait(Driver, timeout ?? E2ESettings.DefaultTimeout)
+        {
+            PollingInterval = E2ESettings.PollingInterval
+        };
         wait.IgnoreExceptionTypes(typeof(NoSuchElementException), typeof(StaleElementReferenceException));
 
         try

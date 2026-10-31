@@ -7,6 +7,11 @@ public static class E2ESettings
 
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(15);
 
+    /// <summary>
+    /// Each poll is a round trip to the device anyway, so a short interval costs little and avoids idling after the UI is ready.
+    /// </summary>
+    public static readonly TimeSpan PollingInterval = TimeSpan.FromMilliseconds(100);
+
     public static string ProjectDirectory { get; } = FindProjectDirectory();
 
     /// <summary>
