@@ -1,13 +1,16 @@
+using OpenQA.Selenium;
 using OpenQA.Selenium.Appium.Service;
 
 namespace FinanceApp.UITests.Infrastructure;
 
 /// <summary>
-/// Shared across the whole E2E collection: starting Appium takes several seconds, sessions are cheap.
+/// Shared across the whole E2E collection: starting Appium takes several seconds, and so does every new session,
+/// so the run keeps a single session and only wipes the app between tests.
 /// </summary>
 public sealed class AppiumServerFixture : IDisposable
 {
     private readonly AppiumLocalService? _localService;
+    private AppSession? _session;
 
     public Uri ServerUri { get; }
 
@@ -44,7 +47,47 @@ public sealed class AppiumServerFixture : IDisposable
         ServerUri = _localService.ServiceUrl;
     }
 
-    public void Dispose() => _localService?.Dispose();
+    /// <summary>
+    /// Returns the app freshly launched with empty data. The first call creates the session, which installs the app
+    /// and wipes its data on its own.
+    /// </summary>
+    public AppSession StartApp()
+    {
+        if (_session is null)
+            return _session = new AppSession(this);
+
+        try
+        {
+            _session.RestartWithEmptyData();
+            return _session;
+        }
+        catch (WebDriverException)
+        {
+            DiscardSession();
+            return _session = new AppSession(this);
+        }
+    }
+
+    /// <summary>
+    /// Ends the shared session so the next test starts a new one, e.g. after the app failed to load.
+    /// </summary>
+    public void DiscardSession()
+    {
+        try
+        {
+            _session?.Dispose();
+        }
+        catch (WebDriverException)
+        {
+        }
+        _session = null;
+    }
+
+    public void Dispose()
+    {
+        DiscardSession();
+        _localService?.Dispose();
+    }
 }
 
 [CollectionDefinition(Name)]

@@ -54,7 +54,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Never hardcode formatted values: use `AppFormat.Money`, `AppFormat.MonthTitle`, `AppFormat.EntryCount`.
 - Always wait (`WaitForVisible`, `WaitForText`, `WaitForGone`), never sleep. The month `CarouselView` keeps neighbour months in the tree, so only consider *displayed* elements.
 - Assert both the UI reaction and the persisted state (`GetEntryRowsAsync`, `GetMonthlyEntryRowsAsync`, `GetCategoryRowsAsync`) when a flow writes to the DB. Row types in `TableRows.cs` mirror the tables and must be updated when the schema changes.
-- Every test gets a fresh Appium session with app data wiped (empty DB, default categories seeded), so tests must not depend on each other.
+- The run shares one Appium session; before every test the app data is wiped and the app relaunched (empty DB, default categories seeded), so tests must not depend on each other. Creating a session per test was the main cost of the suite, so keep it shared.
 - On a timeout, a screenshot + page source are saved to `FinanceApp.UITests/TestResults/diagnostics/`. Check them first when debugging.
 
 ## Git & Pull Request Workflow

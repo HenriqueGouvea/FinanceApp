@@ -131,7 +131,7 @@ public class AddEntryPageObject
     {
         _session.HideKeyboardIfShown();
         if (IsEstimated != isEstimated)
-            _session.ScrollTo(EstimatedSwitchId).Click();
+            _session.ScrollToAndTap(EstimatedSwitchId);
         _session.WaitFor(() => IsEstimated == isEstimated, $"the estimated switch to be {(isEstimated ? "on" : "off")}");
         return this;
     }
@@ -144,7 +144,7 @@ public class AddEntryPageObject
     {
         _session.HideKeyboardIfShown();
         if (AllowsPartialPayment != allowsPartialPayment)
-            _session.ScrollTo(PartialPaymentSwitchId).Click();
+            _session.ScrollToAndTap(PartialPaymentSwitchId);
         _session.WaitFor(() => AllowsPartialPayment == allowsPartialPayment,
             $"the partial payment switch to be {(allowsPartialPayment ? "on" : "off")}");
         return this;
@@ -257,8 +257,8 @@ public class AddEntryPageObject
         var label = day is { } d ? AppLabels.DueDay(d) : AppLabels.NoDueDay;
 
         _session.HideKeyboardIfShown();
-        _session.ScrollTo(DueDayPickerId).Click();
-        _session.ScrollDialogListTo(label).Click();
+        _session.ScrollToAndTap(DueDayPickerId);
+        _session.ScrollDialogListToAndTap(label);
         _session.WaitForText(AppSession.AutomationId(DueDayPickerId), label);
         return this;
     }
@@ -320,7 +320,7 @@ public class AddEntryPageObject
     private IReadOnlyList<string> PickerOptions(string pickerId)
     {
         _session.HideKeyboardIfShown();
-        _session.ScrollTo(pickerId).Click();
+        _session.ScrollToAndTap(pickerId);
         _session.WaitForVisible(PickerDialogOption);
         var options = _session.VisibleTexts(PickerDialogOption);
         _session.PressBack();
@@ -331,7 +331,7 @@ public class AddEntryPageObject
     private void PickOption(string pickerId, string optionLabel)
     {
         _session.HideKeyboardIfShown();
-        _session.ScrollTo(pickerId).Click();
+        _session.ScrollToAndTap(pickerId);
         _session.Tap(AppSession.Text(optionLabel));
         _session.WaitForText(AppSession.AutomationId(pickerId), optionLabel);
     }

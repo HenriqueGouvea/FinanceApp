@@ -21,7 +21,7 @@ dotnet build FinanceApp/FinanceApp.csproj -f net10.0-android -c Debug -p:EmbedAs
 dotnet test FinanceApp.UITests/FinanceApp.UITests.csproj
 ```
 
-Each test runs in a fresh Appium session with app data wiped, so it starts from an empty database.
+The run shares one Appium session. Before each test the app data is wiped (`mobile: clearApp`) and the app relaunched, so every test starts from an empty database.
 The APK is force-reinstalled once per run. That replaces any Fast Deployment install (`dotnet build -t:Run`).
 You'll need to redeploy from the IDE afterwards.
 
