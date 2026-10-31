@@ -247,7 +247,7 @@ public class AddEntryPopupObject
 
         _session.HideKeyboardIfShown();
         _session.ScrollTo(DueDayPickerId).Click();
-        _session.ScrollDialogListTo(label).Click();
+        _session.ScrollDialogListToAndTap(label);
         _session.WaitForText(AppSession.AutomationId(DueDayPickerId), label);
         return this;
     }

@@ -152,11 +152,15 @@ public sealed class AppSession : IDisposable
 
     /// <summary>
     /// Scrolls the open picker dialog's list until the option with that exact text is on screen, for lists
-    /// longer than the dialog (e.g. the 31 due days).
+    /// longer than the dialog (e.g. the 31 due days), then taps it once the list stops gliding: a tap on a
+    /// moving list only stops it.
     /// </summary>
-    public IWebElement ScrollDialogListTo(string text) =>
+    public void ScrollDialogListToAndTap(string text)
+    {
         WaitForVisible(MobileBy.AndroidUIAutomator(
             $"new UiScrollable(new UiSelector().className(\"android.widget.ListView\")).scrollIntoView(new UiSelector().text(\"{text}\"))"));
+        TapWhenSettled(Text(text));
+    }
 
     public void LongPress(IWebElement element, int durationMs = 1500)
     {
