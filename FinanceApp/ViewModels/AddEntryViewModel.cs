@@ -20,7 +20,7 @@ public partial class AddEntryViewModel : ObservableObject
     private int? _editingCategoryId;
     private IReadOnlyList<FinancialCategory> _allCategories = [];
 
-    [ObservableProperty] string popupTitle = "Novo Lançamento";
+    [ObservableProperty] string pageTitle = "Novo Lançamento";
     [ObservableProperty] string description = string.Empty;
     [ObservableProperty] decimal amount;
     [ObservableProperty] FinancialCategory? selectedCategory;
@@ -119,7 +119,7 @@ public partial class AddEntryViewModel : ObservableObject
         OnPropertyChanged(nameof(StructuralFieldsOpacity));
         OnPropertyChanged(nameof(ShowsPaidAmount));
         _targetMonth = new DateTime(targetMonth.Year, targetMonth.Month, 1);
-        PopupTitle = "Novo Lançamento";
+        PageTitle = "Novo Lançamento";
         Description = string.Empty;
         Amount = 0;
         SelectedCategory = null;
@@ -150,7 +150,7 @@ public partial class AddEntryViewModel : ObservableObject
         OnPropertyChanged(nameof(StructuralFieldsOpacity));
         OnPropertyChanged(nameof(ShowsPaidAmount));
         _targetMonth = new DateTime(entry.StartDate.Year, entry.StartDate.Month, 1);
-        PopupTitle = "Editar Lançamento";
+        PageTitle = "Editar Lançamento";
         Description = entry.Description;
         Amount = entry.Amount;
         EntryType = entry.EntryType;

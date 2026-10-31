@@ -46,7 +46,7 @@ public static class MauiProgram
         builder.Services.AddTransient<PartialPaymentViewModel>();
 
         builder.Services.AddTransient<MainPage>();
-        builder.Services.AddTransient<AddEntryPopup>();
+        builder.Services.AddTransient<AddEntryPage>();
         builder.Services.AddTransient<CategoriesPage>();
         builder.Services.AddTransient<CategoryEditPopup>();
         builder.Services.AddTransient<MonthPickerPopup>();

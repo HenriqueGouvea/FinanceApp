@@ -160,4 +160,61 @@ public sealed class AddEntryTests : E2ETestBase
         MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(0));
         (await GetEntryRowsAsync()).Should().BeEmpty();
     }
+
+    [Fact]
+    public void AddEntry_OpenPage_FocusesDescriptionWithoutTapping()
+    {
+        var page = MainPage.OpenAddEntry().WaitForDescriptionFocus();
+
+        page.TitleText.Should().Be(AppLabels.NewEntryTitle);
+    }
+
+    [Fact]
+    public async Task AddEntry_BackButtonAfterScrollingToEnd_DiscardsAndReturnsToMonth()
+    {
+        var month = AppFormat.CurrentMonth.AddMonths(1);
+        MainPage.GoToNextMonth();
+
+        var page = MainPage.OpenAddEntry()
+            .EnterDescription("Voltar E2E")
+            .SelectRecurrence(AppLabels.Recurrent)
+            .EnterAmount(10)
+            .ScrollToEnd();
+
+        page.IsBackButtonVisible.Should().BeTrue("the header stays on screen while the form scrolls");
+        page.GoBack();
+
+        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(month));
+        MainPage.IsEntryVisible("Voltar E2E").Should().BeFalse();
+        MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(0));
+        (await GetEntryRowsAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AddEntry_SystemBack_DiscardsAndReturnsToMonth()
+    {
+        MainPage.OpenAddEntry()
+            .EnterDescription("Voltar Android E2E")
+            .SelectRecurrence(AppLabels.OneTime)
+            .EnterAmount(10)
+            .PressSystemBack();
+
+        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth));
+        MainPage.IsEntryVisible("Voltar Android E2E").Should().BeFalse();
+        (await GetEntryRowsAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AddEntry_SavedFromAnotherMonth_ReturnsToThatMonthWithTheEntry()
+    {
+        var month = AppFormat.CurrentMonth.AddMonths(1);
+        MainPage.GoToNextMonth();
+
+        MainPage.AddEntry("Mês seguinte E2E", AppLabels.OneTime, 40m);
+
+        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(month));
+        MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(40));
+        var row = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
+        row.StartDate.Date.Should().Be(month);
+    }
 }

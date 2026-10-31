@@ -14,6 +14,9 @@
         <Color x:Key="OutcomeTint">#FDECEC</Color>
         <Color x:Key="IncomeAccent">#2E7D32</Color>
         <Color x:Key="IncomeTint">#E8F5E9</Color>
+        <!-- Every other entry row: lighter than the section header tints, so rows never read as headers -->
+        <Color x:Key="OutcomeAlternateRow">#FEF4F4</Color>
+        <Color x:Key="IncomeAlternateRow">#F3F9F3</Color>
         <!-- Same for incomes and outcomes: a paid outcome is good news, so it must not use the red outcome accent -->
         <Color x:Key="PaidAccent">#2E7D32</Color>
         <Color x:Key="PartialAccent">#EF6C00</Color>
@@ -39,7 +42,23 @@
         </Style>
 
         <DataTemplate x:Key="EntryRowTemplate" x:DataType="models:MonthlyEntryProjection">
-            <Grid IsClippedToBounds="True">
+            <Grid IsClippedToBounds="True" BackgroundColor="White">
+                <Grid.Triggers>
+                    <MultiTrigger TargetType="Grid">
+                        <MultiTrigger.Conditions>
+                            <BindingCondition Binding="{Binding IsAlternateRow}" Value="True" />
+                            <BindingCondition Binding="{Binding EntryType}" Value="{x:Static models:FinancialEntryType.Outcome}" />
+                        </MultiTrigger.Conditions>
+                        <Setter Property="BackgroundColor" Value="{StaticResource OutcomeAlternateRow}" />
+                    </MultiTrigger>
+                    <MultiTrigger TargetType="Grid">
+                        <MultiTrigger.Conditions>
+                            <BindingCondition Binding="{Binding IsAlternateRow}" Value="True" />
+                            <BindingCondition Binding="{Binding EntryType}" Value="{x:Static models:FinancialEntryType.Income}" />
+                        </MultiTrigger.Conditions>
+                        <Setter Property="BackgroundColor" Value="{StaticResource IncomeAlternateRow}" />
+                    </MultiTrigger>
+                </Grid.Triggers>
                 <Grid AutomationId="EntryRow" ColumnDefinitions="Auto, *, Auto, Auto" ColumnSpacing="10" Padding="14,10">
                     <Grid.Behaviors>
                         <toolkit:TouchBehavior LongPressDuration="1000"

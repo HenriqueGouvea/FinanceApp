@@ -48,14 +48,15 @@ When a wait times out, the page source and a screenshot are saved under `Finance
 
 | Class | Flows |
 |---|---|
-| `AddEntryTests` | One-time outcome, income, recurrent (start month onwards), installments (exactly N months, labels, total), category chip, cancel |
-| `EditEntryTests` | Pre-filled popup with locked structural fields; description/amount change across months |
+| `AddEntryTests` | Description focused on open; one-time outcome, income, recurrent (start month onwards), installments (exactly N months, labels, total), category chip, cancel; header back button (visible after scrolling to the end) and system back discard the entry and return to the same month; saving from another month returns to it |
+| `EditEntryTests` | Pre-filled entry page with locked structural fields; description/amount change across months; header back button and system back discard changes |
 | `DeleteEntryTests` | One-time; recurrent *this month only*, *this and future*, *all months*; cancelled action sheet |
 | `EntryActionsMenuTests` | Long-press reveals menu (with the status action); tapping outside or on the entry hides it without opening the editor |
 | `EntryStatusTests` | Mark an outcome paid (only that month), revert to pending, income "Recebido" labels, pay a single installment in another month |
 | `MonthNavigationTests` | Fresh-install state, swipe to next/previous month, entry created in a non-current month, "Mês atual" pill (visibility, direction, jump back), month picker (year grid, jump to next/previous year, range limits, "Mês atual" shortcut, cancel, entries loaded after a far jump) |
 | `MonthSummaryTests` | Totals page first; swipe the summary to the paid and received pages (and back) without changing month; dots jump to a page; selected page kept across months; paid/to pay and received/to receive totals (all pending at first, mark paid only that month, revert to pending, delete a paid entry) |
-| `PartialPaymentTests` | "Pagar parcial"/"Receber parcial" action (popup labels and progress, payments add up, reaching the amount marks paid and hides the action, save disabled without an amount, cancel); paid amount field in the edit popup (edit only, prefilled, partial "já gastos"/"já recebidos" line, whole amount, overpaying raises the month's amount, clearing reverts to pending, "Pagar" settles a partial entry, installment in another month) |
+| `PartialPaymentTests` | "Pagar parcial"/"Receber parcial" action (popup labels and progress, payments add up, reaching the amount marks paid and hides the action, save disabled without an amount, cancel); paid amount field in the entry page (edit only, prefilled, partial "já gastos"/"já recebidos" line, whole amount, overpaying raises the month's amount, clearing reverts to pending, "Pagar" settles a partial entry, installment in another month) |
 | `EstimatedAmountTests` | "±" badge for estimated entries in every month, switch off by default, turn estimated on/off when editing, estimated entry paid above its estimate |
 | `SectionToggleTests` | Collapse/expand outcomes; collapsed state shared across months |
-| `CategoryTests` | Seeded outcome/income defaults grouped by type, entry popup offers only categories of the selected type, add outcome/income category and use it on an entry, delete a category used by an entry |
+| `AlternatingRowsTests` | Every other outcome row tinted red and income row tinted green (sampled from the rendered row), alternation restarts per section and follows the new order after a delete |
+| `CategoryTests` | Seeded outcome/income defaults grouped by type, entry page offers only categories of the selected type, add outcome/income category and use it on an entry, delete a category used by an entry |

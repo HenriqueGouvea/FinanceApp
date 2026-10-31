@@ -14,7 +14,7 @@ public sealed class EditEntryTests : E2ETestBase
     }
 
     [Fact]
-    public void EditEntry_TapEntry_OpensPrefilledPopupWithStructuralFieldsLocked()
+    public void EditEntry_TapEntry_OpensPrefilledPageWithStructuralFieldsLocked()
     {
         var popup = MainPage.OpenEntry("Academia E2E");
 
@@ -46,5 +46,34 @@ public sealed class EditEntryTests : E2ETestBase
         row.Amount.Should().Be(150m);
         row.Recurrence.Should().Be(AppFormat.Recurrent);
         row.StartDate.Date.Should().Be(AppFormat.CurrentMonth);
+    }
+
+    [Fact]
+    public async Task EditEntry_BackButton_DiscardsChanges()
+    {
+        MainPage.OpenEntry("Academia E2E")
+            .EnterDescription("Academia Alterada E2E")
+            .EnterAmount(150)
+            .GoBack();
+
+        MainPage.WaitForEntry("Academia E2E");
+        MainPage.IsEntryVisible("Academia Alterada E2E").Should().BeFalse();
+        MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(90));
+
+        var row = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
+        row.Description.Should().Be("Academia E2E");
+        row.Amount.Should().Be(90m);
+    }
+
+    [Fact]
+    public async Task EditEntry_SystemBack_DiscardsChanges()
+    {
+        MainPage.OpenEntry("Academia E2E")
+            .EnterAmount(150)
+            .PressSystemBack();
+
+        MainPage.WaitForEntry("Academia E2E");
+        MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(90));
+        (await GetEntryRowsAsync()).Should().ContainSingle().Which.Amount.Should().Be(90m);
     }
 }

@@ -37,6 +37,10 @@ public record MonthlyEntryProjection(
     DateTime? DueDate = null
 )
 {
+    /// <summary>
+    /// Every other row of its section (the 2nd, 4th...) is tinted, so rows are easier to tell apart.
+    /// </summary>
+    public bool IsAlternateRow { get; init; }
     public bool HasDueDate => DueDate is not null;
     /// <summary>
     /// Falls due today and is still unpaid (or not fully received), so the row highlights it.

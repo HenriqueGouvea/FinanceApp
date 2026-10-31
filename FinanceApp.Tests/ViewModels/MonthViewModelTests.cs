@@ -105,6 +105,43 @@ public class MonthViewModelTests
     }
 
     [Fact]
+    public void OutcomeEntries_WithSeveralEntries_FlagsEveryOtherRowAsAlternate()
+    {
+        _vm.Entries.Add(MakeProjection(100m, FinancialEntryType.Outcome));
+        _vm.Entries.Add(MakeProjection(200m, FinancialEntryType.Outcome));
+        _vm.Entries.Add(MakeProjection(300m, FinancialEntryType.Outcome));
+        _vm.Entries.Add(MakeProjection(400m, FinancialEntryType.Outcome));
+
+        _vm.OutcomeEntries.Select(e => e.IsAlternateRow).Should().Equal(false, true, false, true);
+        _vm.OutcomeEntries.Select(e => e.EffectiveAmount).Should().Equal(100m, 200m, 300m, 400m);
+    }
+
+    [Fact]
+    public void IncomeEntries_InterleavedWithOutcomes_AlternatesWithinItsOwnSection()
+    {
+        _vm.Entries.Add(MakeProjection(100m, FinancialEntryType.Outcome));
+        _vm.Entries.Add(MakeProjection(1000m, FinancialEntryType.Income));
+        _vm.Entries.Add(MakeProjection(200m, FinancialEntryType.Outcome));
+        _vm.Entries.Add(MakeProjection(2000m, FinancialEntryType.Income));
+
+        _vm.IncomeEntries.Select(e => e.IsAlternateRow).Should().Equal(false, true);
+        _vm.OutcomeEntries.Select(e => e.IsAlternateRow).Should().Equal(false, true);
+    }
+
+    [Fact]
+    public void OutcomeEntries_WhenFirstEntryRemoved_RecomputesAlternation()
+    {
+        var first = MakeProjection(100m, FinancialEntryType.Outcome);
+        _vm.Entries.Add(first);
+        _vm.Entries.Add(MakeProjection(200m, FinancialEntryType.Outcome));
+        _vm.Entries.Add(MakeProjection(300m, FinancialEntryType.Outcome));
+
+        _vm.Entries.Remove(first);
+
+        _vm.OutcomeEntries.Select(e => e.IsAlternateRow).Should().Equal(false, true);
+    }
+
+    [Fact]
     public void OutcomeEntries_WhenEntryAdded_RaisesPropertyChanged()
     {
         var notified = new List<string>();
