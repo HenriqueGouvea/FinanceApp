@@ -96,8 +96,6 @@ public sealed class AppSession : IDisposable
     public IReadOnlyList<string> VisibleTexts(By locator) =>
         Driver.FindElements(locator).Where(e => e.Displayed).Select(e => e.Text).ToList();
 
-    public void Tap(By locator) => WaitForVisible(locator).Click();
-
     /// <summary>
     /// Scrolls the nearest scrollable container until the element is on screen, then taps it.
     /// Needed for popups whose buttons sit below the fold on small screens. Scoped to the app so system
@@ -106,14 +104,14 @@ public sealed class AppSession : IDisposable
     public void ScrollToAndTap(string automationId)
     {
         ScrollTo(automationId);
-        TapWhenSettled(AutomationId(automationId));
+        Tap(AutomationId(automationId));
     }
 
     /// <summary>
-    /// Taps once the element stops moving, e.g. while a popup re-centers after the keyboard hides,
-    /// so the tap can't land where the element used to be.
+    /// Taps once the element stops moving (a menu sliding in, a list gliding after a scroll, a popup re-centering
+    /// after the keyboard hides). UiAutomator2's idle wait is off, so a tap could otherwise land mid-animation.
     /// </summary>
-    public void TapWhenSettled(By locator)
+    public void Tap(By locator)
     {
         var last = Rectangle.Empty;
         var element = WaitUntil(d =>
@@ -152,14 +150,13 @@ public sealed class AppSession : IDisposable
 
     /// <summary>
     /// Scrolls the open picker dialog's list until the option with that exact text is on screen, for lists
-    /// longer than the dialog (e.g. the 31 due days), then taps it once the list stops gliding: a tap on a
-    /// moving list only stops it.
+    /// longer than the dialog (e.g. the 31 due days), then taps it.
     /// </summary>
     public void ScrollDialogListToAndTap(string text)
     {
         WaitForVisible(MobileBy.AndroidUIAutomator(
             $"new UiScrollable(new UiSelector().className(\"android.widget.ListView\")).scrollIntoView(new UiSelector().text(\"{text}\"))"));
-        TapWhenSettled(Text(text));
+        Tap(Text(text));
     }
 
     public void LongPress(IWebElement element, int durationMs = 1500)
