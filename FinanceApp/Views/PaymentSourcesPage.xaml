@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:FinanceApp.ViewModels"
+             xmlns:models="clr-namespace:FinanceApp.Models"
+             xmlns:converters="clr-namespace:FinanceApp.Converters"
+             x:Class="FinanceApp.Views.PaymentSourcesPage"
+             x:DataType="vm:PaymentSourcesViewModel"
+             Title="Contas e cartões">
+    <Grid>
+        <CollectionView ItemsSource="{Binding Groups}"
+                        IsGrouped="True"
+                        SelectionMode="None"
+                        Margin="0,10,0,0">
+            <CollectionView.EmptyView>
+                <Label AutomationId="PaymentSourcesEmptyLabel"
+                       Text="Nenhuma conta ou cartão cadastrado. Toque em + para criar."
+                       TextColor="Gray"
+                       HorizontalTextAlignment="Center"
+                       Margin="30" />
+            </CollectionView.EmptyView>
+            <CollectionView.GroupHeaderTemplate>
+                <DataTemplate x:DataType="vm:PaymentSourceGroup">
+                    <Label AutomationId="PaymentSourceGroupHeader"
+                           Text="{Binding Title}"
+                           TextColor="Purple"
+                           FontSize="13"
+                           FontAttributes="Bold"
+                           Padding="20,14,20,4" />
+                </DataTemplate>
+            </CollectionView.GroupHeaderTemplate>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:PaymentSource">
+                    <Grid AutomationId="PaymentSourceRow" ColumnDefinitions="Auto, *, Auto" ColumnSpacing="14" Padding="20,10">
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnPaymentSourceTapped" />
+                        </Grid.GestureRecognizers>
+                        <Border Grid.Column="0"
+                                WidthRequest="40" HeightRequest="40"
+                                StrokeThickness="0"
+                                StrokeShape="RoundRectangle 20"
+                                BackgroundColor="#EDE7F6">
+                            <Label Text="{Binding Type, Converter={x:Static converters:PaymentSourceTypeToIconConverter.Instance}}"
+                                   FontSize="18"
+                                   HorizontalOptions="Center" VerticalOptions="Center" />
+                        </Border>
+                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                            <Label AutomationId="PaymentSourceNameLabel"
+                                   Text="{Binding Name}"
+                                   FontSize="16"
+                                   FontAttributes="Bold" />
+                            <!-- "Saldo" for accounts and vouchers, "Limite" for credit cards -->
+                            <Label AutomationId="PaymentSourceBalanceLabel" FontSize="12" TextColor="Gray">
+                                <Label.Text>
+                                    <MultiBinding StringFormat="{}{0}: {1}">
+                                        <Binding Path="Type" Converter="{x:Static converters:PaymentSourceTypeToBalanceLabelConverter.Instance}" />
+                                        <Binding Path="Balance" Converter="{x:Static converters:MoneyConverter.Instance}" />
+                                    </MultiBinding>
+                                </Label.Text>
+                            </Label>
+                        </VerticalStackLayout>
+                        <Border Grid.Column="2"
+                                AutomationId="DeletePaymentSourceButton"
+                                BackgroundColor="#D32F2F"
+                                StrokeThickness="0"
+                                StrokeShape="RoundRectangle 8"
+                                Padding="12,6"
+                                VerticalOptions="Center">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnDeletePaymentSourceClicked" />
+                            </Border.GestureRecognizers>
+                            <Label Text="Excluir" TextColor="White" FontSize="12" />
+                        </Border>
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <Button AutomationId="AddPaymentSourceButton"
+                Text="+"
+                FontSize="24"
+                BackgroundColor="Purple"
+                TextColor="White"
+                CornerRadius="28"
+                HeightRequest="56"
+                WidthRequest="56"
+                HorizontalOptions="End"
+                VerticalOptions="End"
+                Margin="20"
+                Clicked="OnAddClicked" />
+    </Grid>
+</ContentPage>

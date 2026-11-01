@@ -11,11 +11,14 @@ public class AddEntryViewModelTests
 {
     private readonly IFinanceService _service;
     private readonly ICategoryService _categoryService;
+    private readonly IPaymentSourceService _paymentSourceService;
     private readonly AddEntryViewModel _vm;
 
     private static readonly FinancialCategory Housing = new() { Id = 1, Name = "Moradia", Icon = "🏠", Color = "#1E88E5" };
     private static readonly FinancialCategory Education = new() { Id = 2, Name = "Educação", Icon = "🎓", Color = "#8E24AA" };
     private static readonly FinancialCategory Salary = new() { Id = 3, Name = "Salário", Icon = "💼", Color = "#00897B", EntryType = FinancialEntryType.Income };
+    private static readonly PaymentSource Checking = new() { Id = 1, Name = "Conta Corrente", Type = PaymentSourceType.BankAccount };
+    private static readonly PaymentSource Card = new() { Id = 2, Name = "Nubank", Type = PaymentSourceType.CreditCard };
     private static readonly DateTime June = new(2026, 6, 1, 0, 0, 0, DateTimeKind.Local);
     private static readonly DateTime JuneTenth = new(2026, 6, 10, 0, 0, 0, DateTimeKind.Local);
 
@@ -25,7 +28,9 @@ public class AddEntryViewModelTests
         _categoryService = Substitute.For<ICategoryService>();
         _categoryService.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<FinancialCategory>>([Housing, Education, Salary]));
         _service.GetPaymentsAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>()).Returns([]);
-        _vm = new AddEntryViewModel(_service, _categoryService);
+        _paymentSourceService = Substitute.For<IPaymentSourceService>();
+        _paymentSourceService.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<PaymentSource>>([Checking, Card]));
+        _vm = new AddEntryViewModel(_service, _categoryService, _paymentSourceService);
         _vm.PrepareAsync(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local)).GetAwaiter().GetResult();
     }
 
@@ -943,6 +948,97 @@ public class AddEntryViewModelTests
 
         _vm.Payments.Should().ContainSingle();
         await _service.DidNotReceive().DeletePaymentAsync(Arg.Any<int>());
+    }
+
+    // --- Payment source ---
+
+    [Fact]
+    public void Prepare_LoadsPaymentSourcesWithoutSelection()
+    {
+        _vm.PaymentSources.Should().Equal(Checking, Card);
+        _vm.SelectedPaymentSource.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Prepare_CalledTwice_DoesNotDuplicatePaymentSources()
+    {
+        await _vm.PrepareAsync(June);
+
+        _vm.PaymentSources.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Prepare_AfterSelectingPaymentSource_ClearsSelection()
+    {
+        _vm.SelectedPaymentSource = Card;
+
+        await _vm.PrepareAsync(June);
+
+        _vm.SelectedPaymentSource.Should().BeNull();
+    }
+
+    [Fact]
+    public void PaymentSources_DoNotDependOnEntryType()
+    {
+        _vm.SelectIncomeCommand.Execute(null);
+
+        _vm.PaymentSources.Should().Equal(Checking, Card);
+    }
+
+    [Fact]
+    public async Task PrepareForEdit_SelectsEntryPaymentSource()
+    {
+        var entry = MakeEntry();
+        entry.PaymentSourceId = Card.Id;
+
+        await _vm.PrepareForEditAsync(entry);
+
+        _vm.SelectedPaymentSource.Should().BeSameAs(Card);
+    }
+
+    [Fact]
+    public async Task PrepareForEdit_EntryWithoutPaymentSource_SelectsNone()
+    {
+        _vm.SelectedPaymentSource = Card;
+
+        await _vm.PrepareForEditAsync(MakeEntry());
+
+        _vm.SelectedPaymentSource.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SaveCommand_WithPaymentSource_PassesPaymentSourceId()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.OneTime;
+        _vm.SelectedPaymentSource = Card;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.PaymentSourceId == Card.Id));
+    }
+
+    [Fact]
+    public async Task SaveCommand_WithoutPaymentSource_PassesNullPaymentSourceId()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.OneTime;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.PaymentSourceId == null));
+    }
+
+    [Fact]
+    public void PaymentSourceLabel_FollowsEntryType()
+    {
+        var notified = new List<string>();
+        _vm.PropertyChanged += (_, e) => notified.Add(e.PropertyName!);
+
+        _vm.PaymentSourceLabel.Should().Be("Pago com");
+
+        _vm.SelectIncomeCommand.Execute(null);
+
+        _vm.PaymentSourceLabel.Should().Be("Recebido em");
+        notified.Should().Contain(nameof(AddEntryViewModel.PaymentSourceLabel));
     }
 
     private static FinancialEntry MakeEntry() => new()

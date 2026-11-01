@@ -112,6 +112,13 @@
                                    FontSize="11"
                                    TextColor="{Binding Category.Color, Converter={x:Static converters:HexToColorConverter.Instance}}"/>
                         </HorizontalStackLayout>
+                        <HorizontalStackLayout Spacing="4" IsVisible="{Binding HasPaymentSource}">
+                            <Label Text="{Binding PaymentSource.Type, Converter={x:Static converters:PaymentSourceTypeToIconConverter.Instance}}" FontSize="11"/>
+                            <Label AutomationId="EntryPaymentSourceLabel"
+                                   Text="{Binding PaymentSource.Name}"
+                                   FontSize="11"
+                                   TextColor="Gray"/>
+                        </HorizontalStackLayout>
                         <!-- Turns red while it is due today and not yet paid/received -->
                         <Label AutomationId="EntryDueDateLabel"
                                Text="{Binding DueDate, Converter={x:Static converters:DueDateToLabelConverter.Instance}}"

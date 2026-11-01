@@ -20,6 +20,15 @@ public static class AppLabels
 
     public const string EntriesMenuItem = "Lançamentos";
     public const string CategoriesMenuItem = "Categorias";
+    public const string PaymentSourcesMenuItem = "Contas e cartões";
+
+    public const string BankAccountsHeader = "Contas bancárias";
+    public const string CreditCardsHeader = "Cartões de crédito";
+    public const string MealVouchersHeader = "Vales";
+    public const string Balance = "Saldo";
+    public const string Limit = "Limite";
+    public const string PaidWith = "Pago com";
+    public const string ReceivedIn = "Recebido em";
 
     public const string Paid = "Pago";
     public const string Received = "Recebido";

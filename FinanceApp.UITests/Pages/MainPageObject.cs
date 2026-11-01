@@ -27,6 +27,7 @@ public class MainPageObject
     private static readonly By EntryDescription = AppSession.AutomationId("EntryDescriptionLabel");
     private static readonly By EntryAmount = AppSession.AutomationId("EntryAmountLabel");
     private static readonly By EntryCategory = AppSession.AutomationId("EntryCategoryLabel");
+    private static readonly By EntryPaymentSource = AppSession.AutomationId("EntryPaymentSourceLabel");
     private static readonly By EntryInstallment = AppSession.AutomationId("EntryInstallmentLabel");
     private static readonly By EntryDueDate = AppSession.AutomationId("EntryDueDateLabel");
     private static readonly By DeleteAction = AppSession.AutomationId("DeleteEntryAction");
@@ -123,6 +124,7 @@ public class MainPageObject
     public IReadOnlyList<string> VisibleEntryDescriptions => _session.VisibleTexts(EntryDescription);
     public IReadOnlyList<string> VisibleEntryAmounts => _session.VisibleTexts(EntryAmount);
     public IReadOnlyList<string> VisibleEntryCategories => _session.VisibleTexts(EntryCategory);
+    public IReadOnlyList<string> VisibleEntryPaymentSources => _session.VisibleTexts(EntryPaymentSource);
     public IReadOnlyList<string> VisibleInstallmentLabels => _session.VisibleTexts(EntryInstallment);
 
     public bool IsEntryVisible(string description) => _session.IsVisible(EntryByDescription(description));
@@ -151,7 +153,8 @@ public class MainPageObject
         string? category = null,
         bool isEstimated = false,
         bool allowsPartialPayment = false,
-        int? dueDay = null)
+        int? dueDay = null,
+        string? paymentSource = null)
     {
         var entryPage = OpenAddEntry().EnterDescription(description);
 
@@ -176,6 +179,9 @@ public class MainPageObject
 
         if (category is not null)
             entryPage.SelectCategory(category);
+
+        if (paymentSource is not null)
+            entryPage.SelectPaymentSource(paymentSource);
 
         entryPage.Save();
         return WaitForEntry(description);
@@ -504,6 +510,22 @@ public class MainPageObject
         _session.Tap(FlyoutButton);
         _session.Tap(AppSession.Text(AppLabels.CategoriesMenuItem));
         return new CategoriesPageObject(_session).WaitUntilLoaded();
+    }
+
+    /// <summary>
+    /// Waits for an entry row to show that payment source, e.g. after the source is renamed.
+    /// </summary>
+    public MainPageObject WaitForEntryPaymentSource(string sourceName)
+    {
+        _session.WaitForVisible(AppSession.AutomationIdWithText("EntryPaymentSourceLabel", sourceName));
+        return this;
+    }
+
+    public PaymentSourcesPageObject OpenPaymentSources()
+    {
+        _session.Tap(FlyoutButton);
+        _session.Tap(AppSession.Text(AppLabels.PaymentSourcesMenuItem));
+        return new PaymentSourcesPageObject(_session).WaitUntilLoaded();
     }
 
     private void TapRevealedAction(By action) =>

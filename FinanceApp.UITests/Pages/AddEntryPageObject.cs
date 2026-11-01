@@ -20,6 +20,8 @@ public class AddEntryPageObject
     private static readonly By InstallmentsTotal = AppSession.AutomationId("InstallmentsTotalLabel");
     private const string CategoryPickerId = "CategoryPicker";
     private const string DueDayPickerId = "DueDayPicker";
+    private const string PaymentSourcePickerId = "PaymentSourcePicker";
+    private const string PaymentSourcePickerLabelId = "PaymentSourcePickerLabel";
     private const string EstimatedSwitchId = "EstimatedSwitch";
     private const string PartialPaymentSwitchId = "PartialPaymentSwitch";
     private const string PartialPaymentSwitchLabelId = "PartialPaymentSwitchLabel";
@@ -246,6 +248,28 @@ public class AddEntryPageObject
     public IReadOnlyList<string> RecurrenceOptions() => PickerOptions(RecurrencePickerId);
 
     public string CategoryText => _session.ScrollTo(CategoryPickerId).Text;
+
+    public AddEntryPageObject SelectPaymentSource(string sourceName)
+    {
+        PickOption(PaymentSourcePickerId, sourceName);
+        return this;
+    }
+
+    public IReadOnlyList<string> PaymentSourceOptions() => PickerOptions(PaymentSourcePickerId);
+
+    public string PaymentSourceText => _session.ScrollTo(PaymentSourcePickerId).Text;
+
+    /// <summary>
+    /// The label above the payment source picker: "Pago com" for outcomes, "Recebido em" for incomes.
+    /// </summary>
+    public string PaymentSourceLabelText
+    {
+        get
+        {
+            _session.HideKeyboardIfShown();
+            return _session.ScrollTo(PaymentSourcePickerLabelId).Text;
+        }
+    }
 
     public string DueDayText => _session.ScrollTo(DueDayPickerId).Text;
 

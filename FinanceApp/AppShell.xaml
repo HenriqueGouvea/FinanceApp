@@ -16,4 +16,9 @@
         Title="Categorias"
         ContentTemplate="{DataTemplate views:CategoriesPage}"
         Route="CategoriesPage" />
+
+    <ShellContent
+        Title="Contas e cartões"
+        ContentTemplate="{DataTemplate views:PaymentSourcesPage}"
+        Route="PaymentSourcesPage" />
 </Shell>

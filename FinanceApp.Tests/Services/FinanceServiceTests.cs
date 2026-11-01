@@ -303,6 +303,49 @@ public class FinanceServiceTests
     }
 
     [Fact]
+    public async Task GetMergedEntries_EntryWithPaymentSource_ResolvesSourceOnProjection()
+    {
+        var source = new PaymentSource { Name = "Nubank", Type = PaymentSourceType.CreditCard, Balance = 5000m };
+        await new PaymentSourceService(_context).SaveAsync(source);
+        var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        template.PaymentSourceId = source.Id;
+        await _service.SaveEntryAsync(template);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.HasPaymentSource.Should().BeTrue();
+        projection.PaymentSource!.Name.Should().Be("Nubank");
+        projection.PaymentSource.Type.Should().Be(PaymentSourceType.CreditCard);
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_PhysicalRecordWithPaymentSource_ResolvesSourceOnProjection()
+    {
+        var source = new PaymentSource { Name = "Itaú" };
+        await new PaymentSourceService(_context).SaveAsync(source);
+        var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        template.PaymentSourceId = source.Id;
+        await _service.SaveEntryAsync(template);
+        await _service.SetEntryStatusAsync(template.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.IsProjected.Should().BeFalse();
+        projection.PaymentSource!.Name.Should().Be("Itaú");
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_EntryWithoutPaymentSource_ProjectionHasNullSource()
+    {
+        await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.PaymentSource.Should().BeNull();
+        projection.HasPaymentSource.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task GetMergedEntries_InstallmentsEntry_ReturnsFullInstallmentTotal()
     {
         await SaveTemplateAsync(RecurrenceType.Installments, totalInstallments: 10);

@@ -18,6 +18,10 @@ public static class AppFormat
     public const int Paid = 1;
     public const int PartiallyPaid = 2;
 
+    public const int BankAccount = 0;
+    public const int CreditCard = 1;
+    public const int MealVoucher = 2;
+
     private static readonly CultureInfo Culture = new("pt-BR");
 
     public static DateTime CurrentMonth => new(DateTime.Today.Year, DateTime.Today.Month, 1);
@@ -29,6 +33,11 @@ public static class AppFormat
     }
 
     public static string EntryCount(int count) => $"{count} lançamento(s)";
+
+    /// <summary>
+    /// Balance line of a payment source row (e.g. "Saldo: R$ 1.000,00" or "Limite: R$ 5.000,00").
+    /// </summary>
+    public static string SourceBalance(string label, decimal balance) => $"{label}: {Money(balance)}";
 
 
     /// <summary>

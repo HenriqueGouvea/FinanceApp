@@ -4,7 +4,7 @@
 
 ## Testing
 - [ ] Unit tests: `dotnet test FinanceApp.Tests/FinanceApp.Tests.csproj`
-- [ ] E2E tests (required for UI-visible changes): `dotnet test FinanceApp.UITests/FinanceApp.UITests.csproj`
+- [ ] E2E tests (required for UI-visible changes; only the relevant classes locally, the full suite runs after merge): `dotnet test FinanceApp.UITests/FinanceApp.UITests.csproj --filter "FullyQualifiedName~<Class>"`
 - [ ] New/updated tests:
 
 ## Roadmap
