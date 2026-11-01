@@ -96,9 +96,10 @@ public class PaymentSourcesViewModelTests
     // --- DeleteAsync ---
 
     [Fact]
-    public async Task DeleteAsync_CallsServiceAndRemovesFromList()
+    public async Task DeleteAsync_CallsServiceAndReloadsList()
     {
         await _vm.LoadAsync();
+        ReturnSources(Inter);
 
         await _vm.DeleteAsync(Itau);
 
@@ -109,8 +110,9 @@ public class PaymentSourcesViewModelTests
     [Fact]
     public async Task DeleteAsync_LastSourceOfType_RemovesItsGroup()
     {
-        _service.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<PaymentSource>>([Itau, Nubank]));
+        ReturnSources(Itau, Nubank);
         await _vm.LoadAsync();
+        ReturnSources(Itau);
 
         await _vm.DeleteAsync(Nubank);
 
@@ -127,22 +129,38 @@ public class PaymentSourcesViewModelTests
         _sentMessages.Should().ContainSingle();
     }
 
-    // --- OnPaymentSourceSavedAsync ---
+    // --- OnPaymentSourceSaved ---
 
     [Fact]
-    public async Task OnPaymentSourceSavedAsync_ReloadsSources()
+    public async Task OnPaymentSourceSaved_ReloadsSourcesOnce()
     {
-        await _vm.OnPaymentSourceSavedAsync();
+        _vm.OnPaymentSourceSaved();
 
         await _service.Received(1).GetAllAsync();
         _vm.Groups.SelectMany(g => g).Should().HaveCount(2);
     }
 
     [Fact]
-    public async Task OnPaymentSourceSavedAsync_SendsPaymentSourcesChangedMessage()
+    public void OnPaymentSourceSaved_SendsPaymentSourcesChangedMessage()
     {
-        await _vm.OnPaymentSourceSavedAsync();
+        _vm.OnPaymentSourceSaved();
 
         _sentMessages.Should().ContainSingle();
     }
+
+    // --- PaymentSourcesChangedMessage ---
+
+    [Fact]
+    public async Task PaymentSourcesChangedMessage_FromElsewhere_ReloadsSources()
+    {
+        await _vm.LoadAsync();
+        ReturnSources(Itau, Inter, Nubank);
+
+        _messenger.Send(new PaymentSourcesChangedMessage());
+
+        _vm.Groups.SelectMany(g => g).Should().Equal(Itau, Inter, Nubank);
+    }
+
+    private void ReturnSources(params PaymentSource[] sources) =>
+        _service.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<PaymentSource>>(sources));
 }

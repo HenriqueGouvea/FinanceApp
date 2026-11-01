@@ -85,8 +85,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 All registrations are in `MauiProgram.cs`:
 - `IDatabaseContext` → Singleton (resolved by `DatabaseContext`)
 - `IFinanceService`, `ICategoryService`, `IPaymentSourceService`, `IPreferencesService` → Singleton
-- `IMessenger` → Singleton (`WeakReferenceMessenger.Default`), used to broadcast `CategoriesChangedMessage` and `PaymentSourcesChangedMessage` so `MainViewModel` refreshes
-- `MainViewModel`, `AddEntryViewModel`, `CategoriesViewModel`, `CategoryEditViewModel`, `PaymentSourcesViewModel`, `PaymentSourceEditViewModel`, `MonthPickerViewModel`, `PartialPaymentViewModel`, `MainPage`, `AddEntryPage`, `CategoriesPage`, `CategoryEditPopup`, `PaymentSourcesPage`, `PaymentSourceEditPopup`, `MonthPickerPopup`, `PartialPaymentPopup` → Transient
+- `AppShell` → Singleton, injected into `App`. Its flyout footer lists the payment source balances (`PaymentSourceBalancesViewModel`)
+- `IMessenger` → Singleton (`WeakReferenceMessenger.Default`), used to broadcast `CategoriesChangedMessage` and `PaymentSourcesChangedMessage` so `MainViewModel` (and every view showing payment sources) refreshes
+- `MainViewModel`, `AddEntryViewModel`, `CategoriesViewModel`, `CategoryEditViewModel`, `PaymentSourcesViewModel`, `PaymentSourceEditViewModel`, `PaymentSourceBalancesViewModel`, `MonthPickerViewModel`, `PartialPaymentViewModel`, `MainPage`, `AddEntryPage`, `CategoriesPage`, `CategoryEditPopup`, `PaymentSourcesPage`, `PaymentSourceEditPopup`, `MonthPickerPopup`, `PartialPaymentPopup` → Transient
 
 Never manually instantiate services or ViewModels. If a new service or VM is added, register it in `MauiProgram.cs`.
 

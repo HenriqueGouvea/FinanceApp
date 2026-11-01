@@ -58,7 +58,7 @@ public partial class PaymentSourcesPage : ContentPage
         vm.SetSaveCallback(async () =>
         {
             await popup.CloseAsync();
-            await _viewModel.OnPaymentSourceSavedAsync();
+            _viewModel.OnPaymentSourceSaved();
         });
 
         await this.ShowPopupAsync(popup);

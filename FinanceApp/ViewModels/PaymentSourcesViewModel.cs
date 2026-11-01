@@ -8,7 +8,7 @@ using System.Collections.ObjectModel;
 
 namespace FinanceApp.ViewModels;
 
-public partial class PaymentSourcesViewModel : ObservableObject
+public partial class PaymentSourcesViewModel : ObservableObject, IRecipient<PaymentSourcesChangedMessage>
 {
     private readonly IPaymentSourceService _paymentSourceService;
     private readonly IMessenger _messenger;
@@ -23,7 +23,11 @@ public partial class PaymentSourcesViewModel : ObservableObject
         _paymentSourceService = paymentSourceService;
         _messenger = messenger;
         Groups.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
+        messenger.Register(this);
     }
+
+    // Sources can also be edited from the hamburger menu while this page is open.
+    public async void Receive(PaymentSourcesChangedMessage message) => await LoadAsync();
 
     [RelayCommand]
     public async Task LoadAsync()
@@ -38,16 +42,13 @@ public partial class PaymentSourcesViewModel : ObservableObject
     public async Task DeleteAsync(PaymentSource source)
     {
         await _paymentSourceService.DeleteAsync(source.Id);
-        _sources.Remove(source);
-        BuildGroups();
         _messenger.Send(new PaymentSourcesChangedMessage());
     }
 
-    public async Task OnPaymentSourceSavedAsync()
-    {
-        await LoadAsync();
-        _messenger.Send(new PaymentSourcesChangedMessage());
-    }
+    /// <summary>
+    /// Notifies every screen showing sources, which reloads this list too.
+    /// </summary>
+    public void OnPaymentSourceSaved() => _messenger.Send(new PaymentSourcesChangedMessage());
 
     private void BuildGroups()
     {
