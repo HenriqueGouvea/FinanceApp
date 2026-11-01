@@ -30,11 +30,15 @@ public class FinanceService : IFinanceService
         var categories = await db.Table<FinancialCategory>().ToListAsync();
         var categoryLookup = categories.ToDictionary(c => c.Id);
 
+        var sources = await db.Table<PaymentSource>().ToListAsync();
+        var sourceLookup = sources.ToDictionary(s => s.Id);
+
         var projections = new List<MonthlyEntryProjection>();
 
         foreach (var template in activeTemplates)
         {
             var category = template.CategoryId is { } categoryId ? categoryLookup.GetValueOrDefault(categoryId) : null;
+            var source = template.PaymentSourceId is { } sourceId ? sourceLookup.GetValueOrDefault(sourceId) : null;
 
             if (physicalLookup.TryGetValue(template.Id, out var record))
             {
@@ -66,7 +70,8 @@ public class FinanceService : IFinanceService
                     IsEstimated: template.IsEstimated,
                     PlannedAmount: plannedAmount,
                     AllowsPartialPayment: template.AllowsPartialPayment,
-                    DueDate: BuildDueDate(template, year, month)
+                    DueDate: BuildDueDate(template, year, month),
+                    PaymentSource: source
                 ));
             }
             else
@@ -84,7 +89,8 @@ public class FinanceService : IFinanceService
                     InstallmentTotalAmount: BuildInstallmentTotal(template),
                     IsEstimated: template.IsEstimated,
                     AllowsPartialPayment: template.AllowsPartialPayment,
-                    DueDate: BuildDueDate(template, year, month)
+                    DueDate: BuildDueDate(template, year, month),
+                    PaymentSource: source
                 ));
             }
         }

@@ -14,6 +14,7 @@ public class FinancialEntryRow
     public int EntryType { get; set; }
     public int? TotalInstallments { get; set; }
     public int? CategoryId { get; set; }
+    public int? PaymentSourceId { get; set; }
     public bool IsEstimated { get; set; }
     public bool AllowsPartialPayment { get; set; }
     public int? DueDay { get; set; }
@@ -47,4 +48,12 @@ public class FinancialCategoryRow
     public string Icon { get; set; } = string.Empty;
     public string Color { get; set; } = string.Empty;
     public int EntryType { get; set; }
+}
+
+public class PaymentSourceRow
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int Type { get; set; }
+    public decimal Balance { get; set; }
 }

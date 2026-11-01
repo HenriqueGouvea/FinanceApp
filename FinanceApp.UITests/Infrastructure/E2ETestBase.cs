@@ -36,4 +36,7 @@ public abstract class E2ETestBase
 
     protected Task<List<FinancialCategoryRow>> GetCategoryRowsAsync() =>
         Session.Database.QueryAsync<FinancialCategoryRow>("SELECT * FROM FinancialCategory");
+
+    protected Task<List<PaymentSourceRow>> GetPaymentSourceRowsAsync() =>
+        Session.Database.QueryAsync<PaymentSourceRow>("SELECT * FROM PaymentSource");
 }

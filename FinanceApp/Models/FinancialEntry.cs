@@ -14,6 +14,7 @@ public class FinancialEntry
     public FinancialEntryType EntryType { get; set; }
     public int? TotalInstallments { get; set; }
     public int? CategoryId { get; set; }
+    public int? PaymentSourceId { get; set; }
     /// <summary>
     /// The amount varies from month to month (e.g. energy bill, supermarket), so it is only an estimate.
     /// </summary>

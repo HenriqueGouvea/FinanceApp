@@ -10,7 +10,9 @@ using System.Globalization;
 
 namespace FinanceApp.ViewModels;
 
-public partial class MainViewModel : ObservableObject, IRecipient<CategoriesChangedMessage>
+public partial class MainViewModel : ObservableObject,
+    IRecipient<CategoriesChangedMessage>,
+    IRecipient<PaymentSourcesChangedMessage>
 {
     private const int MaxMonthsFromToday = 24;
     private const string IncomesExpandedKey = "incomes_expanded";
@@ -54,10 +56,11 @@ public partial class MainViewModel : ObservableObject, IRecipient<CategoriesChan
         _financeService = financeService;
         _preferencesService = preferencesService;
         ShowSwipeHint = preferencesService.Get(ShowSwipeHintKey, true);
-        messenger.Register(this);
+        messenger.RegisterAll(this);
     }
 
     public async void Receive(CategoriesChangedMessage message) => await RefreshAllAsync();
+    public async void Receive(PaymentSourcesChangedMessage message) => await RefreshAllAsync();
 
     [RelayCommand]
     public async Task InitializeAsync()

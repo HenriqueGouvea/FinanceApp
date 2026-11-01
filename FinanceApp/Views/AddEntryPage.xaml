@@ -235,6 +235,16 @@
                     ItemDisplayBinding="{Binding Name, x:DataType=models:FinancialCategory}"
                     SelectedItem="{Binding SelectedCategory}" />
 
+            <!-- Account, card or voucher the entry is paid with ("Pago com") or received in ("Recebido em") -->
+            <VerticalStackLayout Spacing="2">
+                <Label AutomationId="PaymentSourcePickerLabel" Text="{Binding PaymentSourceLabel}" FontSize="12" TextColor="Gray" />
+                <Picker AutomationId="PaymentSourcePicker"
+                        Title="{Binding PaymentSourceLabel}"
+                        ItemsSource="{Binding PaymentSources}"
+                        ItemDisplayBinding="{Binding Name, x:DataType=models:PaymentSource}"
+                        SelectedItem="{Binding SelectedPaymentSource}" />
+            </VerticalStackLayout>
+
             <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,10,0,0">
                 <Button Grid.Column="0" AutomationId="CancelEntryButton" Text="Cancelar" Clicked="OnBackClicked" BackgroundColor="Gray" />
                 <Button Grid.Column="1" AutomationId="SaveEntryButton" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="Purple" />

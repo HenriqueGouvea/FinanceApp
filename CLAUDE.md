@@ -23,7 +23,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **ViewModel tests** (`FinanceApp.Tests/ViewModels/`) — mock `IFinanceService` with NSubstitute. No DB.
 - **E2E tests** (`FinanceApp.UITests/`) — drive the real Android app and assert on UI and the on-device DB. See "E2E tests" below.
 
-**Definition of done:** a feature or bug fix is not complete with unit tests alone. Any change that adds or alters user-visible behaviour (a new screen, popup, gesture, list or label reaction, or a new DB write triggered from the UI) must also add or update E2E tests covering the happy path and the key variations (e.g. each delete scope, each recurrence type). Then build the APK and run the E2E suite (or the affected test classes) before reporting the work as done. Pure service/ViewModel refactors with no UI impact only need unit tests.
+**Definition of done:** a feature or bug fix is not complete with unit tests alone. Any change that adds or alters user-visible behaviour (a new screen, popup, gesture, list or label reaction, or a new DB write triggered from the UI) must also add or update E2E tests covering the happy path and the key variations (e.g. each delete scope, each recurrence type). Then build the APK and run **only the E2E classes that matter** locally before reporting the work as done: the new or changed test classes, plus the existing classes covering screens the change touches (e.g. a new field on the entry page → `AddEntryTests`, `EditEntryTests`). **Never run the full E2E suite locally**: it takes over an hour on the local emulator, which tends to crash on long runs. The full suite runs in CI (`E2E (Android)`) after each merge to `master`. In the PR's Testing section, list which E2E classes ran locally and their pass counts. Pure service/ViewModel refactors with no UI impact only need unit tests.
+
+**Reporting E2E progress:** while a local E2E run is in progress, keep the user posted on how many tests are left, e.g. "10/40 tests pending", updated every 10 minutes. Run `dotnet test` with `--logger "console;verbosity=normal"` so each finished test prints a `Passed`/`Failed` line that can be counted.
 
 **Infrastructure:**
 - `TestDatabaseContext` (`FinanceApp.Tests/Infrastructure/`) — implements `IDatabaseContext` using a GUID-named SQLite in-memory database (`file:{guid}?mode=memory&cache=shared`). The connection is opened once in the constructor and kept alive for the test lifetime.
@@ -42,11 +44,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Run:**
 1. Build the APK (required after any app change; Fast Deployment APKs can't be used): `dotnet build FinanceApp/FinanceApp.csproj -f net10.0-android -c Debug -p:EmbedAssembliesIntoApk=true -o artifacts/e2e-apk`
-2. `dotnet test FinanceApp.UITests/FinanceApp.UITests.csproj` (single class: `--filter "FullyQualifiedName~DeleteEntryTests"`). The full suite takes ~10 minutes.
+2. Run the relevant classes: `dotnet test FinanceApp.UITests/FinanceApp.UITests.csproj --logger "console;verbosity=normal" --filter "FullyQualifiedName~DeleteEntryTests|FullyQualifiedName~EditEntryTests"`. Each test takes ~30 s locally. The full suite (no filter) is for CI only; see "Definition of done".
 
 **Structure:**
-- `Tests/` — one class per feature area (`AddEntryTests`, `EditEntryTests`, `DeleteEntryTests`, `EntryActionsMenuTests`, `EntryStatusTests`, `MonthSummaryTests`, `PartialPaymentTests`, `PartialPaymentFlagTests`, `PaymentRecordsTests`, `OverBudgetTests`, `EstimatedAmountTests`, `DueDateTests`, `MonthNavigationTests`, `SectionToggleTests`, `AlternatingRowsTests`, `CategoryTests`). Each class derives from `E2ETestBase` and must carry `[Collection(E2ECollection.Name)]` and `[Trait("Category", "E2E")]`. Shared arrange steps (e.g. creating the entry under test) go in the constructor.
-- `Pages/` — page objects (`MainPageObject`, `AddEntryPageObject`, `CategoriesPageObject`, `MonthPickerPopupObject`, `PartialPaymentPopupObject`). Tests never call Appium directly; add a page object method instead. User-facing pt-BR texts the tests select by live in `AppLabels`.
+- `Tests/` — one class per feature area (`AddEntryTests`, `EditEntryTests`, `DeleteEntryTests`, `EntryActionsMenuTests`, `EntryStatusTests`, `MonthSummaryTests`, `PartialPaymentTests`, `PartialPaymentFlagTests`, `PaymentRecordsTests`, `OverBudgetTests`, `EstimatedAmountTests`, `DueDateTests`, `MonthNavigationTests`, `SectionToggleTests`, `AlternatingRowsTests`, `CategoryTests`, `PaymentSourceTests`). Each class derives from `E2ETestBase` and must carry `[Collection(E2ECollection.Name)]` and `[Trait("Category", "E2E")]`. Shared arrange steps (e.g. creating the entry under test) go in the constructor.
+- `Pages/` — page objects (`MainPageObject`, `AddEntryPageObject`, `CategoriesPageObject`, `PaymentSourcesPageObject`, `MonthPickerPopupObject`, `PartialPaymentPopupObject`). Tests never call Appium directly; add a page object method instead. User-facing pt-BR texts the tests select by live in `AppLabels`.
 - `Infrastructure/` — `AppSession` (driver, waits, gestures, diagnostics), `DeviceDatabase` + `TableRows` (DB assertions), `AppFormat` (expected money/month/count strings and enum values).
 
 **Rules:**
@@ -82,9 +84,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## DI Registration
 All registrations are in `MauiProgram.cs`:
 - `IDatabaseContext` → Singleton (resolved by `DatabaseContext`)
-- `IFinanceService`, `ICategoryService`, `IPreferencesService` → Singleton
-- `IMessenger` → Singleton (`WeakReferenceMessenger.Default`), used to broadcast `CategoriesChangedMessage` so `MainViewModel` refreshes
-- `MainViewModel`, `AddEntryViewModel`, `CategoriesViewModel`, `CategoryEditViewModel`, `MonthPickerViewModel`, `PartialPaymentViewModel`, `MainPage`, `AddEntryPage`, `CategoriesPage`, `CategoryEditPopup`, `MonthPickerPopup`, `PartialPaymentPopup` → Transient
+- `IFinanceService`, `ICategoryService`, `IPaymentSourceService`, `IPreferencesService` → Singleton
+- `AppShell` → Singleton, injected into `App`. Its flyout footer lists the payment source balances (`PaymentSourceBalancesViewModel`)
+- `IMessenger` → Singleton (`WeakReferenceMessenger.Default`), used to broadcast `CategoriesChangedMessage` and `PaymentSourcesChangedMessage` so `MainViewModel` (and every view showing payment sources) refreshes
+- `MainViewModel`, `AddEntryViewModel`, `CategoriesViewModel`, `CategoryEditViewModel`, `PaymentSourcesViewModel`, `PaymentSourceEditViewModel`, `PaymentSourceBalancesViewModel`, `MonthPickerViewModel`, `PartialPaymentViewModel`, `MainPage`, `AddEntryPage`, `CategoriesPage`, `CategoryEditPopup`, `PaymentSourcesPage`, `PaymentSourceEditPopup`, `MonthPickerPopup`, `PartialPaymentPopup` → Transient
 
 Never manually instantiate services or ViewModels. If a new service or VM is added, register it in `MauiProgram.cs`.
 

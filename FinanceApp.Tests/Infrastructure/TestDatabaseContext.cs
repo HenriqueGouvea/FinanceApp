@@ -19,6 +19,7 @@ public class TestDatabaseContext : IDatabaseContext
         _connection.CreateTableAsync<FinancialMonthlyEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK).Wait();
         _connection.CreateTableAsync<FinancialPayment>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK).Wait();
         _connection.CreateTableAsync<FinancialCategory>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK).Wait();
+        _connection.CreateTableAsync<PaymentSource>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK).Wait();
     }
 
     public Task<SQLiteAsyncConnection> GetConnectionAsync() => Task.FromResult(_connection);

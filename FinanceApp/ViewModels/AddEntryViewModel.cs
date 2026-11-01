@@ -10,6 +10,7 @@ public partial class AddEntryViewModel : ObservableObject
 {
     private readonly IFinanceService _financeService;
     private readonly ICategoryService _categoryService;
+    private readonly IPaymentSourceService _paymentSourceService;
     private Action<FinancialEntry>? _onSaved;
     private DateTime _targetMonth;
     private int _editingEntryId;
@@ -24,6 +25,7 @@ public partial class AddEntryViewModel : ObservableObject
     [ObservableProperty] string description = string.Empty;
     [ObservableProperty] decimal amount;
     [ObservableProperty] FinancialCategory? selectedCategory;
+    [ObservableProperty] PaymentSource? selectedPaymentSource;
     [ObservableProperty] FinancialEntryType entryType = FinancialEntryType.Outcome;
     [ObservableProperty] RecurrenceType? selectedRecurrence;
     [ObservableProperty] int? totalInstallments;
@@ -45,6 +47,7 @@ public partial class AddEntryViewModel : ObservableObject
     public string PaymentsHeader => IsIncome ? "Recebimentos neste mês" : "Pagamentos neste mês";
     public string PartialPaymentLabel => IsIncome ? "Recebimento parcial" : "Pagamento parcial";
     public string PartialPaymentHint => IsIncome ? "Recebido aos poucos durante o mês" : "Pago aos poucos durante o mês, como mercado";
+    public string PaymentSourceLabel => IsIncome ? "Recebido em" : "Pago com";
     public bool HasPayments => Payments.Count > 0;
     /// <summary>
     /// The month's paid amount is only edited for entries paid little by little, or to remove payments recorded before the flag was turned off.
@@ -54,6 +57,7 @@ public partial class AddEntryViewModel : ObservableObject
     public double StructuralFieldsOpacity => IsEditing ? 0.4 : 1.0;
 
     public ObservableCollection<FinancialCategory> Categories { get; } = [];
+    public ObservableCollection<PaymentSource> PaymentSources { get; } = [];
 
     /// <summary>
     /// Partial payments recorded in the month being edited. Deleting one only takes effect on save.
@@ -62,10 +66,11 @@ public partial class AddEntryViewModel : ObservableObject
     public List<RecurrenceType> RecurrenceTypes { get; } = [RecurrenceType.OneTime, RecurrenceType.Recurrent, RecurrenceType.Installments];
     public List<int> DueDays { get; } = [NoDueDay, .. Enumerable.Range(1, 31)];
 
-    public AddEntryViewModel(IFinanceService financeService, ICategoryService categoryService)
+    public AddEntryViewModel(IFinanceService financeService, ICategoryService categoryService, IPaymentSourceService paymentSourceService)
     {
         _financeService = financeService;
         _categoryService = categoryService;
+        _paymentSourceService = paymentSourceService;
         Payments.CollectionChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(HasPayments));
@@ -105,6 +110,7 @@ public partial class AddEntryViewModel : ObservableObject
         OnPropertyChanged(nameof(PaymentsHeader));
         OnPropertyChanged(nameof(PartialPaymentLabel));
         OnPropertyChanged(nameof(PartialPaymentHint));
+        OnPropertyChanged(nameof(PaymentSourceLabel));
         FilterCategories();
     }
 
@@ -114,6 +120,7 @@ public partial class AddEntryViewModel : ObservableObject
         _editingEndDate = null;
         _editingCategoryId = null;
         await LoadCategoriesAsync();
+        await LoadPaymentSourcesAsync();
 
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(StructuralFieldsOpacity));
@@ -123,6 +130,7 @@ public partial class AddEntryViewModel : ObservableObject
         Description = string.Empty;
         Amount = 0;
         SelectedCategory = null;
+        SelectedPaymentSource = null;
         EntryType = FinancialEntryType.Outcome;
         FilterCategories();
         SelectedRecurrence = null;
@@ -145,6 +153,7 @@ public partial class AddEntryViewModel : ObservableObject
         _editingEndDate = entry.EndDate;
         _editingCategoryId = entry.CategoryId;
         await LoadCategoriesAsync();
+        await LoadPaymentSourcesAsync();
 
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(StructuralFieldsOpacity));
@@ -156,6 +165,7 @@ public partial class AddEntryViewModel : ObservableObject
         EntryType = entry.EntryType;
         FilterCategories();
         SelectedCategory = Categories.FirstOrDefault(c => c.Id == entry.CategoryId);
+        SelectedPaymentSource = PaymentSources.FirstOrDefault(s => s.Id == entry.PaymentSourceId);
         SelectedRecurrence = entry.Recurrence;
         TotalInstallments = entry.TotalInstallments;
         IsEstimated = entry.IsEstimated;
@@ -197,6 +207,7 @@ public partial class AddEntryViewModel : ObservableObject
             Description = Description,
             Amount = Amount,
             CategoryId = SelectedCategory?.Id,
+            PaymentSourceId = SelectedPaymentSource?.Id,
             StartDate = new DateTime(_targetMonth.Year, _targetMonth.Month, 1),
             EndDate = _editingEndDate,
             EntryType = EntryType,
@@ -233,6 +244,13 @@ public partial class AddEntryViewModel : ObservableObject
     private async Task LoadCategoriesAsync()
     {
         _allCategories = await _categoryService.GetAllAsync();
+    }
+
+    private async Task LoadPaymentSourcesAsync()
+    {
+        PaymentSources.Clear();
+        foreach (var source in await _paymentSourceService.GetAllAsync())
+            PaymentSources.Add(source);
     }
 
     // The edited entry keeps its category even when it belongs to the other type (data from before the split).

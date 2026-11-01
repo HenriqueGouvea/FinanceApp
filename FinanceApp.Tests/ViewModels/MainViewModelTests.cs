@@ -198,6 +198,17 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task PaymentSourcesChangedMessage_ReloadsNearbyMonths()
+    {
+        await _vm.InitializeAsync();
+        _service.ClearReceivedCalls();
+
+        _messenger.Send(new PaymentSourcesChangedMessage());
+
+        await _service.Received(5).GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>());
+    }
+
+    [Fact]
     public async Task ClearDatabaseAsync_CallsClearAllData()
     {
         await _vm.InitializeAsync();
