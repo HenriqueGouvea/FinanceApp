@@ -112,8 +112,51 @@
                     </Entry>
                 </VerticalStackLayout>
 
+                <!-- Credit cards only: the bill groups the month's card outcomes, due on one day and paid by a bank account -->
+                <VerticalStackLayout AutomationId="CreditCardBillFields" Spacing="10" IsVisible="{Binding IsCreditCard}">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="Vencimento da fatura" FontSize="12" TextColor="Gray" />
+                        <Picker AutomationId="BillDueDayPicker"
+                                Title="Vencimento da fatura"
+                                ItemsSource="{Binding BillDueDays}"
+                                ItemDisplayBinding="{Binding ., Converter={x:Static converters:DueDayToLabelConverter.Instance}, x:DataType=x:Int32}"
+                                SelectedItem="{Binding BillDueDay}" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="Fatura paga com" FontSize="12" TextColor="Gray" />
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6" IsVisible="{Binding HasBillPaymentAccounts}">
+                            <Picker AutomationId="BillPaymentAccountPicker"
+                                    Title="Fatura paga com"
+                                    ItemsSource="{Binding BillPaymentAccounts}"
+                                    ItemDisplayBinding="{Binding Name, x:DataType=models:PaymentSource}"
+                                    SelectedItem="{Binding BillPaymentAccount}" />
+                            <Button Grid.Column="1"
+                                    AutomationId="ClearBillPaymentAccountButton"
+                                    Text="✕"
+                                    FontSize="14"
+                                    Padding="0"
+                                    WidthRequest="36"
+                                    HeightRequest="36"
+                                    BackgroundColor="Transparent"
+                                    TextColor="Gray"
+                                    Command="{Binding ClearBillPaymentAccountCommand}"
+                                    IsVisible="{Binding HasBillPaymentAccount}" />
+                        </Grid>
+                        <Label AutomationId="NoBillPaymentAccountsLabel"
+                               Text="Cadastre uma conta bancária para escolher qual paga a fatura."
+                               FontSize="12"
+                               TextColor="Gray"
+                               IsVisible="{Binding HasBillPaymentAccounts, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
+                    </VerticalStackLayout>
+
+                    <Label Text="Os lançamentos pagos com este cartão de crédito aparecem juntos na fatura do mês, com um só vencimento."
+                           FontSize="11"
+                           TextColor="Gray" />
+                </VerticalStackLayout>
+
                 <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,10,0,0">
-                    <Button Grid.Column="0" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />
+                    <Button Grid.Column="0" AutomationId="CancelPaymentSourceButton" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />
                     <Button Grid.Column="1" AutomationId="SavePaymentSourceButton" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="Purple" />
                 </Grid>
             </VerticalStackLayout>

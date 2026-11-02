@@ -140,6 +140,79 @@ public class PaymentSourceServiceTests
         (await _financeService.GetEntryByIdAsync(rent.Id))!.PaymentSourceId.Should().Be(account.Id);
     }
 
+    // --- Credit card bill ---
+
+    [Fact]
+    public async Task SaveAsync_CreditCard_PersistsBillDueDayAndPaymentAccount()
+    {
+        var account = new PaymentSource { Name = "Itaú", Type = PaymentSourceType.BankAccount };
+        await _service.SaveAsync(account);
+        var card = new PaymentSource { Name = "Nubank", Type = PaymentSourceType.CreditCard, BillDueDay = 10, BillPaymentSourceId = account.Id };
+
+        await _service.SaveAsync(card);
+
+        var stored = (await _service.GetAllAsync()).Single(s => s.Id == card.Id);
+        stored.BillDueDay.Should().Be(10);
+        stored.BillPaymentSourceId.Should().Be(account.Id);
+    }
+
+    [Theory]
+    [InlineData(PaymentSourceType.BankAccount)]
+    [InlineData(PaymentSourceType.MealVoucher)]
+    public async Task SaveAsync_NotACreditCard_ClearsBillFields(PaymentSourceType type)
+    {
+        var source = new PaymentSource { Name = "Itaú", Type = type, BillDueDay = 10, BillPaymentSourceId = 99 };
+
+        await _service.SaveAsync(source);
+
+        var stored = (await _service.GetAllAsync()).Single();
+        stored.BillDueDay.Should().BeNull();
+        stored.BillPaymentSourceId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SaveAsync_AccountTurnedIntoVoucher_NoLongerPaysCardBills()
+    {
+        var account = new PaymentSource { Name = "Itaú", Type = PaymentSourceType.BankAccount };
+        await _service.SaveAsync(account);
+        var card = new PaymentSource { Name = "Nubank", Type = PaymentSourceType.CreditCard, BillPaymentSourceId = account.Id };
+        await _service.SaveAsync(card);
+
+        account.Type = PaymentSourceType.MealVoucher;
+        await _service.SaveAsync(account);
+
+        (await _service.GetAllAsync()).Single(s => s.Id == card.Id).BillPaymentSourceId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SaveAsync_AccountRenamed_KeepsPayingCardBills()
+    {
+        var account = new PaymentSource { Name = "Itaú", Type = PaymentSourceType.BankAccount };
+        await _service.SaveAsync(account);
+        var card = new PaymentSource { Name = "Nubank", Type = PaymentSourceType.CreditCard, BillPaymentSourceId = account.Id };
+        await _service.SaveAsync(card);
+
+        account.Name = "Itaú Personnalité";
+        await _service.SaveAsync(account);
+
+        (await _service.GetAllAsync()).Single(s => s.Id == card.Id).BillPaymentSourceId.Should().Be(account.Id);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_AccountPayingCardBills_UnlinksTheCards()
+    {
+        var account = new PaymentSource { Name = "Itaú", Type = PaymentSourceType.BankAccount };
+        await _service.SaveAsync(account);
+        var card = new PaymentSource { Name = "Nubank", Type = PaymentSourceType.CreditCard, BillDueDay = 10, BillPaymentSourceId = account.Id };
+        await _service.SaveAsync(card);
+
+        await _service.DeleteAsync(account.Id);
+
+        var stored = (await _service.GetAllAsync()).Single();
+        stored.BillPaymentSourceId.Should().BeNull();
+        stored.BillDueDay.Should().Be(10);
+    }
+
     private static FinancialEntry MakeEntry(string description, int? paymentSourceId) => new()
     {
         Description = description,

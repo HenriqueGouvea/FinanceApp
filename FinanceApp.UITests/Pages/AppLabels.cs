@@ -82,6 +82,13 @@ public static class AppLabels
     public const string DueToday = "Vence hoje";
     public static string DueDay(int day) => $"Dia {day}";
 
+    public const string MarkBillPaid = "Pagar fatura";
+    public const string BillPaid = "Paga";
+    public static string BillName(string card) => $"💳 Fatura {card}";
+    public static string BillAccount(string account) => $"Débito em {account}";
+    public const string CreditCardBillDueHint = "Vence com a fatura do cartão de crédito";
+    public static string CreditCardBillDueHintFor(int day) => $"Vence com a fatura do cartão de crédito (dia {day})";
+
     public const string GoToCurrentMonthBackward = "‹ Mês atual";
     public const string GoToCurrentMonthForward = "Mês atual ›";
     public const string SwipeHint = "Toque no mês para escolher ou deslize para os lados";

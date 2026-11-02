@@ -19,6 +19,12 @@ public interface IFinanceService
     Task SetEntryStatusAsync(int entryId, int year, int month, FinancialMonthlyEntryStatus status);
 
     /// <summary>
+    /// Sets the status of every outcome on a credit card's bill for a single month, with the same rules as
+    /// <see cref="SetEntryStatusAsync"/>: paying the bill settles all of its entries, pending resets them.
+    /// </summary>
+    Task SetCreditCardBillStatusAsync(int cardId, int year, int month, FinancialMonthlyEntryStatus status);
+
+    /// <summary>
     /// Records how much of the entry was already paid (or received) in a single month: partially paid while above zero,
     /// even past the planned amount, since only <see cref="SetEntryStatusAsync"/> settles a month. A settled month stays
     /// paid unless the new total is below its planned amount. Clearing it (zero) reverts to pending and removes the

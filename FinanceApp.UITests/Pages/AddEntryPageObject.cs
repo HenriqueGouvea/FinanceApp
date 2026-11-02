@@ -20,6 +20,7 @@ public class AddEntryPageObject
     private static readonly By InstallmentsTotal = AppSession.AutomationId("InstallmentsTotalLabel");
     private const string CategoryPickerId = "CategoryPicker";
     private const string DueDayPickerId = "DueDayPicker";
+    private const string CreditCardBillDueHintId = "CreditCardBillDueHintLabel";
     private const string PaymentSourcePickerId = "PaymentSourcePicker";
     private const string PaymentSourcePickerLabelId = "PaymentSourcePickerLabel";
     private const string EstimatedSwitchId = "EstimatedSwitch";
@@ -272,6 +273,13 @@ public class AddEntryPageObject
     }
 
     public string DueDayText => _session.ScrollTo(DueDayPickerId).Text;
+
+    public bool IsDueDayPickerVisible => _session.TryScrollTo(DueDayPickerId) is not null;
+
+    /// <summary>
+    /// The line shown instead of the due day picker for an outcome paid with a credit card, or null when not shown.
+    /// </summary>
+    public string? CreditCardBillDueHintText => _session.TryScrollTo(CreditCardBillDueHintId)?.Text;
 
     /// <summary>
     /// Picks a due day (1–31), or <see cref="AppLabels.NoDueDay"/> when null. The options outgrow the dialog, so it is scrolled.

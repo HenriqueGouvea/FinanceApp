@@ -1223,7 +1223,184 @@ public class FinanceServiceTests
             .Should().ContainSingle().Which.FinancialEntryId.Should().Be(kept.Id);
     }
 
-    private async Task<FinancialEntry> SaveTemplateAsync(RecurrenceType recurrence, int? totalInstallments = null, int? dueDay = null)
+    // --- Credit card bill ---
+
+    [Fact]
+    public async Task GetMergedEntries_OutcomeOnCreditCard_FallsDueWithTheBillInsteadOfItsOwnDueDay()
+    {
+        var card = await SaveCardAsync(billDueDay: 10);
+        await SaveTemplateAsync(RecurrenceType.Recurrent, dueDay: 25, paymentSourceId: card.Id);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.IsOnCreditCardBill.Should().BeTrue();
+        projection.DueDate.Should().Be(new DateTime(2026, 4, 10, 0, 0, 0, DateTimeKind.Local));
+        projection.ShowsDueDate.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_CreditCardWithoutBillDueDay_OutcomeHasNoDueDate()
+    {
+        var card = await SaveCardAsync();
+        await SaveTemplateAsync(RecurrenceType.Recurrent, dueDay: 25, paymentSourceId: card.Id);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.DueDate.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_BillDueDayPastEndOfMonth_FallsOnLastDay()
+    {
+        var card = await SaveCardAsync(billDueDay: 31);
+        await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.DueDate.Should().Be(new DateTime(2026, 4, 30, 0, 0, 0, DateTimeKind.Local));
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_OutcomeOnCreditCard_ResolvesBillPaymentAccount()
+    {
+        var account = new PaymentSource { Name = "Itaú", Type = PaymentSourceType.BankAccount };
+        await new PaymentSourceService(_context).SaveAsync(account);
+        var card = await SaveCardAsync(billPaymentSourceId: account.Id);
+        await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.BillPaymentAccount!.Name.Should().Be("Itaú");
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_IncomeOnCreditCard_KeepsItsOwnDueDateAndIsNotOnTheBill()
+    {
+        var card = await SaveCardAsync(billDueDay: 10);
+        var refund = await SaveTemplateAsync(RecurrenceType.Recurrent, dueDay: 25, paymentSourceId: card.Id);
+        refund.EntryType = FinancialEntryType.Income;
+        await _service.SaveEntryAsync(refund);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.IsOnCreditCardBill.Should().BeFalse();
+        projection.DueDate.Should().Be(new DateTime(2026, 4, 25, 0, 0, 0, DateTimeKind.Local));
+        projection.BillPaymentAccount.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_OutcomeOnBankAccount_KeepsItsOwnDueDate()
+    {
+        var account = new PaymentSource { Name = "Itaú", Type = PaymentSourceType.BankAccount };
+        await new PaymentSourceService(_context).SaveAsync(account);
+        await SaveTemplateAsync(RecurrenceType.Recurrent, dueDay: 25, paymentSourceId: account.Id);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.IsOnCreditCardBill.Should().BeFalse();
+        projection.DueDate.Should().Be(new DateTime(2026, 4, 25, 0, 0, 0, DateTimeKind.Local));
+    }
+
+    [Fact]
+    public async Task SetCreditCardBillStatusAsync_Paid_PaysEveryOutcomeOnTheCardThatMonth()
+    {
+        var card = await SaveCardAsync();
+        var netflix = await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+        var market = await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+
+        await _service.SetCreditCardBillStatusAsync(card.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        var entries = await _service.GetMergedEntriesForMonthAsync(2026, 4);
+        entries.Should().OnlyContain(e => e.IsPaid);
+        entries.Select(e => e.FinancialEntryId).Should().BeEquivalentTo([netflix.Id, market.Id]);
+    }
+
+    [Fact]
+    public async Task SetCreditCardBillStatusAsync_Paid_LeavesOtherCardsAccountsAndMonthsPending()
+    {
+        var card = await SaveCardAsync();
+        var otherCard = await SaveCardAsync();
+        await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+        var onOtherCard = await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: otherCard.Id);
+        var unlinked = await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        await _service.SetCreditCardBillStatusAsync(card.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        var april = await _service.GetMergedEntriesForMonthAsync(2026, 4);
+        april.Single(e => e.FinancialEntryId == onOtherCard.Id).IsPending.Should().BeTrue();
+        april.Single(e => e.FinancialEntryId == unlinked.Id).IsPending.Should().BeTrue();
+        (await _service.GetMergedEntriesForMonthAsync(2026, 5)).Should().OnlyContain(e => e.IsPending);
+    }
+
+    [Fact]
+    public async Task SetCreditCardBillStatusAsync_Paid_DoesNotPayIncomesOnTheCard()
+    {
+        var card = await SaveCardAsync();
+        var refund = await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+        refund.EntryType = FinancialEntryType.Income;
+        await _service.SaveEntryAsync(refund);
+
+        await _service.SetCreditCardBillStatusAsync(card.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single().IsPending.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SetCreditCardBillStatusAsync_Paid_SettlesPartiallyPaidEntriesKeepingTheirPayments()
+    {
+        var card = await SaveCardAsync();
+        var market = await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+        await _service.AddPaymentAsync(market.Id, 2026, 4, 40m, AprilTenth, string.Empty);
+
+        await _service.SetCreditCardBillStatusAsync(card.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+        projection.IsPaid.Should().BeTrue();
+        projection.PaidAmount.Should().Be(100m);
+        (await _service.GetPaymentsAsync(market.Id, 2026, 4)).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task SetCreditCardBillStatusAsync_Pending_ResetsEveryOutcomeOnTheCard()
+    {
+        var card = await SaveCardAsync();
+        var netflix = await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+        var market = await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+        await _service.SetEntryStatusAsync(netflix.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+        await _service.AddPaymentAsync(market.Id, 2026, 4, 40m, AprilTenth, string.Empty);
+
+        await _service.SetCreditCardBillStatusAsync(card.Id, 2026, 4, FinancialMonthlyEntryStatus.Pending);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Should().OnlyContain(e => e.IsPending && e.PaidAmount == 0);
+        (await _service.GetPaymentsAsync(market.Id, 2026, 4)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SetCreditCardBillStatusAsync_SkipsEntriesCancelledThatMonth()
+    {
+        var card = await SaveCardAsync();
+        var netflix = await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+        await _service.DeleteEntryAsync(netflix.Id, 2026, 4, EntryDeleteScope.ThisMonth);
+
+        await _service.SetCreditCardBillStatusAsync(card.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Should().BeEmpty();
+    }
+
+    private async Task<PaymentSource> SaveCardAsync(int? billDueDay = null, int? billPaymentSourceId = null)
+    {
+        var card = new PaymentSource
+        {
+            Name = "Nubank",
+            Type = PaymentSourceType.CreditCard,
+            BillDueDay = billDueDay,
+            BillPaymentSourceId = billPaymentSourceId
+        };
+        await new PaymentSourceService(_context).SaveAsync(card);
+        return card;
+    }
+
+    private async Task<FinancialEntry> SaveTemplateAsync(RecurrenceType recurrence, int? totalInstallments = null, int? dueDay = null, int? paymentSourceId = null)
     {
         var entry = new FinancialEntry
         {
@@ -1233,7 +1410,8 @@ public class FinanceServiceTests
             Recurrence = recurrence,
             TotalInstallments = totalInstallments,
             EntryType = FinancialEntryType.Outcome,
-            DueDay = dueDay
+            DueDay = dueDay,
+            PaymentSourceId = paymentSourceId
         };
         await _service.SaveEntryAsync(entry);
         return entry;

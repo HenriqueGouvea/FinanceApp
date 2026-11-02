@@ -625,6 +625,97 @@ public class AddEntryViewModelTests
         await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Id == entry.Id && e.DueDay == null));
     }
 
+    // --- Credit card bill ---
+
+    [Fact]
+    public void IsOnCreditCardBill_OutcomePaidWithCreditCard_IsTrue()
+    {
+        _vm.SelectedPaymentSource = Card;
+
+        _vm.IsOnCreditCardBill.Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsOnCreditCardBill_OutcomePaidWithBankAccount_IsFalse()
+    {
+        _vm.SelectedPaymentSource = Checking;
+
+        _vm.IsOnCreditCardBill.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsOnCreditCardBill_IncomeReceivedOnCreditCard_IsFalse()
+    {
+        _vm.SelectedPaymentSource = Card;
+
+        _vm.SelectIncomeCommand.Execute(null);
+
+        _vm.IsOnCreditCardBill.Should().BeFalse();
+    }
+
+    [Fact]
+    public void SelectedPaymentSource_Changed_RaisesIsOnCreditCardBillChanged()
+    {
+        var changed = new List<string?>();
+        _vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        _vm.SelectedPaymentSource = Card;
+
+        changed.Should().Contain([nameof(AddEntryViewModel.IsOnCreditCardBill), nameof(AddEntryViewModel.CreditCardBillDueHint)]);
+    }
+
+    [Fact]
+    public void EntryType_Changed_RaisesIsOnCreditCardBillChanged()
+    {
+        var changed = new List<string?>();
+        _vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        _vm.SelectIncomeCommand.Execute(null);
+
+        changed.Should().Contain(nameof(AddEntryViewModel.IsOnCreditCardBill));
+    }
+
+    [Fact]
+    public void CreditCardBillDueHint_CardWithBillDueDay_ShowsTheDay()
+    {
+        _vm.SelectedPaymentSource = new PaymentSource { Id = 5, Name = "Visa", Type = PaymentSourceType.CreditCard, BillDueDay = 10 };
+
+        _vm.CreditCardBillDueHint.Should().Be("Vence com a fatura do cartão de crédito (dia 10)");
+    }
+
+    [Fact]
+    public void CreditCardBillDueHint_CardWithoutBillDueDay_OmitsTheDay()
+    {
+        _vm.SelectedPaymentSource = Card;
+
+        _vm.CreditCardBillDueHint.Should().Be("Vence com a fatura do cartão de crédito");
+    }
+
+    [Fact]
+    public async Task SaveCommand_OutcomeOnCreditCard_SavesNullDueDay()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Recurrent;
+        _vm.SelectedDueDay = 10;
+        _vm.SelectedPaymentSource = Card;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.DueDay == null && e.PaymentSourceId == Card.Id));
+    }
+
+    [Fact]
+    public async Task SaveCommand_IncomeOnCreditCard_KeepsDueDay()
+    {
+        _vm.SelectIncomeCommand.Execute(null);
+        _vm.SelectedRecurrence = RecurrenceType.Recurrent;
+        _vm.SelectedDueDay = 10;
+        _vm.SelectedPaymentSource = Card;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.DueDay == 10));
+    }
+
     // --- Partial payment flag ---
 
     [Fact]

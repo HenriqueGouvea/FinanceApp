@@ -45,7 +45,7 @@ public partial class AppShell : Shell
             ?? throw new InvalidOperationException("PaymentSourceEditPopup not found.");
         var vm = (PaymentSourceEditViewModel)popup.BindingContext;
 
-        vm.PrepareForEdit(source);
+        await vm.PrepareForEditAsync(source);
         vm.SetSaveCallback(async () =>
         {
             await popup.CloseAsync();

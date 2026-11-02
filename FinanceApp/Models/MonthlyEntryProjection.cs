@@ -20,6 +20,7 @@ namespace FinanceApp.Models;
 /// <param name="AllowsPartialPayment">True when the template accepts partial payments.</param>
 /// <param name="DueDate">The day the entry falls due in the month, or null when it has no due date.</param>
 /// <param name="PaymentSource">The account or card the entry is paid with (or received in), or null when not linked.</param>
+/// <param name="BillPaymentAccount">For an outcome paid with a credit card, the bank account that pays the card's bill, or null when not set.</param>
 public record MonthlyEntryProjection(
     int FinancialEntryId,
     int? FinancialMonthlyEntryId,
@@ -36,7 +37,8 @@ public record MonthlyEntryProjection(
     decimal? PlannedAmount = null,
     bool AllowsPartialPayment = false,
     DateTime? DueDate = null,
-    PaymentSource? PaymentSource = null
+    PaymentSource? PaymentSource = null,
+    PaymentSource? BillPaymentAccount = null
 )
 {
     /// <summary>
@@ -45,6 +47,14 @@ public record MonthlyEntryProjection(
     public bool IsAlternateRow { get; init; }
     public bool HasDueDate => DueDate is not null;
     public bool HasPaymentSource => PaymentSource is not null;
+    /// <summary>
+    /// An outcome paid with a credit card: it is grouped under the card's bill and falls due with it.
+    /// </summary>
+    public bool IsOnCreditCardBill => EntryType == FinancialEntryType.Outcome && PaymentSource?.Type == PaymentSourceType.CreditCard;
+    /// <summary>
+    /// Entries on a credit card bill don't repeat the due date: the bill row shows it.
+    /// </summary>
+    public bool ShowsDueDate => HasDueDate && !IsOnCreditCardBill;
     /// <summary>
     /// Falls due today and is still unpaid (or not fully received), so the row highlights it.
     /// </summary>

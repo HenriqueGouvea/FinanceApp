@@ -9,26 +9,30 @@ namespace FinanceApp.Tests.ViewModels;
 
 public class PaymentSourceEditViewModelTests
 {
+    private static readonly PaymentSource Checking = new() { Id = 1, Name = "Itaú", Type = PaymentSourceType.BankAccount };
+    private static readonly PaymentSource Savings = new() { Id = 2, Name = "Inter", Type = PaymentSourceType.BankAccount };
+    private static readonly PaymentSource Card = new() { Id = 3, Name = "Visa", Type = PaymentSourceType.CreditCard };
+
     private readonly IPaymentSourceService _service;
     private readonly PaymentSourceEditViewModel _vm;
 
     public PaymentSourceEditViewModelTests()
     {
         _service = Substitute.For<IPaymentSourceService>();
+        _service.GetAllAsync().Returns([Checking, Savings, Card]);
         _vm = new PaymentSourceEditViewModel(_service);
-        _vm.Prepare();
     }
 
     // --- Prepare ---
 
     [Fact]
-    public void Prepare_ResetsFieldsToBankAccountWithZeroBalance()
+    public async Task Prepare_ResetsFieldsToBankAccountWithZeroBalance()
     {
         _vm.Name = "Old";
         _vm.Type = PaymentSourceType.CreditCard;
         _vm.Balance = 300m;
 
-        _vm.Prepare();
+        await _vm.PrepareAsync();
 
         _vm.Name.Should().BeEmpty();
         _vm.Type.Should().Be(PaymentSourceType.BankAccount);
@@ -39,9 +43,9 @@ public class PaymentSourceEditViewModelTests
     [Fact]
     public async Task Prepare_AfterEdit_SavesAsNewSource()
     {
-        _vm.PrepareForEdit(MakeSource());
+        await _vm.PrepareForEditAsync(MakeSource());
 
-        _vm.Prepare();
+        await _vm.PrepareAsync();
         _vm.Name = "Inter";
         await _vm.SaveCommand.ExecuteAsync(null);
 
@@ -51,9 +55,9 @@ public class PaymentSourceEditViewModelTests
     // --- PrepareForEdit ---
 
     [Fact]
-    public void PrepareForEdit_SetsAllFieldsFromSource()
+    public async Task PrepareForEdit_SetsAllFieldsFromSource()
     {
-        _vm.PrepareForEdit(MakeSource());
+        await _vm.PrepareForEditAsync(MakeSource());
 
         _vm.Name.Should().Be("Nubank");
         _vm.Type.Should().Be(PaymentSourceType.CreditCard);
@@ -64,7 +68,7 @@ public class PaymentSourceEditViewModelTests
     [Fact]
     public async Task PrepareForEdit_SaveKeepsSourceId()
     {
-        _vm.PrepareForEdit(MakeSource());
+        await _vm.PrepareForEditAsync(MakeSource());
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
@@ -146,11 +150,114 @@ public class PaymentSourceEditViewModelTests
         invoked.Should().BeTrue();
     }
 
-    private static PaymentSource MakeSource() => new()
+    // --- Credit card bill ---
+
+    [Fact]
+    public async Task PrepareAsync_LoadsOnlyBankAccountsAsBillPaymentAccounts()
+    {
+        await _vm.PrepareAsync();
+
+        _vm.BillPaymentAccounts.Should().Equal(Checking, Savings);
+        _vm.HasBillPaymentAccounts.Should().BeTrue();
+        _vm.BillPaymentAccount.Should().BeNull();
+        _vm.BillDueDay.Should().Be(AddEntryViewModel.NoDueDay);
+    }
+
+    [Fact]
+    public async Task PrepareAsync_NoBankAccounts_HasNoBillPaymentAccounts()
+    {
+        _service.GetAllAsync().Returns([Card]);
+
+        await _vm.PrepareAsync();
+
+        _vm.HasBillPaymentAccounts.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PrepareForEditAsync_CreditCard_SelectsItsBillDueDayAndPaymentAccount()
+    {
+        await _vm.PrepareForEditAsync(MakeSource(billDueDay: 10, billPaymentSourceId: Savings.Id));
+
+        _vm.BillDueDay.Should().Be(10);
+        _vm.BillPaymentAccount.Should().Be(Savings);
+        _vm.HasBillPaymentAccount.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task PrepareForEditAsync_BankAccount_IsNotOfferedToPayItsOwnBill()
+    {
+        await _vm.PrepareForEditAsync(Checking);
+
+        _vm.BillPaymentAccounts.Should().Equal(Savings);
+    }
+
+    [Theory]
+    [InlineData(PaymentSourceType.BankAccount, false)]
+    [InlineData(PaymentSourceType.CreditCard, true)]
+    [InlineData(PaymentSourceType.MealVoucher, false)]
+    public void IsCreditCard_FollowsType(PaymentSourceType type, bool expected)
+    {
+        _vm.SelectTypeCommand.Execute(type);
+
+        _vm.IsCreditCard.Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task SaveCommand_CreditCard_PassesBillDueDayAndPaymentAccount()
+    {
+        await _vm.PrepareAsync();
+        _vm.Name = "Visa";
+        _vm.SelectTypeCommand.Execute(PaymentSourceType.CreditCard);
+        _vm.BillDueDay = 15;
+        _vm.BillPaymentAccount = Checking;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveAsync(Arg.Is<PaymentSource>(s =>
+            s.BillDueDay == 15 && s.BillPaymentSourceId == Checking.Id));
+    }
+
+    [Fact]
+    public async Task SaveCommand_CreditCardWithoutBillDueDay_SavesNullDueDay()
+    {
+        await _vm.PrepareAsync();
+        _vm.Name = "Visa";
+        _vm.SelectTypeCommand.Execute(PaymentSourceType.CreditCard);
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveAsync(Arg.Is<PaymentSource>(s => s.BillDueDay == null && s.BillPaymentSourceId == null));
+    }
+
+    [Fact]
+    public async Task SaveCommand_ChangedFromCreditCardToBankAccount_DropsBillFields()
+    {
+        await _vm.PrepareForEditAsync(MakeSource(billDueDay: 10, billPaymentSourceId: Checking.Id));
+        _vm.SelectTypeCommand.Execute(PaymentSourceType.BankAccount);
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveAsync(Arg.Is<PaymentSource>(s => s.BillDueDay == null && s.BillPaymentSourceId == null));
+    }
+
+    [Fact]
+    public async Task ClearBillPaymentAccountCommand_UnselectsAccount()
+    {
+        await _vm.PrepareForEditAsync(MakeSource(billPaymentSourceId: Checking.Id));
+
+        _vm.ClearBillPaymentAccountCommand.Execute(null);
+
+        _vm.BillPaymentAccount.Should().BeNull();
+        _vm.HasBillPaymentAccount.Should().BeFalse();
+    }
+
+    private static PaymentSource MakeSource(int? billDueDay = null, int? billPaymentSourceId = null) => new()
     {
         Id = 9,
         Name = "Nubank",
         Type = PaymentSourceType.CreditCard,
-        Balance = 5000m
+        Balance = 5000m,
+        BillDueDay = billDueDay,
+        BillPaymentSourceId = billPaymentSourceId
     };
 }

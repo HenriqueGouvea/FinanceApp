@@ -47,7 +47,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 2. Run the relevant classes: `dotnet test FinanceApp.UITests/FinanceApp.UITests.csproj --logger "console;verbosity=normal" --filter "FullyQualifiedName~DeleteEntryTests|FullyQualifiedName~EditEntryTests"`. Each test takes ~30 s locally. The full suite (no filter) is for CI only; see "Definition of done".
 
 **Structure:**
-- `Tests/` — one class per feature area (`AddEntryTests`, `EditEntryTests`, `DeleteEntryTests`, `EntryActionsMenuTests`, `EntryStatusTests`, `MonthSummaryTests`, `PartialPaymentTests`, `PartialPaymentFlagTests`, `PaymentRecordsTests`, `OverBudgetTests`, `EstimatedAmountTests`, `DueDateTests`, `MonthNavigationTests`, `SectionToggleTests`, `AlternatingRowsTests`, `CategoryTests`, `PaymentSourceTests`, `AppLockTests`, `SetupTests`, `SettingsTests`). Each class derives from `E2ETestBase` (which skips the first-run setup wizard unless constructed with `skipSetup: false`) and must carry `[Collection(E2ECollection.Name)]` and `[Trait("Category", "E2E")]`. Shared arrange steps (e.g. creating the entry under test) go in the constructor.
+- `Tests/` — one class per feature area (`AddEntryTests`, `EditEntryTests`, `DeleteEntryTests`, `EntryActionsMenuTests`, `EntryStatusTests`, `MonthSummaryTests`, `PartialPaymentTests`, `PartialPaymentFlagTests`, `PaymentRecordsTests`, `OverBudgetTests`, `EstimatedAmountTests`, `DueDateTests`, `MonthNavigationTests`, `SectionToggleTests`, `AlternatingRowsTests`, `CategoryTests`, `PaymentSourceTests`, `CreditCardBillTests`, `AppLockTests`, `SetupTests`, `SettingsTests`). Each class derives from `E2ETestBase` (which skips the first-run setup wizard unless constructed with `skipSetup: false`) and must carry `[Collection(E2ECollection.Name)]` and `[Trait("Category", "E2E")]`. Shared arrange steps (e.g. creating the entry under test) go in the constructor.
 - `Pages/` — page objects (`MainPageObject`, `AddEntryPageObject`, `CategoriesPageObject`, `PaymentSourcesPageObject`, `MonthPickerPopupObject`, `PartialPaymentPopupObject`, `SecurityPageObject`, `PinPageObject`, `SetupPageObject`, `SettingsPageObject`). Tests never call Appium directly; add a page object method instead. User-facing pt-BR texts the tests select by live in `AppLabels`.
 - `Infrastructure/` — `AppSession` (driver, waits, gestures, diagnostics), `DeviceDatabase` + `TableRows` (DB assertions), `AppFormat` (expected money/month/count strings and enum values).
 
@@ -73,7 +73,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Structure
 - **Data/:** `DatabaseContext.cs` — SQLite singleton connection + table creation via `GetConnectionAsync()`. `IDatabaseContext` is the interface used for DI and test substitution.
-- **Models/:** Clean POCOs (no persistence attributes). `FinancialEntry` is the template/parent; `FinancialMonthlyEntry` is the physical override; `FinancialPayment` is one partial payment recorded against a `FinancialMonthlyEntry`; `MonthlyEntryProjection` is the non-persisted read model returned to ViewModels.
+- **Models/:** Clean POCOs (no persistence attributes). `FinancialEntry` is the template/parent; `FinancialMonthlyEntry` is the physical override; `FinancialPayment` is one partial payment recorded against a `FinancialMonthlyEntry`; `MonthlyEntryProjection` is the non-persisted read model returned to ViewModels; `CreditCardBill` is the non-persisted read model grouping a month's outcomes paid with one credit card.
 - **Services/:** All DB access is mediated by `IFinanceService` / `FinanceService`. Business logic lives here, not in ViewModels.
 - **ViewModels/:** UI state only. Depend on `IFinanceService` via constructor injection.
 - **Views/:** XAML pages and `CommunityToolkit.Maui.Views.Popup` subclasses.
@@ -139,7 +139,7 @@ SQLite (FinanceDataV3.db3)
   - `Installments`: Fixed number of payments spread over N months.
   - `Recurrent`: Monthly recurring entries without a fixed end date.
 - **Payment source terminology (pt-BR UI):** a `PaymentSource` of type `CreditCard` is always shown as "Cartão de crédito", never just "Cartão": bank accounts come with a (debit) card too, so "Cartão" alone doesn't tell them apart. Bank accounts are "Conta" / "Conta bancária", meal vouchers "Vale".
-- **Credit card bill (planned):** a credit card will have its bill due date and the bank account that pays the bill on that date. This link is the core of the credit card control (see `ROADMAP.md`).
+- **Credit card bill:** a credit card has a bill due day (`PaymentSource.BillDueDay`) and the bank account that pays it (`BillPaymentSourceId`). Each month, the outcomes paid with the card are grouped under its bill (`CreditCardBill`, built in `MonthViewModel`), fall due on the bill's day instead of their own `DueDay`, and are paid together with "Pagar fatura" (`IFinanceService.SetCreditCardBillStatusAsync`). The bill never adds to the month's totals: its entries are already counted. Balances don't move with payments yet (see `ROADMAP.md`).
 - **Future Roadmap:** Transitioning to a distributed architecture (Web App + MAUI) consuming a centralized Web API. Logic must be decoupled from local storage to facilitate this migration.
 
 ## Domain Model Reference (Vision)

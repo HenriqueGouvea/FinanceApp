@@ -56,7 +56,7 @@ public partial class MainPage : ContentPage
 
         if (BindingContext is not MainViewModel mainVm) return;
 
-        if (mainVm.SelectedMonth is { RevealedEntryId: not null } month)
+        if (mainVm.SelectedMonth is { } month && (month.RevealedEntryId is not null || month.RevealedBillCardId is not null))
         {
             month.HideEntryActions();
             return;
@@ -101,6 +101,7 @@ public partial class MainPage : ContentPage
         if (BindingContext is not MainViewModel { SelectedMonth: { } month }) return;
 
         _isLongPressInProgress = true;
+        month.RevealedBillCardId = null;
         month.RevealedEntryId = projection.FinancialEntryId;
     }
 
@@ -167,6 +168,45 @@ public partial class MainPage : ContentPage
         await this.ShowPopupAsync(popup);
     }
 
+    private void OnBillTapped(object? sender, TouchGestureCompletedEventArgs e)
+    {
+        // TouchBehavior also raises a tap when the finger is lifted after a long press.
+        if (_isLongPressInProgress)
+        {
+            _isLongPressInProgress = false;
+            return;
+        }
+
+        if (GetBill(sender) is not { } bill) return;
+        if (BindingContext is not MainViewModel { SelectedMonth: { } month }) return;
+
+        if (month.RevealedEntryId is not null || month.RevealedBillCardId is not null)
+        {
+            month.HideEntryActions();
+            return;
+        }
+
+        month.ToggleBill(bill.Card.Id);
+    }
+
+    private void OnBillLongPressed(object? sender, LongPressCompletedEventArgs e)
+    {
+        if (GetBill(sender) is not { } bill) return;
+        if (BindingContext is not MainViewModel { SelectedMonth: { } month }) return;
+
+        _isLongPressInProgress = true;
+        month.RevealedEntryId = null;
+        month.RevealedBillCardId = bill.Card.Id;
+    }
+
+    private async void OnToggleBillStatusClicked(object? sender, TappedEventArgs e)
+    {
+        if (GetBill(sender) is not { } bill) return;
+        if (BindingContext is not MainViewModel mainVm) return;
+
+        await mainVm.ToggleCreditCardBillStatusAsync(bill);
+    }
+
     private async void OnMonthTitleTapped(object? sender, TappedEventArgs e)
     {
         if (BindingContext is not MainViewModel { SelectedMonth: { } month } mainVm) return;
@@ -188,6 +228,9 @@ public partial class MainPage : ContentPage
 
     private static MonthlyEntryProjection? GetProjection(object? sender) =>
         (sender as BindableObject)?.BindingContext as MonthlyEntryProjection;
+
+    private static CreditCardBill? GetBill(object? sender) =>
+        (sender as BindableObject)?.BindingContext as CreditCardBill;
 
     private T Resolve<T>() where T : class =>
         Handler?.MauiContext?.Services.GetService<T>()

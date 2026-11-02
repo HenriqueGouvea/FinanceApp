@@ -50,6 +50,20 @@ public class MainPageObject
     private static readonly By SwipeHint = AppSession.AutomationId("SwipeHintLabel");
     private static readonly By MonthPickerBadge = AppSession.AutomationId("MonthPickerBadge");
     private static readonly By FlyoutGreeting = AppSession.AutomationId("FlyoutGreetingLabel");
+    private static readonly By Bill = AppSession.AutomationId("CreditCardBill");
+    private static readonly By BillRow = AppSession.AutomationId("CreditCardBillRow");
+    private static readonly By BillName = AppSession.AutomationId("CreditCardBillNameLabel");
+    private static readonly By BillAmount = AppSession.AutomationId("CreditCardBillAmountLabel");
+    private static readonly By BillDueDate = AppSession.AutomationId("CreditCardBillDueDateLabel");
+    private static readonly By BillAccount = AppSession.AutomationId("CreditCardBillAccountLabel");
+    private static readonly By BillCount = AppSession.AutomationId("CreditCardBillCountLabel");
+    private static readonly By BillStatus = AppSession.AutomationId("CreditCardBillStatusLabel");
+    private static readonly By BillPaidIcon = AppSession.AutomationId("CreditCardBillPaidIcon");
+    private static readonly By BillPartialIcon = AppSession.AutomationId("CreditCardBillPartialIcon");
+    private static readonly By BillPaid = AppSession.AutomationId("CreditCardBillPaidLabel");
+    private static readonly By BillEntries = AppSession.AutomationId("CreditCardBillEntries");
+    private static readonly By PayBillAction = AppSession.AutomationId("PayCreditCardBillAction");
+    private static readonly By MarkBillPendingAction = AppSession.AutomationId("MarkCreditCardBillPendingAction");
     private static readonly By FlyoutButton =
         MobileBy.AndroidUIAutomator("new UiSelector().className(\"android.widget.ImageButton\").instance(0)");
 
@@ -560,12 +574,129 @@ public class MainPageObject
 
     public bool IsLoaded => _session.IsVisible(AddEntryButton);
 
-    private void TapRevealedAction(By action) =>
-        (FindRevealedAction(action) ?? throw new InvalidOperationException($"No revealed {action} in the entry actions menu.")).Click();
+    // --- Credit card bills ---
 
-    private IWebElement? FindRevealedAction(By action)
+    /// <summary>
+    /// The bill rows of the displayed month, e.g. "💳 Fatura Nubank" (see <see cref="AppLabels.BillName"/>).
+    /// </summary>
+    public IReadOnlyList<string> VisibleBillNames => _session.VisibleTexts(BillName);
+
+    public MainPageObject WaitForBill(string card)
     {
-        var rows = _session.Driver.FindElements(EntryRow).Where(r => r.Displayed).ToList();
+        _session.WaitForVisible(BillByCard(card));
+        return this;
+    }
+
+    public MainPageObject WaitForBillGone(string card)
+    {
+        _session.WaitForGone(BillByCard(card));
+        return this;
+    }
+
+    public string BillAmountText(string card) => FindBillRow(card).FindElement(BillAmount).Text;
+
+    public string BillCountText(string card) => FindBillRow(card).FindElement(BillCount).Text;
+
+    /// <summary>
+    /// The bill's due date line ("Vence hoje" or e.g. "Vence 10/11"), or null when the card has no due day.
+    /// </summary>
+    public string? BillDueDateText(string card) => VisibleTextIn(FindBillRow(card), BillDueDate);
+
+    /// <summary>
+    /// The "Débito em Itaú" line, or null when no account pays the bill.
+    /// </summary>
+    public string? BillAccountText(string card) => VisibleTextIn(FindBillRow(card), BillAccount);
+
+    /// <summary>
+    /// The amount already paid shown under a partially paid bill's total, or null otherwise.
+    /// </summary>
+    public string? BillPaidText(string card) => VisibleTextIn(FindBillRow(card), BillPaid);
+
+    public bool IsBillPaid(string card) =>
+        FindBillRow(card).FindElements(BillPaidIcon).Any(e => e.Displayed) && VisibleTextIn(FindBillRow(card), BillStatus) == AppLabels.BillPaid;
+
+    public bool IsBillPartiallyPaid(string card) => FindBillRow(card).FindElements(BillPartialIcon).Any(e => e.Displayed);
+
+    /// <summary>
+    /// The descriptions of the entries listed under the card's bill (empty while it is collapsed).
+    /// </summary>
+    public IReadOnlyList<string> BillEntryDescriptions(string card) =>
+        FindBill(card).FindElements(BillEntries).Where(e => e.Displayed)
+            .SelectMany(e => e.FindElements(EntryDescription))
+            .Where(d => d.Displayed)
+            .Select(d => d.Text)
+            .ToList();
+
+    /// <summary>
+    /// Taps the bill row to collapse or expand its entries.
+    /// </summary>
+    public MainPageObject ToggleBill(string card)
+    {
+        var expanded = BillEntryDescriptions(card).Count > 0;
+        FindBillRow(card).Click();
+        _session.WaitFor(() => BillEntryDescriptions(card).Count > 0 != expanded, $"the \"{card}\" bill to {(expanded ? "collapse" : "expand")}");
+        return this;
+    }
+
+    public MainPageObject RevealBillActions(string card)
+    {
+        _session.LongPress(FindBillRow(card));
+        _session.WaitFor(() => FindRevealedAction(PayBillAction, BillRow) is not null || FindRevealedAction(MarkBillPendingAction, BillRow) is not null,
+            "the bill actions menu to slide in");
+        return this;
+    }
+
+    /// <summary>
+    /// Text of the status action in the revealed bill menu ("Pagar fatura" or "Pendente").
+    /// </summary>
+    public string RevealedBillActionText =>
+        (FindRevealedAction(PayBillAction, BillRow) ?? FindRevealedAction(MarkBillPendingAction, BillRow)
+            ?? throw new InvalidOperationException("No bill actions menu is revealed."))
+            .FindElement(By.ClassName("android.widget.TextView")).Text;
+
+    /// <summary>
+    /// Long-presses the bill and taps "Pagar fatura", then waits for the bill to show as paid.
+    /// </summary>
+    public MainPageObject PayBill(string card)
+    {
+        RevealBillActions(card);
+        TapRevealedAction(PayBillAction, BillRow);
+        _session.WaitFor(() => IsBillPaid(card), $"the \"{card}\" bill to show as paid");
+        return this;
+    }
+
+    /// <summary>
+    /// Long-presses a paid bill and taps "Pendente", then waits for the paid indicator to disappear.
+    /// </summary>
+    public MainPageObject MarkBillPending(string card)
+    {
+        RevealBillActions(card);
+        TapRevealedAction(MarkBillPendingAction, BillRow);
+        _session.WaitFor(() => !IsBillPaid(card), $"the \"{card}\" bill to show as pending");
+        return this;
+    }
+
+    private IWebElement FindBill(string card)
+    {
+        _session.WaitForVisible(BillByCard(card));
+        return _session.Driver.FindElements(Bill)
+            .First(b => b.Displayed && b.FindElements(BillName).Any(n => n.Displayed && n.Text == AppLabels.BillName(card)));
+    }
+
+    private IWebElement FindBillRow(string card) => FindBill(card).FindElement(BillRow);
+
+    private static string? VisibleTextIn(IWebElement container, By locator) =>
+        container.FindElements(locator).FirstOrDefault(e => e.Displayed)?.Text;
+
+    private static By BillByCard(string card) =>
+        AppSession.AutomationIdWithText("CreditCardBillNameLabel", AppLabels.BillName(card));
+
+    private void TapRevealedAction(By action, By? row = null) =>
+        (FindRevealedAction(action, row) ?? throw new InvalidOperationException($"No revealed {action} in the actions menu.")).Click();
+
+    private IWebElement? FindRevealedAction(By action, By? row = null)
+    {
+        var rows = _session.Driver.FindElements(row ?? EntryRow).Where(r => r.Displayed).ToList();
         if (rows.Count == 0)
             return null;
 

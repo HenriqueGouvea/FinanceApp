@@ -25,7 +25,10 @@ public partial class AddEntryViewModel : ObservableObject
     [ObservableProperty] string description = string.Empty;
     [ObservableProperty] decimal amount;
     [ObservableProperty] FinancialCategory? selectedCategory;
-    [ObservableProperty] PaymentSource? selectedPaymentSource;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsOnCreditCardBill))]
+    [NotifyPropertyChangedFor(nameof(CreditCardBillDueHint))]
+    PaymentSource? selectedPaymentSource;
     [ObservableProperty] FinancialEntryType entryType = FinancialEntryType.Outcome;
     [ObservableProperty] RecurrenceType? selectedRecurrence;
     [ObservableProperty] int? totalInstallments;
@@ -48,6 +51,13 @@ public partial class AddEntryViewModel : ObservableObject
     public string PartialPaymentLabel => IsIncome ? "Recebimento parcial" : "Pagamento parcial";
     public string PartialPaymentHint => IsIncome ? "Recebido aos poucos durante o mês" : "Pago aos poucos durante o mês, como mercado";
     public string PaymentSourceLabel => IsIncome ? "Recebido em" : "Pago com";
+    /// <summary>
+    /// An outcome paid with a credit card falls due with the card's bill, so it has no due day of its own.
+    /// </summary>
+    public bool IsOnCreditCardBill => !IsIncome && SelectedPaymentSource?.Type == PaymentSourceType.CreditCard;
+    public string CreditCardBillDueHint => SelectedPaymentSource?.BillDueDay is { } day
+        ? $"Vence com a fatura do cartão de crédito (dia {day})"
+        : "Vence com a fatura do cartão de crédito";
     public bool HasPayments => Payments.Count > 0;
     /// <summary>
     /// The month's paid amount is only edited for entries paid little by little, or to remove payments recorded before the flag was turned off.
@@ -111,6 +121,7 @@ public partial class AddEntryViewModel : ObservableObject
         OnPropertyChanged(nameof(PartialPaymentLabel));
         OnPropertyChanged(nameof(PartialPaymentHint));
         OnPropertyChanged(nameof(PaymentSourceLabel));
+        OnPropertyChanged(nameof(IsOnCreditCardBill));
         FilterCategories();
     }
 
@@ -215,7 +226,7 @@ public partial class AddEntryViewModel : ObservableObject
             TotalInstallments = TotalInstallments,
             IsEstimated = IsEstimated,
             AllowsPartialPayment = AllowsPartialPayment,
-            DueDay = SelectedDueDay == NoDueDay ? null : SelectedDueDay
+            DueDay = SelectedDueDay == NoDueDay || IsOnCreditCardBill ? null : SelectedDueDay
         };
 
         await _financeService.SaveEntryAsync(entry);

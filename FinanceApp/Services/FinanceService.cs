@@ -39,6 +39,10 @@ public class FinanceService : IFinanceService
         {
             var category = template.CategoryId is { } categoryId ? categoryLookup.GetValueOrDefault(categoryId) : null;
             var source = template.PaymentSourceId is { } sourceId ? sourceLookup.GetValueOrDefault(sourceId) : null;
+            var isOnCardBill = template.EntryType == FinancialEntryType.Outcome && source?.Type == PaymentSourceType.CreditCard;
+            // An outcome paid with a credit card falls due with the card's bill.
+            var dueDate = BuildDueDate(isOnCardBill ? source!.BillDueDay : template.DueDay, year, month);
+            var billAccount = isOnCardBill && source!.BillPaymentSourceId is { } accountId ? sourceLookup.GetValueOrDefault(accountId) : null;
 
             if (physicalLookup.TryGetValue(template.Id, out var record))
             {
@@ -70,8 +74,9 @@ public class FinanceService : IFinanceService
                     IsEstimated: template.IsEstimated,
                     PlannedAmount: plannedAmount,
                     AllowsPartialPayment: template.AllowsPartialPayment,
-                    DueDate: BuildDueDate(template, year, month),
-                    PaymentSource: source
+                    DueDate: dueDate,
+                    PaymentSource: source,
+                    BillPaymentAccount: billAccount
                 ));
             }
             else
@@ -89,8 +94,9 @@ public class FinanceService : IFinanceService
                     InstallmentTotalAmount: BuildInstallmentTotal(template),
                     IsEstimated: template.IsEstimated,
                     AllowsPartialPayment: template.AllowsPartialPayment,
-                    DueDate: BuildDueDate(template, year, month),
-                    PaymentSource: source
+                    DueDate: dueDate,
+                    PaymentSource: source,
+                    BillPaymentAccount: billAccount
                 ));
             }
         }
@@ -164,6 +170,17 @@ public class FinanceService : IFinanceService
         {
             Console.WriteLine($"Error setting entry status: {ex.Message}");
         }
+    }
+
+    public async Task SetCreditCardBillStatusAsync(int cardId, int year, int month, FinancialMonthlyEntryStatus status)
+    {
+        var entries = await GetMergedEntriesForMonthAsync(year, month);
+        var billEntries = entries
+            .Where(e => e.IsOnCreditCardBill && e.PaymentSource!.Id == cardId && e.Status != status)
+            .ToList();
+
+        foreach (var entry in billEntries)
+            await SetEntryStatusAsync(entry.FinancialEntryId, year, month, status);
     }
 
     public Task SetPaidAmountAsync(int entryId, int year, int month, decimal paidAmount) =>
@@ -414,8 +431,8 @@ public class FinanceService : IFinanceService
         return $"{n}/{entry.TotalInstallments}";
     }
 
-    private static DateTime? BuildDueDate(FinancialEntry entry, int year, int month) =>
-        entry.DueDay is { } day
+    private static DateTime? BuildDueDate(int? dueDay, int year, int month) =>
+        dueDay is { } day
             ? new DateTime(year, month, Math.Clamp(day, 1, DateTime.DaysInMonth(year, month)), 0, 0, 0, DateTimeKind.Local)
             : null;
 

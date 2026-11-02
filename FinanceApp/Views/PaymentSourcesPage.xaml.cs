@@ -25,7 +25,7 @@ public partial class PaymentSourcesPage : ContentPage
         var popup = ResolvePopup();
         var vm = (PaymentSourceEditViewModel)popup.BindingContext;
 
-        vm.Prepare();
+        await vm.PrepareAsync();
         await ShowEditPopupAsync(popup, vm);
     }
 
@@ -36,7 +36,7 @@ public partial class PaymentSourcesPage : ContentPage
         var popup = ResolvePopup();
         var vm = (PaymentSourceEditViewModel)popup.BindingContext;
 
-        vm.PrepareForEdit(source);
+        await vm.PrepareForEditAsync(source);
         await ShowEditPopupAsync(popup, vm);
     }
 
