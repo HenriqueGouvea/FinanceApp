@@ -21,6 +21,17 @@ public static class AppLabels
     public const string EntriesMenuItem = "Lançamentos";
     public const string CategoriesMenuItem = "Categorias";
     public const string PaymentSourcesMenuItem = "Contas e cartões";
+    public const string SecurityMenuItem = "Segurança";
+
+    public const string EnterPin = "Digite seu PIN";
+    public const string CreatePin = "Crie um PIN de 4 dígitos";
+    public const string ConfirmPin = "Confirme o PIN";
+    public const string EnterCurrentPin = "Digite o PIN atual";
+    public const string EnterNewPin = "Digite o novo PIN";
+    public const string WrongPin = "PIN incorreto. Tente novamente.";
+    public const string PinMismatch = "Os PINs não conferem. Crie o PIN novamente.";
+    public const string PinNotRecoverable = "o PIN não pode ser recuperado";
+    public const string Understood = "Entendi";
 
     public const string BankAccountsHeader = "Contas bancárias";
     public const string CreditCardsHeader = "Cartões de crédito";

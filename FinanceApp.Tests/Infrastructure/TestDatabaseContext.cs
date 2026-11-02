@@ -11,8 +11,10 @@ public class TestDatabaseContext : IDatabaseContext
     public TestDatabaseContext()
     {
         var id = Guid.NewGuid().ToString("N");
+        // Without the Uri flag the string is taken as a file name, which Windows rejects and Linux writes to disk.
         var connStr = new SQLiteConnectionString(
             $"file:{id}?mode=memory&cache=shared",
+            SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.FullMutex | SQLiteOpenFlags.Uri,
             storeDateTimeAsTicks: true);
         _connection = new SQLiteAsyncConnection(connStr);
         _connection.CreateTableAsync<FinancialEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK).Wait();
