@@ -49,6 +49,7 @@ public class MainPageObject
     private static readonly By NextMonthButton = AppSession.AutomationId("NextMonthButton");
     private static readonly By SwipeHint = AppSession.AutomationId("SwipeHintLabel");
     private static readonly By MonthPickerBadge = AppSession.AutomationId("MonthPickerBadge");
+    private static readonly By FlyoutGreeting = AppSession.AutomationId("FlyoutGreetingLabel");
     private static readonly By FlyoutButton =
         MobileBy.AndroidUIAutomator("new UiSelector().className(\"android.widget.ImageButton\").instance(0)");
 
@@ -528,12 +529,34 @@ public class MainPageObject
         return new PaymentSourcesPageObject(_session).WaitUntilLoaded();
     }
 
-    public SecurityPageObject OpenSecurity()
+    public SettingsPageObject OpenSettings()
     {
         _session.Tap(FlyoutButton);
-        _session.Tap(AppSession.Text(AppLabels.SecurityMenuItem));
-        return new SecurityPageObject(_session).WaitUntilLoaded();
+        _session.Tap(AppSession.Text(AppLabels.SettingsMenuItem));
+        return new SettingsPageObject(_session).WaitUntilLoaded();
     }
+
+    /// <summary>
+    /// "PIN e biometria" in the settings.
+    /// </summary>
+    public SecurityPageObject OpenSecurity() => OpenSettings().OpenSecurity();
+
+    /// <summary>
+    /// Opens the hamburger menu, reads its greeting (e.g. "Olá, Ana!") and closes it again.
+    /// </summary>
+    public string ReadMenuGreeting()
+    {
+        _session.Tap(FlyoutButton);
+        var greeting = _session.WaitForVisible(FlyoutGreeting).Text;
+        _session.PressBack();
+        _session.WaitForGone(FlyoutGreeting);
+        return greeting;
+    }
+
+    /// <summary>
+    /// Opens the setup wizard again through "Refazer configuração inicial" in the settings.
+    /// </summary>
+    public SetupPageObject RedoSetup() => OpenSettings().RedoSetup();
 
     public bool IsLoaded => _session.IsVisible(AddEntryButton);
 

@@ -11,7 +11,7 @@ public partial class PaymentSourceEditViewModel : ObservableObject
     private Func<Task>? _onSaved;
     private int _editingSourceId;
 
-    [ObservableProperty] string popupTitle = "Nova Conta ou Cartão";
+    [ObservableProperty] string popupTitle = "Nova Conta ou Cartão de Crédito";
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
@@ -31,7 +31,7 @@ public partial class PaymentSourceEditViewModel : ObservableObject
     public void Prepare()
     {
         _editingSourceId = 0;
-        PopupTitle = "Nova Conta ou Cartão";
+        PopupTitle = "Nova Conta ou Cartão de Crédito";
         Name = string.Empty;
         Type = PaymentSourceType.BankAccount;
         Balance = 0;
@@ -40,7 +40,7 @@ public partial class PaymentSourceEditViewModel : ObservableObject
     public void PrepareForEdit(PaymentSource source)
     {
         _editingSourceId = source.Id;
-        PopupTitle = "Editar Conta ou Cartão";
+        PopupTitle = "Editar Conta ou Cartão de Crédito";
         Name = source.Name;
         Type = source.Type;
         Balance = source.Balance;

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+               xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+               xmlns:toolkit="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
+               xmlns:vm="clr-namespace:FinanceApp.ViewModels"
+               xmlns:converters="clr-namespace:FinanceApp.Converters"
+               x:Class="FinanceApp.Views.ProfileEditPopup"
+               x:DataType="vm:ProfileEditViewModel">
+    <Border BackgroundColor="White"
+            StrokeShape="RoundRectangle 12"
+            Padding="20"
+            WidthRequest="350"
+            VerticalOptions="Center">
+        <VerticalStackLayout Spacing="15">
+            <Label Text="Nome e foto" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
+
+            <Border AutomationId="ProfileAvatar"
+                    WidthRequest="96"
+                    HeightRequest="96"
+                    HorizontalOptions="Center"
+                    StrokeShape="Ellipse"
+                    StrokeThickness="0"
+                    BackgroundColor="#EDE7F6">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding PickPhotoCommand}" />
+                </Border.GestureRecognizers>
+                <Grid>
+                    <Label AutomationId="ProfileAvatarInitialLabel"
+                           Text="{Binding Initial}"
+                           FontSize="38"
+                           TextColor="Purple"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"
+                           IsVisible="{Binding HasPhoto, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
+                    <Image Source="{Binding PhotoPath}" Aspect="AspectFill" IsVisible="{Binding HasPhoto}" />
+                </Grid>
+            </Border>
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="8">
+                <Button AutomationId="ProfilePickPhotoButton"
+                        Text="Escolher foto"
+                        FontSize="13"
+                        BackgroundColor="#EDE7F6"
+                        TextColor="Purple"
+                        Command="{Binding PickPhotoCommand}" />
+                <Button AutomationId="ProfileRemovePhotoButton"
+                        Text="Remover foto"
+                        FontSize="13"
+                        BackgroundColor="Transparent"
+                        TextColor="#D32F2F"
+                        IsVisible="{Binding HasPhoto}"
+                        Command="{Binding RemovePhotoCommand}" />
+            </HorizontalStackLayout>
+
+            <Entry x:Name="NameEntry" AutomationId="ProfileNameEntry" Placeholder="Como podemos te chamar?" Text="{Binding Name}" MaxLength="40" />
+
+            <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,10,0,0">
+                <Button Grid.Column="0" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />
+                <Button Grid.Column="1" AutomationId="SaveProfileButton" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="Purple" />
+            </Grid>
+        </VerticalStackLayout>
+    </Border>
+</toolkit:Popup>

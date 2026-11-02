@@ -47,8 +47,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 2. Run the relevant classes: `dotnet test FinanceApp.UITests/FinanceApp.UITests.csproj --logger "console;verbosity=normal" --filter "FullyQualifiedName~DeleteEntryTests|FullyQualifiedName~EditEntryTests"`. Each test takes ~30 s locally. The full suite (no filter) is for CI only; see "Definition of done".
 
 **Structure:**
-- `Tests/` — one class per feature area (`AddEntryTests`, `EditEntryTests`, `DeleteEntryTests`, `EntryActionsMenuTests`, `EntryStatusTests`, `MonthSummaryTests`, `PartialPaymentTests`, `PartialPaymentFlagTests`, `PaymentRecordsTests`, `OverBudgetTests`, `EstimatedAmountTests`, `DueDateTests`, `MonthNavigationTests`, `SectionToggleTests`, `AlternatingRowsTests`, `CategoryTests`, `PaymentSourceTests`, `AppLockTests`). Each class derives from `E2ETestBase` and must carry `[Collection(E2ECollection.Name)]` and `[Trait("Category", "E2E")]`. Shared arrange steps (e.g. creating the entry under test) go in the constructor.
-- `Pages/` — page objects (`MainPageObject`, `AddEntryPageObject`, `CategoriesPageObject`, `PaymentSourcesPageObject`, `MonthPickerPopupObject`, `PartialPaymentPopupObject`, `SecurityPageObject`, `PinPageObject`). Tests never call Appium directly; add a page object method instead. User-facing pt-BR texts the tests select by live in `AppLabels`.
+- `Tests/` — one class per feature area (`AddEntryTests`, `EditEntryTests`, `DeleteEntryTests`, `EntryActionsMenuTests`, `EntryStatusTests`, `MonthSummaryTests`, `PartialPaymentTests`, `PartialPaymentFlagTests`, `PaymentRecordsTests`, `OverBudgetTests`, `EstimatedAmountTests`, `DueDateTests`, `MonthNavigationTests`, `SectionToggleTests`, `AlternatingRowsTests`, `CategoryTests`, `PaymentSourceTests`, `AppLockTests`, `SetupTests`, `SettingsTests`). Each class derives from `E2ETestBase` (which skips the first-run setup wizard unless constructed with `skipSetup: false`) and must carry `[Collection(E2ECollection.Name)]` and `[Trait("Category", "E2E")]`. Shared arrange steps (e.g. creating the entry under test) go in the constructor.
+- `Pages/` — page objects (`MainPageObject`, `AddEntryPageObject`, `CategoriesPageObject`, `PaymentSourcesPageObject`, `MonthPickerPopupObject`, `PartialPaymentPopupObject`, `SecurityPageObject`, `PinPageObject`, `SetupPageObject`, `SettingsPageObject`). Tests never call Appium directly; add a page object method instead. User-facing pt-BR texts the tests select by live in `AppLabels`.
 - `Infrastructure/` — `AppSession` (driver, waits, gestures, diagnostics), `DeviceDatabase` + `TableRows` (DB assertions), `AppFormat` (expected money/month/count strings and enum values).
 
 **Rules:**
@@ -84,12 +84,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## DI Registration
 All registrations are in `MauiProgram.cs`:
 - `IDatabaseContext` → Singleton (resolved by `DatabaseContext`)
-- `IFinanceService`, `ICategoryService`, `IPaymentSourceService`, `IPreferencesService`, `ISecureStorageService`, `IAppLockService`, `TimeProvider` → Singleton
+- `IFinanceService`, `ICategoryService`, `IPaymentSourceService`, `IPreferencesService`, `ISecureStorageService`, `IAppLockService`, `IUserProfileService`, `ISetupService`, `TimeProvider`, `IFileSystem` (`FileSystem.Current`), `IMediaPicker` (`MediaPicker.Default`) → Singleton
 - `IBiometricService` → Singleton: `BiometricService` (AndroidX BiometricPrompt, in `Platforms/Android`) on Android, `UnavailableBiometricService` elsewhere
-- `App` locks itself with `PinPage` (modal) on start when a PIN is set, and on resume after `AppLockService.LockTimeout` in the background
-- `AppShell` → Singleton, injected into `App`. Its flyout footer lists the payment source balances (`PaymentSourceBalancesViewModel`)
-- `IMessenger` → Singleton (`WeakReferenceMessenger.Default`), used to broadcast `CategoriesChangedMessage` and `PaymentSourcesChangedMessage` so `MainViewModel` (and every view showing payment sources) refreshes
-- `MainViewModel`, `AddEntryViewModel`, `CategoriesViewModel`, `CategoryEditViewModel`, `PaymentSourcesViewModel`, `PaymentSourceEditViewModel`, `PaymentSourceBalancesViewModel`, `MonthPickerViewModel`, `PartialPaymentViewModel`, `PinViewModel`, `SecurityViewModel`, `MainPage`, `AddEntryPage`, `CategoriesPage`, `CategoryEditPopup`, `PaymentSourcesPage`, `PaymentSourceEditPopup`, `MonthPickerPopup`, `PartialPaymentPopup`, `PinPage`, `SecurityPage` → Transient
+- `App` shows the setup wizard (`SetupPage`, modal, via `AppShell.ShowSetupAsync`) on the first run (`ISetupService.ShouldShowAsync`); otherwise it locks itself with `PinPage` (modal) on start when a PIN is set, and on resume after `AppLockService.LockTimeout` in the background
+- `AppShell` → Singleton, injected into `App`. Its menu is "Início" (`MainPage`), "Categorias", "Contas e cartões" and "Configurações" (`SettingsPage`, which edits the name and photo with `ProfileEditPopup`, pushes `SecurityPage` and reruns the setup wizard). Its flyout header greets the user with their name and photo (`UserProfileViewModel`), and its flyout footer lists the payment source balances (`PaymentSourceBalancesViewModel`)
+- `IMessenger` → Singleton (`WeakReferenceMessenger.Default`), used to broadcast `CategoriesChangedMessage`, `PaymentSourcesChangedMessage`, `SetupCompletedMessage` and `ProfileChangedMessage` so `MainViewModel` (and every view showing payment sources) refreshes
+- `MainViewModel`, `AddEntryViewModel`, `CategoriesViewModel`, `CategoryEditViewModel`, `PaymentSourcesViewModel`, `PaymentSourceEditViewModel`, `PaymentSourceBalancesViewModel`, `MonthPickerViewModel`, `PartialPaymentViewModel`, `PinViewModel`, `SecurityViewModel`, `SetupViewModel`, `UserProfileViewModel`, `ProfileEditViewModel`, `MainPage`, `AddEntryPage`, `CategoriesPage`, `CategoryEditPopup`, `PaymentSourcesPage`, `PaymentSourceEditPopup`, `MonthPickerPopup`, `PartialPaymentPopup`, `PinPage`, `SecurityPage`, `SetupPage`, `SettingsPage`, `ProfileEditPopup` → Transient
 
 Never manually instantiate services or ViewModels. If a new service or VM is added, register it in `MauiProgram.cs`.
 
@@ -138,6 +138,8 @@ SQLite (FinanceDataV3.db3)
   - `OneTime`: Single occurrence.
   - `Installments`: Fixed number of payments spread over N months.
   - `Recurrent`: Monthly recurring entries without a fixed end date.
+- **Payment source terminology (pt-BR UI):** a `PaymentSource` of type `CreditCard` is always shown as "Cartão de crédito", never just "Cartão": bank accounts come with a (debit) card too, so "Cartão" alone doesn't tell them apart. Bank accounts are "Conta" / "Conta bancária", meal vouchers "Vale".
+- **Credit card bill (planned):** a credit card will have its bill due date and the bank account that pays the bill on that date. This link is the core of the credit card control (see `ROADMAP.md`).
 - **Future Roadmap:** Transitioning to a distributed architecture (Web App + MAUI) consuming a centralized Web API. Logic must be decoupled from local storage to facilitate this migration.
 
 ## Domain Model Reference (Vision)

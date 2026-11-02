@@ -11,7 +11,9 @@ namespace FinanceApp.ViewModels;
 /// <summary>
 /// Current balance of every payment source, shown at the bottom of the hamburger menu.
 /// </summary>
-public partial class PaymentSourceBalancesViewModel : ObservableObject, IRecipient<PaymentSourcesChangedMessage>
+public partial class PaymentSourceBalancesViewModel : ObservableObject,
+    IRecipient<PaymentSourcesChangedMessage>,
+    IRecipient<SetupCompletedMessage>
 {
     private readonly IPaymentSourceService _paymentSourceService;
     private readonly IMessenger _messenger;
@@ -25,10 +27,11 @@ public partial class PaymentSourceBalancesViewModel : ObservableObject, IRecipie
         _paymentSourceService = paymentSourceService;
         _messenger = messenger;
         Sources.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasSources));
-        messenger.Register(this);
+        messenger.RegisterAll(this);
     }
 
     public async void Receive(PaymentSourcesChangedMessage message) => await LoadAsync();
+    public async void Receive(SetupCompletedMessage message) => await LoadAsync();
 
     [RelayCommand]
     public async Task LoadAsync()

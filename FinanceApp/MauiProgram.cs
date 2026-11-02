@@ -39,6 +39,10 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPaymentSourceService, PaymentSourceService>();
         builder.Services.AddSingleton<ISecureStorageService, SecureStorageService>();
         builder.Services.AddSingleton<IAppLockService, AppLockService>();
+        builder.Services.AddSingleton<IUserProfileService, UserProfileService>();
+        builder.Services.AddSingleton<ISetupService, SetupService>();
+        builder.Services.AddSingleton(FileSystem.Current);
+        builder.Services.AddSingleton(MediaPicker.Default);
         builder.Services.AddSingleton(TimeProvider.System);
 #if ANDROID
         builder.Services.AddSingleton<IBiometricService, BiometricService>();
@@ -58,6 +62,9 @@ public static class MauiProgram
         builder.Services.AddTransient<PaymentSourceBalancesViewModel>();
         builder.Services.AddTransient<PinViewModel>();
         builder.Services.AddTransient<SecurityViewModel>();
+        builder.Services.AddTransient<SetupViewModel>();
+        builder.Services.AddTransient<UserProfileViewModel>();
+        builder.Services.AddTransient<ProfileEditViewModel>();
 
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddTransient<MainPage>();
@@ -70,6 +77,9 @@ public static class MauiProgram
         builder.Services.AddTransient<PaymentSourceEditPopup>();
         builder.Services.AddTransient<PinPage>();
         builder.Services.AddTransient<SecurityPage>();
+        builder.Services.AddTransient<SetupPage>();
+        builder.Services.AddTransient<SettingsPage>();
+        builder.Services.AddTransient<ProfileEditPopup>();
 
         return builder.Build();
     }

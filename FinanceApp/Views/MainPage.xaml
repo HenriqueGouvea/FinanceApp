@@ -8,7 +8,7 @@
              xmlns:controls="clr-namespace:FinanceApp.Controls"
              x:Class="FinanceApp.Views.MainPage"
              x:DataType="vm:MainViewModel"
-             Title="Lançamentos">
+             Title="Início">
     <ContentPage.Resources>
         <Color x:Key="OutcomeAccent">#D32F2F</Color>
         <Color x:Key="OutcomeTint">#FDECEC</Color>

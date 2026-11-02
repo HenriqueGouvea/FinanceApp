@@ -11,8 +11,6 @@ public class SecurityPageObject
     private static readonly By PinLockSwitch = AppSession.AutomationId("PinLockSwitch");
     private static readonly By ChangePinRow = AppSession.AutomationId("ChangePinRow");
     private static readonly By BiometricRow = AppSession.AutomationId("BiometricRow");
-    private static readonly By FlyoutButton =
-        MobileBy.AndroidUIAutomator("new UiSelector().className(\"android.widget.ImageButton\").instance(0)");
 
     private readonly AppSession _session;
 
@@ -68,10 +66,12 @@ public class SecurityPageObject
         return WaitForPinLock(true);
     }
 
+    /// <summary>
+    /// The page is pushed from the settings, so Back returns there before the menu leads to "Início".
+    /// </summary>
     public MainPageObject GoToEntries()
     {
-        _session.Tap(FlyoutButton);
-        _session.Tap(AppSession.Text(AppLabels.EntriesMenuItem));
-        return new MainPageObject(_session).WaitUntilLoaded();
+        _session.PressBack();
+        return new SettingsPageObject(_session).WaitUntilLoaded().GoToHome();
     }
 }

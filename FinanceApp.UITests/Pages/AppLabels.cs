@@ -18,10 +18,27 @@ public static class AppLabels
     public const string DeleteThisAndFuture = "Este e os próximos meses";
     public const string DeleteAllMonths = "Todos os meses";
 
-    public const string EntriesMenuItem = "Lançamentos";
+    public const string HomeMenuItem = "Início";
     public const string CategoriesMenuItem = "Categorias";
     public const string PaymentSourcesMenuItem = "Contas e cartões";
-    public const string SecurityMenuItem = "Segurança";
+    public const string SettingsMenuItem = "Configurações";
+    public const string SettingsUserSection = "Usuário";
+    public const string SettingsSecuritySection = "Segurança";
+    public const string SettingsGuideSection = "Guia inicial";
+    public const string AddNameAndPhoto = "Adicionar nome e foto";
+    public const string CreditCardType = "💳 Cartão de crédito";
+
+    public const string SetupSkip = "Pular";
+    public const string SetupClose = "Fechar";
+    public const string SetupContinue = "Continuar";
+    public const string SetupStart = "Começar";
+    public const string SetupSummaryTitle = "Tudo pronto!";
+    public static string SetupSummaryTitleFor(string name) => $"Tudo pronto, {name}!";
+    public static string MenuGreeting(string name) => $"Olá, {name}!";
+    public const string MenuGreetingWithoutName = "Olá!";
+    public static string SetupSchedule(params string[] parts) => string.Join(" · ", ["Todo mês", .. parts]);
+    public const string EstimatedValue = "valor estimado";
+    public const string PartialPaymentValue = "pagamento parcial";
 
     public const string EnterPin = "Digite seu PIN";
     public const string CreatePin = "Crie um PIN de 4 dígitos";

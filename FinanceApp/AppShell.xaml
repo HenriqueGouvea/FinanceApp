@@ -10,8 +10,48 @@
     Title="FinanceApp"
     FlyoutBehavior="Flyout">
 
+    <!-- Greeting with the name and photo from the setup wizard -->
+    <Shell.FlyoutHeader>
+        <Grid x:Name="ProfileHeader"
+              x:DataType="vm:UserProfileViewModel"
+              ColumnDefinitions="Auto, *"
+              ColumnSpacing="14"
+              Padding="20,24,20,16"
+              BackgroundColor="#EDE7F6">
+            <Border Grid.Column="0"
+                    AutomationId="FlyoutAvatar"
+                    WidthRequest="52"
+                    HeightRequest="52"
+                    StrokeShape="Ellipse"
+                    StrokeThickness="0"
+                    BackgroundColor="Purple">
+                <Grid>
+                    <Label AutomationId="FlyoutAvatarInitialLabel"
+                           Text="{Binding Initial}"
+                           FontSize="22"
+                           TextColor="White"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"
+                           IsVisible="{Binding HasPhoto, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
+                    <Image AutomationId="FlyoutAvatarImage"
+                           Source="{Binding PhotoPath}"
+                           Aspect="AspectFill"
+                           IsVisible="{Binding HasPhoto}" />
+                </Grid>
+            </Border>
+            <Label Grid.Column="1"
+                   AutomationId="FlyoutGreetingLabel"
+                   Text="{Binding Greeting}"
+                   FontSize="18"
+                   FontAttributes="Bold"
+                   TextColor="Purple"
+                   LineBreakMode="TailTruncation"
+                   VerticalOptions="Center" />
+        </Grid>
+    </Shell.FlyoutHeader>
+
     <ShellContent
-        Title="Lançamentos"
+        Title="Início"
         ContentTemplate="{DataTemplate views:MainPage}"
         Route="MainPage" />
 
@@ -26,9 +66,9 @@
         Route="PaymentSourcesPage" />
 
     <ShellContent
-        Title="Segurança"
-        ContentTemplate="{DataTemplate views:SecurityPage}"
-        Route="SecurityPage" />
+        Title="Configurações"
+        ContentTemplate="{DataTemplate views:SettingsPage}"
+        Route="SettingsPage" />
 
     <!-- Current balance of each account, card and voucher; tapping one opens it to update the balance -->
     <Shell.FlyoutFooter>

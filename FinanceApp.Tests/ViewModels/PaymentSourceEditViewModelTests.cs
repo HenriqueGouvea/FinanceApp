@@ -33,7 +33,7 @@ public class PaymentSourceEditViewModelTests
         _vm.Name.Should().BeEmpty();
         _vm.Type.Should().Be(PaymentSourceType.BankAccount);
         _vm.Balance.Should().Be(0m);
-        _vm.PopupTitle.Should().Be("Nova Conta ou Cartão");
+        _vm.PopupTitle.Should().Be("Nova Conta ou Cartão de Crédito");
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public class PaymentSourceEditViewModelTests
         _vm.Name.Should().Be("Nubank");
         _vm.Type.Should().Be(PaymentSourceType.CreditCard);
         _vm.Balance.Should().Be(5000m);
-        _vm.PopupTitle.Should().Be("Editar Conta ou Cartão");
+        _vm.PopupTitle.Should().Be("Editar Conta ou Cartão de Crédito");
     }
 
     [Fact]
