@@ -528,6 +528,15 @@ public class MainPageObject
         return new PaymentSourcesPageObject(_session).WaitUntilLoaded();
     }
 
+    public SecurityPageObject OpenSecurity()
+    {
+        _session.Tap(FlyoutButton);
+        _session.Tap(AppSession.Text(AppLabels.SecurityMenuItem));
+        return new SecurityPageObject(_session).WaitUntilLoaded();
+    }
+
+    public bool IsLoaded => _session.IsVisible(AddEntryButton);
+
     private void TapRevealedAction(By action) =>
         (FindRevealedAction(action) ?? throw new InvalidOperationException($"No revealed {action} in the entry actions menu.")).Click();
 

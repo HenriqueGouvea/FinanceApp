@@ -59,7 +59,29 @@ public sealed class AppSession : IDisposable
         Driver.ActivateApp(E2ESettings.AppPackage);
     }
 
+    /// <summary>
+    /// Stops the app and launches it again keeping its data, i.e. a cold start (where the PIN lock shows up).
+    /// </summary>
+    public void Relaunch()
+    {
+        Driver.TerminateApp(E2ESettings.AppPackage);
+        Driver.ActivateApp(E2ESettings.AppPackage);
+    }
+
+    /// <summary>
+    /// Sends the app to the background (as the home button does) and brings it back once the duration is over.
+    /// </summary>
+    public void SendToBackground(TimeSpan duration) => Driver.BackgroundApp(duration);
+
+    /// <summary>
+    /// Leaves the app (e.g. after Back closed it), then brings it back without restarting it.
+    /// </summary>
+    public void BringToForeground() => Driver.ActivateApp(E2ESettings.AppPackage);
+
     public static By AutomationId(string automationId) => MobileBy.Id(automationId);
+
+    public static By TextContaining(string text) =>
+        MobileBy.AndroidUIAutomator($"new UiSelector().textContains(\"{text}\")");
 
     public static By AutomationIdWithText(string automationId, string text) =>
         MobileBy.AndroidUIAutomator(

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:FinanceApp.ViewModels"
+             xmlns:converters="clr-namespace:FinanceApp.Converters"
+             x:Class="FinanceApp.Views.PinPage"
+             x:DataType="vm:PinViewModel"
+             BackgroundColor="White"
+             Shell.NavBarIsVisible="False">
+    <ContentPage.Resources>
+        <Style x:Key="PinKey" TargetType="Button">
+            <Setter Property="WidthRequest" Value="64" />
+            <Setter Property="HeightRequest" Value="64" />
+            <Setter Property="CornerRadius" Value="32" />
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="BackgroundColor" Value="#F3E5F5" />
+            <Setter Property="TextColor" Value="Purple" />
+            <Setter Property="HorizontalOptions" Value="Center" />
+            <Setter Property="Command" Value="{Binding AddDigitCommand, x:DataType=vm:PinViewModel}" />
+        </Style>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto, *, Auto, Auto" Padding="24,8,24,16">
+        <Button Grid.Row="0"
+                AutomationId="PinCancelButton"
+                Text="Cancelar"
+                BackgroundColor="Transparent"
+                TextColor="Purple"
+                HorizontalOptions="Start"
+                IsVisible="{Binding CanCancel}"
+                Clicked="OnCancelClicked" />
+
+        <VerticalStackLayout Grid.Row="1" VerticalOptions="Center" Spacing="10">
+            <Label Text="🔒" FontSize="32" HorizontalOptions="Center" />
+            <Label AutomationId="PinTitleLabel"
+                   Text="{Binding Title}"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center" />
+            <Label AutomationId="PinDotsLabel"
+                   Text="{Binding Dots}"
+                   FontSize="24"
+                   TextColor="Purple"
+                   CharacterSpacing="4"
+                   HorizontalOptions="Center" />
+            <Label AutomationId="PinErrorLabel"
+                   Text="{Binding ErrorMessage}"
+                   FontSize="14"
+                   TextColor="#D32F2F"
+                   HorizontalTextAlignment="Center"
+                   MinimumHeightRequest="20" />
+        </VerticalStackLayout>
+
+        <Grid Grid.Row="2"
+              AutomationId="PinKeypad"
+              ColumnDefinitions="*, *, *"
+              RowDefinitions="Auto, Auto, Auto, Auto"
+              RowSpacing="12"
+              HorizontalOptions="Center"
+              WidthRequest="300">
+            <Button Grid.Row="0" Grid.Column="0" AutomationId="PinKey1" Text="1" CommandParameter="1" Style="{StaticResource PinKey}" />
+            <Button Grid.Row="0" Grid.Column="1" AutomationId="PinKey2" Text="2" CommandParameter="2" Style="{StaticResource PinKey}" />
+            <Button Grid.Row="0" Grid.Column="2" AutomationId="PinKey3" Text="3" CommandParameter="3" Style="{StaticResource PinKey}" />
+            <Button Grid.Row="1" Grid.Column="0" AutomationId="PinKey4" Text="4" CommandParameter="4" Style="{StaticResource PinKey}" />
+            <Button Grid.Row="1" Grid.Column="1" AutomationId="PinKey5" Text="5" CommandParameter="5" Style="{StaticResource PinKey}" />
+            <Button Grid.Row="1" Grid.Column="2" AutomationId="PinKey6" Text="6" CommandParameter="6" Style="{StaticResource PinKey}" />
+            <Button Grid.Row="2" Grid.Column="0" AutomationId="PinKey7" Text="7" CommandParameter="7" Style="{StaticResource PinKey}" />
+            <Button Grid.Row="2" Grid.Column="1" AutomationId="PinKey8" Text="8" CommandParameter="8" Style="{StaticResource PinKey}" />
+            <Button Grid.Row="2" Grid.Column="2" AutomationId="PinKey9" Text="9" CommandParameter="9" Style="{StaticResource PinKey}" />
+            <Button Grid.Row="3" Grid.Column="0"
+                    AutomationId="PinBiometricKey"
+                    Text="👆"
+                    Style="{StaticResource PinKey}"
+                    BackgroundColor="Transparent"
+                    Command="{Binding UnlockWithBiometricsCommand}"
+                    IsVisible="{Binding CanUseBiometrics}" />
+            <Button Grid.Row="3" Grid.Column="1" AutomationId="PinKey0" Text="0" CommandParameter="0" Style="{StaticResource PinKey}" />
+            <Button Grid.Row="3" Grid.Column="2"
+                    AutomationId="PinDeleteKey"
+                    Text="⌫"
+                    Style="{StaticResource PinKey}"
+                    BackgroundColor="Transparent"
+                    Command="{Binding DeleteDigitCommand}" />
+        </Grid>
+
+        <Button Grid.Row="3"
+                AutomationId="ForgotPinButton"
+                Text="Esqueci o PIN"
+                BackgroundColor="Transparent"
+                TextColor="Gray"
+                FontSize="13"
+                Margin="0,8,0,0"
+                HorizontalOptions="Center"
+                IsVisible="{Binding CanCancel, Converter={x:Static converters:InverseBoolConverter.Instance}}"
+                Clicked="OnForgotPinClicked" />
+    </Grid>
+</ContentPage>

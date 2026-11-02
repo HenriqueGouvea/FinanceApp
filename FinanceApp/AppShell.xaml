@@ -25,6 +25,11 @@
         ContentTemplate="{DataTemplate views:PaymentSourcesPage}"
         Route="PaymentSourcesPage" />
 
+    <ShellContent
+        Title="Segurança"
+        ContentTemplate="{DataTemplate views:SecurityPage}"
+        Route="SecurityPage" />
+
     <!-- Current balance of each account, card and voucher; tapping one opens it to update the balance -->
     <Shell.FlyoutFooter>
         <VerticalStackLayout x:Name="BalancesFooter"
