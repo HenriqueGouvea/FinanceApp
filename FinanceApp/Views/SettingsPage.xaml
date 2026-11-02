@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:FinanceApp.ViewModels"
+             xmlns:converters="clr-namespace:FinanceApp.Converters"
+             x:Class="FinanceApp.Views.SettingsPage"
+             x:DataType="vm:UserProfileViewModel"
+             Title="Configurações">
+    <ScrollView>
+        <VerticalStackLayout Padding="20,12,20,20" Spacing="4">
+
+            <!-- Usuário -->
+            <Label AutomationId="SettingsUserHeader" Text="Usuário" FontSize="13" FontAttributes="Bold" TextColor="Purple" Margin="0,8,0,0" />
+            <Grid AutomationId="SettingsProfileRow" ColumnDefinitions="Auto, *, Auto" ColumnSpacing="14" Padding="0,10">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnProfileTapped" />
+                </Grid.GestureRecognizers>
+                <Border Grid.Column="0"
+                        WidthRequest="48"
+                        HeightRequest="48"
+                        StrokeShape="Ellipse"
+                        StrokeThickness="0"
+                        BackgroundColor="Purple">
+                    <Grid>
+                        <Label Text="{Binding Initial}"
+                               FontSize="20"
+                               TextColor="White"
+                               HorizontalOptions="Center"
+                               VerticalOptions="Center"
+                               IsVisible="{Binding HasPhoto, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
+                        <Image Source="{Binding PhotoPath}" Aspect="AspectFill" IsVisible="{Binding HasPhoto}" />
+                    </Grid>
+                </Border>
+                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                    <Label AutomationId="SettingsProfileNameLabel" Text="{Binding DisplayName}" FontSize="16" LineBreakMode="TailTruncation" />
+                    <Label Text="Nome e foto, guardados só neste aparelho" FontSize="12" TextColor="Gray" />
+                </VerticalStackLayout>
+                <Label Grid.Column="2" Text="›" FontSize="22" TextColor="Gray" VerticalOptions="Center" />
+            </Grid>
+            <BoxView HeightRequest="1" Color="#E0E0E0" Margin="0,8" />
+
+            <!-- Segurança -->
+            <Label AutomationId="SettingsSecurityHeader" Text="Segurança" FontSize="13" FontAttributes="Bold" TextColor="Purple" />
+            <Grid AutomationId="SettingsSecurityRow" ColumnDefinitions="*, Auto" Padding="0,10">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnSecurityTapped" />
+                </Grid.GestureRecognizers>
+                <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
+                    <Label Text="PIN e biometria" FontSize="16" />
+                    <Label Text="Bloqueie o app com um PIN ou com a digital" FontSize="12" TextColor="Gray" />
+                </VerticalStackLayout>
+                <Label Grid.Column="1" Text="›" FontSize="22" TextColor="Gray" VerticalOptions="Center" />
+            </Grid>
+            <BoxView HeightRequest="1" Color="#E0E0E0" Margin="0,8" />
+
+            <!-- Guia inicial -->
+            <Label AutomationId="SettingsGuideHeader" Text="Guia inicial" FontSize="13" FontAttributes="Bold" TextColor="Purple" />
+            <Grid AutomationId="SettingsRedoSetupRow" ColumnDefinitions="*, Auto" Padding="0,10">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnRedoSetupTapped" />
+                </Grid.GestureRecognizers>
+                <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
+                    <Label Text="Refazer configuração inicial" FontSize="16" />
+                    <Label Text="Cadastre contas, renda e gastos fixos de novo, sem apagar o que já existe"
+                           FontSize="12"
+                           TextColor="Gray" />
+                </VerticalStackLayout>
+                <Label Grid.Column="1" Text="›" FontSize="22" TextColor="Gray" VerticalOptions="Center" />
+            </Grid>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

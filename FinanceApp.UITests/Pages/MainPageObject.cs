@@ -529,12 +529,17 @@ public class MainPageObject
         return new PaymentSourcesPageObject(_session).WaitUntilLoaded();
     }
 
-    public SecurityPageObject OpenSecurity()
+    public SettingsPageObject OpenSettings()
     {
         _session.Tap(FlyoutButton);
-        _session.Tap(AppSession.Text(AppLabels.SecurityMenuItem));
-        return new SecurityPageObject(_session).WaitUntilLoaded();
+        _session.Tap(AppSession.Text(AppLabels.SettingsMenuItem));
+        return new SettingsPageObject(_session).WaitUntilLoaded();
     }
+
+    /// <summary>
+    /// "PIN e biometria" in the settings.
+    /// </summary>
+    public SecurityPageObject OpenSecurity() => OpenSettings().OpenSecurity();
 
     /// <summary>
     /// Opens the hamburger menu, reads its greeting (e.g. "Olá, Ana!") and closes it again.
@@ -549,14 +554,9 @@ public class MainPageObject
     }
 
     /// <summary>
-    /// Opens the setup wizard again through the menu's "Refazer configuração inicial".
+    /// Opens the setup wizard again through "Refazer configuração inicial" in the settings.
     /// </summary>
-    public SetupPageObject RedoSetup()
-    {
-        _session.Tap(FlyoutButton);
-        _session.Tap(AppSession.Text(AppLabels.RedoSetupMenuItem));
-        return new SetupPageObject(_session).WaitUntilLoaded();
-    }
+    public SetupPageObject RedoSetup() => OpenSettings().RedoSetup();
 
     public bool IsLoaded => _session.IsVisible(AddEntryButton);
 

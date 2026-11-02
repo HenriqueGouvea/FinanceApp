@@ -100,14 +100,28 @@ public class SetupPageObject
     }
 
     /// <summary>
-    /// Taps "Pular" (first run) or "Fechar" (run from the menu), which closes the wizard without creating anything.
+    /// Taps "Pular" on the first run, which skips the wizard for good without creating anything.
     /// </summary>
     public MainPageObject Skip()
+    {
+        TapSkip();
+        return new MainPageObject(_session).WaitUntilLoaded();
+    }
+
+    /// <summary>
+    /// Taps "Fechar" on a wizard opened from the settings, which returns there without creating anything.
+    /// </summary>
+    public SettingsPageObject Close()
+    {
+        TapSkip();
+        return new SettingsPageObject(_session).WaitUntilLoaded();
+    }
+
+    private void TapSkip()
     {
         _session.HideKeyboardIfShown();
         _session.Tap(SkipButton);
         _session.WaitForGone(StepLabel);
-        return new MainPageObject(_session).WaitUntilLoaded();
     }
 
     /// <summary>
@@ -165,6 +179,13 @@ public class SetupPageObject
     }
 
     public IReadOnlyList<string> SourceNames => _session.VisibleTexts(SourceName);
+
+    /// <summary>
+    /// The label of the credit card type chip ("💳 Cartão de crédito").
+    /// </summary>
+    public string CreditCardTypeText =>
+        _session.WaitForVisible(By.XPath(
+            $"//*[@resource-id='{E2ESettings.AppPackage}:id/SetupSourceCreditCardTypeButton']//android.widget.TextView")).Text;
 
     public SetupPageObject RemoveSource(string name)
     {
@@ -243,8 +264,51 @@ public class SetupPageObject
     public bool IsExpenseChecked(string description) =>
         _session.WaitForVisible(ExpenseRowElement(description, "SetupExpenseCheckBox")).GetAttribute("checked") == "true";
 
-    public bool IsExpenseDueDayVisible(string description) =>
-        _session.IsVisible(ExpenseRowElement(description, "SetupExpenseDueDayPicker"));
+    /// <summary>
+    /// "Valor estimado (±)" of a selected expense.
+    /// </summary>
+    public bool IsExpenseEstimated(string description)
+    {
+        ShowOption(description, "SetupExpenseEstimatedOption");
+        return IsOptionChecked(description, "SetupExpenseEstimatedCheckBox");
+    }
+
+    /// <summary>
+    /// "Pagamento parcial" of a selected expense.
+    /// </summary>
+    public bool IsExpensePartialPayment(string description)
+    {
+        ShowOption(description, "SetupExpensePartialPaymentOption");
+        return IsOptionChecked(description, "SetupExpensePartialPaymentCheckBox");
+    }
+
+    public SetupPageObject ToggleExpenseEstimated(string description) =>
+        ToggleOption(description, "SetupExpenseEstimatedOption", "SetupExpenseEstimatedCheckBox");
+
+    public SetupPageObject ToggleExpensePartialPayment(string description) =>
+        ToggleOption(description, "SetupExpensePartialPaymentOption", "SetupExpensePartialPaymentCheckBox");
+
+    // The options sit at the bottom of the row, below the fold once the keyboard closes, so they are scrolled clear
+    // of the footer buttons first. Expenses are handled top to bottom, so scrolling down is enough.
+    private void ShowOption(string description, string optionId)
+    {
+        _session.HideKeyboardIfShown();
+        var option = ExpenseRowElement(description, optionId);
+        var footerTop = _session.WaitForVisible(NextButton).Location.Y;
+        _session.ScrollDownUntil(() => IsAboveFooter(option, footerTop), $"the option of \"{description}\" to be on screen");
+    }
+
+    private bool IsOptionChecked(string description, string checkBoxId) =>
+        _session.WaitForVisible(ExpenseRowElement(description, checkBoxId)).GetAttribute("checked") == "true";
+
+    private SetupPageObject ToggleOption(string description, string optionId, string checkBoxId)
+    {
+        ShowOption(description, optionId);
+        var wasChecked = IsOptionChecked(description, checkBoxId);
+        _session.Tap(ExpenseRowElement(description, optionId));
+        _session.WaitFor(() => IsOptionChecked(description, checkBoxId) != wasChecked, $"the option of \"{description}\" to be toggled");
+        return this;
+    }
 
     public string ExpensesSourceText => _session.ScrollTo(ExpensesSourcePickerId).Text;
 

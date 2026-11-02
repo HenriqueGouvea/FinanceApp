@@ -264,9 +264,23 @@ public class SetupViewModelTests
         await _vm.PrepareAsync(isRerun: false);
 
         _vm.Expenses.Where(e => e.IsEstimated).Select(e => e.Description).Should().Equal("Energia", "Água", "Mercado");
+        _vm.Expenses.Where(e => e.AllowsPartialPayment).Select(e => e.Description).Should().Equal("Mercado");
+    }
+
+    [Fact]
+    public async Task ExpenseFlags_CanBeToggledByTheUser()
+    {
+        await _vm.PrepareAsync(isRerun: false);
         var supermarket = _vm.Expenses.Single(e => e.Description == "Mercado");
+        var internet = _vm.Expenses.Single(e => e.Description == "Internet");
+
+        supermarket.ToggleEstimatedCommand.Execute(null);
+        internet.TogglePartialPaymentCommand.Execute(null);
+
+        supermarket.IsEstimated.Should().BeFalse();
         supermarket.AllowsPartialPayment.Should().BeTrue();
-        supermarket.HasDueDay.Should().BeFalse();
+        internet.AllowsPartialPayment.Should().BeTrue();
+        internet.IsEstimated.Should().BeFalse();
     }
 
     // --- Summary ---
@@ -281,6 +295,7 @@ public class SetupViewModelTests
         SelectExpense("Aluguel ou financiamento", 1500, dueDay: 10);
         SelectExpense("Energia", 200);
         SelectExpense("Internet", 0);
+        SelectExpense("Mercado", 1000);
 
         await GoToSummaryAsync();
 
@@ -288,10 +303,11 @@ public class SetupViewModelTests
         _vm.SummaryRows.Select(r => (r.Description, r.Detail, r.Amount)).Should().Equal(
             ("Salário", "Todo mês · dia 5 · Nubank", 5000m),
             ("Aluguel ou financiamento", "Todo mês · dia 10 · Nubank", 1500m),
-            ("Energia", "Todo mês · valor estimado · Nubank", 200m));
+            ("Energia", "Todo mês · valor estimado · Nubank", 200m),
+            ("Mercado", "Todo mês · valor estimado · pagamento parcial · Nubank", 1000m));
         _vm.TotalIncome.Should().Be(5000);
-        _vm.TotalOutcome.Should().Be(1700);
-        _vm.Balance.Should().Be(3300);
+        _vm.TotalOutcome.Should().Be(2700);
+        _vm.Balance.Should().Be(2300);
     }
 
     [Fact]
@@ -322,13 +338,13 @@ public class SetupViewModelTests
     [Fact]
     public async Task Next_OnSummary_CompletesSetupAndCloses()
     {
-        var closed = false;
+        string? closed = null;
         var received = false;
         _messenger.Register<SetupCompletedMessage>(this, (_, _) => received = true);
         NewUserSetup? saved = null;
         await _setupService.CompleteAsync(Arg.Do<NewUserSetup>(s => saved = s));
         await _vm.PrepareAsync(isRerun: false);
-        _vm.SetClosedCallback(() => { closed = true; return Task.CompletedTask; });
+        _vm.SetClosedCallback(completed => { closed = completed ? "finished" : "skipped"; return Task.CompletedTask; });
         _vm.Name = "Ana";
         _vm.PhotoPath = "/cache/picked.jpg";
         AddSource("Nubank", PaymentSourceType.BankAccount);
@@ -337,6 +353,7 @@ public class SetupViewModelTests
         _vm.SalaryDay = SetupViewModel.NoDueDay;
         _vm.ExpensesSource = _vm.NewSources.Single(s => s.Name == "Visa");
         SelectExpense("Mercado", 1200, dueDay: 15);
+        _vm.Expenses.Single(e => e.Description == "Mercado").ToggleEstimatedCommand.Execute(null);
         await GoToSummaryAsync();
 
         await _vm.NextCommand.ExecuteAsync(null);
@@ -348,9 +365,9 @@ public class SetupViewModelTests
         saved.Entries.Select(e => (e.Description, e.Amount, e.EntryType, e.DueDay, e.IsEstimated, e.AllowsPartialPayment, e.CategoryName, e.PaymentSource!.Name))
             .Should().Equal(
                 ("Salário", 5000m, FinancialEntryType.Income, (int?)null, false, false, "Salário", "Nubank"),
-                ("Mercado", 1200m, FinancialEntryType.Outcome, (int?)null, true, true, "Mercado", "Visa"));
+                ("Mercado", 1200m, FinancialEntryType.Outcome, (int?)15, false, true, "Mercado", "Visa"));
         received.Should().BeTrue();
-        closed.Should().BeTrue();
+        closed.Should().Be("finished");
     }
 
     // --- Skip ---
@@ -358,30 +375,30 @@ public class SetupViewModelTests
     [Fact]
     public async Task Skip_FirstRun_SkipsForGoodAndCloses()
     {
-        var closed = false;
+        string? closed = null;
         await _vm.PrepareAsync(isRerun: false);
-        _vm.SetClosedCallback(() => { closed = true; return Task.CompletedTask; });
+        _vm.SetClosedCallback(completed => { closed = completed ? "finished" : "skipped"; return Task.CompletedTask; });
 
         await _vm.SkipCommand.ExecuteAsync(null);
 
         _setupService.Received(1).Skip();
         await _setupService.DidNotReceive().CompleteAsync(Arg.Any<NewUserSetup>());
-        closed.Should().BeTrue();
+        closed.Should().Be("skipped");
     }
 
     [Fact]
     public async Task Skip_Rerun_OnlyCloses()
     {
-        var closed = false;
+        string? closed = null;
         await _vm.PrepareAsync(isRerun: true);
-        _vm.SetClosedCallback(() => { closed = true; return Task.CompletedTask; });
+        _vm.SetClosedCallback(completed => { closed = completed ? "finished" : "skipped"; return Task.CompletedTask; });
         _vm.Salary = 5000;
 
         await _vm.SkipCommand.ExecuteAsync(null);
 
         _setupService.DidNotReceive().Skip();
         await _setupService.DidNotReceive().CompleteAsync(Arg.Any<NewUserSetup>());
-        closed.Should().BeTrue();
+        closed.Should().Be("skipped");
     }
 
     private void AddSource(string name, PaymentSourceType type)

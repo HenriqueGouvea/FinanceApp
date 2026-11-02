@@ -20,14 +20,20 @@ public partial class AppShell : Shell
     }
 
     /// <summary>
-    /// Opens the setup wizard: on the first run, or again from the menu (<paramref name="isRerun"/>) to add more entries.
+    /// Opens the setup wizard: on the first run, or again from the settings (<paramref name="isRerun"/>) to add more entries.
+    /// Once finished, it lands on the entries page to show what was created.
     /// </summary>
     public async Task ShowSetupAsync(bool isRerun)
     {
         var page = Handler?.MauiContext?.Services.GetService<SetupPage>()
             ?? throw new InvalidOperationException("SetupPage not found.");
 
-        await page.PrepareAsync(isRerun, async () => await Navigation.PopModalAsync());
+        await page.PrepareAsync(isRerun, async completed =>
+        {
+            await Navigation.PopModalAsync();
+            if (completed && isRerun)
+                await GoToAsync("//MainPage");
+        });
         await Navigation.PushModalAsync(page, animated: isRerun);
     }
 
@@ -54,11 +60,5 @@ public partial class AppShell : Shell
     {
         FlyoutIsPresented = false;
         await GoToAsync("//PaymentSourcesPage");
-    }
-
-    private async void OnRedoSetupClicked(object? sender, EventArgs e)
-    {
-        FlyoutIsPresented = false;
-        await ShowSetupAsync(isRerun: true);
     }
 }

@@ -46,6 +46,27 @@ public class UserProfileViewModelTests
     }
 
     [Fact]
+    public void DisplayName_NoName_InvitesToAddOne()
+    {
+        _vm.Load();
+        _vm.DisplayName.Should().Be("Adicionar nome e foto");
+
+        _vm.Name = "Ana";
+        _vm.DisplayName.Should().Be("Ana");
+    }
+
+    [Fact]
+    public void ProfileChanged_ReloadsProfile()
+    {
+        _vm.Load();
+        _profileService.Name.Returns("Ana");
+
+        _messenger.Send(new ProfileChangedMessage());
+
+        _vm.Greeting.Should().Be("Olá, Ana!");
+    }
+
+    [Fact]
     public void SetupCompleted_ReloadsProfile()
     {
         _vm.Load();

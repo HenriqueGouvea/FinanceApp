@@ -78,7 +78,7 @@ public class CategoriesPageObject
     public MainPageObject GoToEntries()
     {
         _session.Tap(FlyoutButton);
-        _session.Tap(AppSession.Text(AppLabels.EntriesMenuItem));
+        _session.Tap(AppSession.Text(AppLabels.HomeMenuItem));
         return new MainPageObject(_session).WaitUntilLoaded();
     }
 

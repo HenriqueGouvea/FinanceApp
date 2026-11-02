@@ -7,14 +7,16 @@ using FinanceApp.Services;
 namespace FinanceApp.ViewModels;
 
 /// <summary>
-/// The greeting with the user's photo at the top of the hamburger menu.
+/// The user's name and photo: the greeting at the top of the hamburger menu and the "Usuário" section of the settings.
 /// </summary>
-public partial class UserProfileViewModel : ObservableObject, IRecipient<SetupCompletedMessage>
+public partial class UserProfileViewModel : ObservableObject,
+    IRecipient<SetupCompletedMessage>,
+    IRecipient<ProfileChangedMessage>
 {
     private readonly IUserProfileService _profileService;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Greeting), nameof(Initial))]
+    [NotifyPropertyChangedFor(nameof(Greeting), nameof(Initial), nameof(DisplayName))]
     string name = string.Empty;
 
     [ObservableProperty]
@@ -25,13 +27,19 @@ public partial class UserProfileViewModel : ObservableObject, IRecipient<SetupCo
     public string Initial => string.IsNullOrWhiteSpace(Name) ? "👤" : Name[..1].ToUpperInvariant();
     public bool HasPhoto => PhotoPath is not null;
 
+    /// <summary>
+    /// The name, or an invitation to add one, as shown in the settings.
+    /// </summary>
+    public string DisplayName => string.IsNullOrWhiteSpace(Name) ? "Adicionar nome e foto" : Name;
+
     public UserProfileViewModel(IUserProfileService profileService, IMessenger messenger)
     {
         _profileService = profileService;
-        messenger.Register(this);
+        messenger.RegisterAll(this);
     }
 
     public void Receive(SetupCompletedMessage message) => Load();
+    public void Receive(ProfileChangedMessage message) => Load();
 
     [RelayCommand]
     public void Load()

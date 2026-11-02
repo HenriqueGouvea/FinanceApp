@@ -64,6 +64,7 @@ public static class MauiProgram
         builder.Services.AddTransient<SecurityViewModel>();
         builder.Services.AddTransient<SetupViewModel>();
         builder.Services.AddTransient<UserProfileViewModel>();
+        builder.Services.AddTransient<ProfileEditViewModel>();
 
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddTransient<MainPage>();
@@ -77,6 +78,8 @@ public static class MauiProgram
         builder.Services.AddTransient<PinPage>();
         builder.Services.AddTransient<SecurityPage>();
         builder.Services.AddTransient<SetupPage>();
+        builder.Services.AddTransient<SettingsPage>();
+        builder.Services.AddTransient<ProfileEditPopup>();
 
         return builder.Build();
     }

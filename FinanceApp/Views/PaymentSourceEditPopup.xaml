@@ -39,7 +39,7 @@
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding SelectTypeCommand}" CommandParameter="{x:Static models:PaymentSourceType.BankAccount}" />
                         </Border.GestureRecognizers>
-                        <Label Text="🏦 Conta" HorizontalOptions="Center" FontSize="13" TextColor="Purple">
+                        <Label Text="🏦 Conta" HorizontalOptions="Center" VerticalOptions="Center" FontSize="13" TextColor="Purple">
                             <Label.Triggers>
                                 <DataTrigger TargetType="Label" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.BankAccount}">
                                     <Setter Property="TextColor" Value="White" />
@@ -63,7 +63,7 @@
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding SelectTypeCommand}" CommandParameter="{x:Static models:PaymentSourceType.CreditCard}" />
                         </Border.GestureRecognizers>
-                        <Label Text="💳 Cartão" HorizontalOptions="Center" FontSize="13" TextColor="Purple">
+                        <Label Text="💳 Cartão de crédito" HorizontalOptions="Center" HorizontalTextAlignment="Center" VerticalOptions="Center" FontSize="13" TextColor="Purple">
                             <Label.Triggers>
                                 <DataTrigger TargetType="Label" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.CreditCard}">
                                     <Setter Property="TextColor" Value="White" />
@@ -87,7 +87,7 @@
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding SelectTypeCommand}" CommandParameter="{x:Static models:PaymentSourceType.MealVoucher}" />
                         </Border.GestureRecognizers>
-                        <Label Text="🍽️ Vale" HorizontalOptions="Center" FontSize="13" TextColor="Purple">
+                        <Label Text="🍽️ Vale" HorizontalOptions="Center" VerticalOptions="Center" FontSize="13" TextColor="Purple">
                             <Label.Triggers>
                                 <DataTrigger TargetType="Label" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.MealVoucher}">
                                     <Setter Property="TextColor" Value="White" />

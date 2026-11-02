@@ -10,7 +10,7 @@ namespace FinanceApp.ViewModels;
 
 /// <summary>
 /// The setup wizard: name and photo, accounts and cards, salary and house expenses, then a summary of the
-/// recurrent entries it will create. Shown on the first run and again from the menu to add more.
+/// recurrent entries it will create. Shown on the first run and again from the settings to add more.
 /// </summary>
 public partial class SetupViewModel : ObservableObject
 {
@@ -23,7 +23,7 @@ public partial class SetupViewModel : ObservableObject
     private readonly IUserProfileService _profileService;
     private readonly IMediaPicker _mediaPicker;
     private readonly IMessenger _messenger;
-    private Func<Task>? _onClosed;
+    private Func<bool, Task>? _onClosed;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StepNumber), nameof(Progress), nameof(IsFirstStep), nameof(IsLastStep), nameof(NextButtonText),
@@ -75,7 +75,7 @@ public partial class SetupViewModel : ObservableObject
     public string NextButtonText => IsLastStep ? "Começar" : "Continuar";
 
     /// <summary>
-    /// The first run can be skipped for good; run again from the menu, the wizard is just closed.
+    /// The first run can be skipped for good; run again from the settings, the wizard is just closed.
     /// </summary>
     public string SkipButtonText => IsRerun ? "Fechar" : "Pular";
 
@@ -149,9 +149,9 @@ public partial class SetupViewModel : ObservableObject
     }
 
     /// <summary>
-    /// <paramref name="onClosed"/> runs once the wizard is finished or skipped and must close it.
+    /// <paramref name="onClosed"/> runs once the wizard is finished (true) or skipped (false) and must close it.
     /// </summary>
-    public void SetClosedCallback(Func<Task> onClosed)
+    public void SetClosedCallback(Func<bool, Task> onClosed)
     {
         _onClosed = onClosed;
     }
@@ -159,16 +159,8 @@ public partial class SetupViewModel : ObservableObject
     [RelayCommand]
     async Task PickPhoto()
     {
-        try
-        {
-            var photos = await _mediaPicker.PickPhotosAsync(new MediaPickerOptions { Title = "Escolha sua foto", SelectionLimit = 1 });
-            if (photos.FirstOrDefault() is { } photo)
-                PhotoPath = photo.FullPath;
-        }
-        catch (Exception ex) when (ex is PermissionException or FeatureNotSupportedException)
-        {
-            Console.WriteLine($"Error picking the profile photo: {ex.Message}");
-        }
+        if (await _mediaPicker.PickProfilePhotoAsync() is { } path)
+            PhotoPath = path;
     }
 
     [RelayCommand]
@@ -241,7 +233,7 @@ public partial class SetupViewModel : ObservableObject
             _setupService.Skip();
 
         if (_onClosed is not null)
-            await _onClosed();
+            await _onClosed(false);
     }
 
     private async Task FinishAsync()
@@ -250,7 +242,7 @@ public partial class SetupViewModel : ObservableObject
         _messenger.Send(new SetupCompletedMessage());
 
         if (_onClosed is not null)
-            await _onClosed();
+            await _onClosed(true);
     }
 
     private NewUserSetup BuildSetup() => new()
@@ -280,7 +272,7 @@ public partial class SetupViewModel : ObservableObject
                 Description = expense.Description,
                 Amount = expense.Amount,
                 EntryType = FinancialEntryType.Outcome,
-                DueDay = expense.HasDueDay && expense.DueDay != NoDueDay ? expense.DueDay : null,
+                DueDay = expense.DueDay == NoDueDay ? null : expense.DueDay,
                 IsEstimated = expense.IsEstimated,
                 AllowsPartialPayment = expense.AllowsPartialPayment,
                 CategoryName = expense.CategoryName,
@@ -312,6 +304,8 @@ public partial class SetupViewModel : ObservableObject
             parts.Add($"dia {day}");
         if (entry.IsEstimated)
             parts.Add("valor estimado");
+        if (entry.AllowsPartialPayment)
+            parts.Add("pagamento parcial");
         if (entry.PaymentSource is { } source)
             parts.Add(source.Name);
         return string.Join(" · ", parts);
@@ -328,13 +322,13 @@ public partial class SetupViewModel : ObservableObject
     [
         new() { Icon = "🏠", Description = "Aluguel ou financiamento", CategoryName = "Moradia" },
         new() { Icon = "🏢", Description = "Condomínio", CategoryName = "Moradia" },
-        new() { Icon = "💡", Description = "Energia", Hint = "Valor estimado: muda a cada mês", CategoryName = "Moradia", IsEstimated = true },
-        new() { Icon = "🚿", Description = "Água", Hint = "Valor estimado: muda a cada mês", CategoryName = "Moradia", IsEstimated = true },
+        new() { Icon = "💡", Description = "Energia", CategoryName = "Moradia", IsEstimated = true },
+        new() { Icon = "🚿", Description = "Água", CategoryName = "Moradia", IsEstimated = true },
         new() { Icon = "🌐", Description = "Internet", CategoryName = "Moradia" },
         new() { Icon = "📱", Description = "Celular", CategoryName = "Moradia" },
         new()
         {
-            Icon = "🛒", Description = "Mercado", Hint = "Valor estimado, pago aos poucos durante o mês", CategoryName = "Mercado",
+            Icon = "🛒", Description = "Mercado", CategoryName = "Mercado",
             IsEstimated = true, AllowsPartialPayment = true
         }
     ];

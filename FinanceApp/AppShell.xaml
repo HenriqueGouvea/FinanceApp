@@ -51,7 +51,7 @@
     </Shell.FlyoutHeader>
 
     <ShellContent
-        Title="Lançamentos"
+        Title="Início"
         ContentTemplate="{DataTemplate views:MainPage}"
         Route="MainPage" />
 
@@ -66,13 +66,9 @@
         Route="PaymentSourcesPage" />
 
     <ShellContent
-        Title="Segurança"
-        ContentTemplate="{DataTemplate views:SecurityPage}"
-        Route="SecurityPage" />
-
-    <MenuItem Text="Refazer configuração inicial"
-              AutomationId="RedoSetupMenuItem"
-              Clicked="OnRedoSetupClicked" />
+        Title="Configurações"
+        ContentTemplate="{DataTemplate views:SettingsPage}"
+        Route="SettingsPage" />
 
     <!-- Current balance of each account, card and voucher; tapping one opens it to update the balance -->
     <Shell.FlyoutFooter>

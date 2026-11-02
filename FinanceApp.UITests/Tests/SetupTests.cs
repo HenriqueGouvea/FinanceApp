@@ -69,7 +69,9 @@ public sealed class SetupTests : E2ETestBase
     [Fact]
     public void AddSources_FirstAccountIsWhereSalaryAndExpensesGo()
     {
-        _setup.Next()
+        _setup.Next();
+        _setup.CreditCardTypeText.Should().Be(AppLabels.CreditCardType);
+        _setup
             .AddSource(Card, AppFormat.CreditCard, 8000)
             .AddSource(Account, AppFormat.BankAccount, 2500);
 
@@ -93,7 +95,7 @@ public sealed class SetupTests : E2ETestBase
             (Salary, AppLabels.SetupSchedule("dia 6", Account), AppFormat.Money(5000)),
             (Rent, AppLabels.SetupSchedule("dia 10", Card), AppFormat.Money(1500)),
             (Energy, AppLabels.SetupSchedule("dia 15", AppLabels.EstimatedValue, Card), AppFormat.Money(200)),
-            (Supermarket, AppLabels.SetupSchedule(AppLabels.EstimatedValue, Card), AppFormat.Money(1000)));
+            (Supermarket, AppLabels.SetupSchedule(AppLabels.EstimatedValue, AppLabels.PartialPaymentValue, Card), AppFormat.Money(1000)));
         _setup.SummaryIncomeText.Should().Be(AppFormat.Money(5000));
         _setup.SummaryOutcomeText.Should().Be(AppFormat.Money(2700));
         _setup.SummaryBalanceText.Should().Be(AppFormat.Money(2300));
@@ -172,11 +174,27 @@ public sealed class SetupTests : E2ETestBase
     }
 
     [Fact]
-    public void HouseExpenses_SupermarketHasNoDueDay()
+    public async Task HouseExpenses_EstimatedAndPartialPaymentOptions_ArePresetAndCanBeChanged()
     {
-        _setup.Next().Next().Next().SelectExpense(Supermarket, 1000);
+        // Each expense is handled while on screen, top to bottom: Internet comes before Mercado in the list.
+        _setup.Next().Next().Next().SelectExpense(Internet, 100);
+        _setup.IsExpenseEstimated(Internet).Should().BeFalse();
+        _setup.IsExpensePartialPayment(Internet).Should().BeFalse();
+        _setup.ToggleExpenseEstimated(Internet);
 
-        _setup.IsExpenseDueDayVisible(Supermarket).Should().BeFalse();
+        _setup.SelectExpense(Supermarket, 1000);
+        _setup.IsExpenseEstimated(Supermarket).Should().BeTrue();
+        _setup.IsExpensePartialPayment(Supermarket).Should().BeTrue();
+        _setup.ToggleExpenseEstimated(Supermarket);
+
+        _setup.Next().Finish();
+
+        var entries = await GetEntryRowsAsync();
+        entries.Select(e => (e.Description, e.IsEstimated, e.AllowsPartialPayment)).Should().BeEquivalentTo(
+        [
+            (Supermarket, false, true),
+            (Internet, true, false)
+        ]);
     }
 
     [Fact]
@@ -201,8 +219,8 @@ public sealed class SetupTests : E2ETestBase
     {
         var main = _setup.Skip();
 
-        var again = main.RedoSetup().Next().Next().EnterSalary(5000);
-        main = again.Skip();
+        var settings = main.RedoSetup().Next().Next().EnterSalary(5000).Close();
+        main = settings.GoToHome();
 
         main.IncomeCountText.Should().Be(AppFormat.EntryCount(0));
         (await GetEntryRowsAsync()).Should().BeEmpty();

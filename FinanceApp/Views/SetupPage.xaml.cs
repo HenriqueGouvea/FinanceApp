@@ -3,7 +3,7 @@ using FinanceApp.ViewModels;
 namespace FinanceApp.Views;
 
 /// <summary>
-/// The setup wizard, pushed modally on the first run and from the menu's "Refazer configuração inicial".
+/// The setup wizard, pushed modally on the first run and from "Refazer configuração inicial" in the settings.
 /// </summary>
 public partial class SetupPage : ContentPage
 {
@@ -23,15 +23,15 @@ public partial class SetupPage : ContentPage
     }
 
     /// <summary>
-    /// <paramref name="onClosed"/> runs once the wizard is finished or skipped and must close the page.
+    /// <paramref name="onClosed"/> runs once the wizard is finished (true) or skipped (false) and must close the page.
     /// </summary>
-    public async Task PrepareAsync(bool isRerun, Func<Task> onClosed)
+    public async Task PrepareAsync(bool isRerun, Func<bool, Task> onClosed)
     {
         await _viewModel.PrepareAsync(isRerun);
         _viewModel.SetClosedCallback(onClosed);
     }
 
-    // Back goes to the previous step. On the first step it closes a wizard opened from the menu, while on the
+    // Back goes to the previous step. On the first step it closes a wizard opened from the settings, while on the
     // first run it leaves the app, as the home button would, so the setup is still offered next time.
     protected override bool OnBackButtonPressed()
     {
