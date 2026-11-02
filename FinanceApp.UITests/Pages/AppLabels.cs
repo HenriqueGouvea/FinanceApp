@@ -22,6 +22,18 @@ public static class AppLabels
     public const string CategoriesMenuItem = "Categorias";
     public const string PaymentSourcesMenuItem = "Contas e cartões";
     public const string SecurityMenuItem = "Segurança";
+    public const string RedoSetupMenuItem = "Refazer configuração inicial";
+
+    public const string SetupSkip = "Pular";
+    public const string SetupClose = "Fechar";
+    public const string SetupContinue = "Continuar";
+    public const string SetupStart = "Começar";
+    public const string SetupSummaryTitle = "Tudo pronto!";
+    public static string SetupSummaryTitleFor(string name) => $"Tudo pronto, {name}!";
+    public static string MenuGreeting(string name) => $"Olá, {name}!";
+    public const string MenuGreetingWithoutName = "Olá!";
+    public static string SetupSchedule(params string[] parts) => string.Join(" · ", ["Todo mês", .. parts]);
+    public const string EstimatedValue = "valor estimado";
 
     public const string EnterPin = "Digite seu PIN";
     public const string CreatePin = "Crie um PIN de 4 dígitos";

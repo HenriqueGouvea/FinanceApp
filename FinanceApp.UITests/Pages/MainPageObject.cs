@@ -49,6 +49,7 @@ public class MainPageObject
     private static readonly By NextMonthButton = AppSession.AutomationId("NextMonthButton");
     private static readonly By SwipeHint = AppSession.AutomationId("SwipeHintLabel");
     private static readonly By MonthPickerBadge = AppSession.AutomationId("MonthPickerBadge");
+    private static readonly By FlyoutGreeting = AppSession.AutomationId("FlyoutGreetingLabel");
     private static readonly By FlyoutButton =
         MobileBy.AndroidUIAutomator("new UiSelector().className(\"android.widget.ImageButton\").instance(0)");
 
@@ -533,6 +534,28 @@ public class MainPageObject
         _session.Tap(FlyoutButton);
         _session.Tap(AppSession.Text(AppLabels.SecurityMenuItem));
         return new SecurityPageObject(_session).WaitUntilLoaded();
+    }
+
+    /// <summary>
+    /// Opens the hamburger menu, reads its greeting (e.g. "Olá, Ana!") and closes it again.
+    /// </summary>
+    public string ReadMenuGreeting()
+    {
+        _session.Tap(FlyoutButton);
+        var greeting = _session.WaitForVisible(FlyoutGreeting).Text;
+        _session.PressBack();
+        _session.WaitForGone(FlyoutGreeting);
+        return greeting;
+    }
+
+    /// <summary>
+    /// Opens the setup wizard again through the menu's "Refazer configuração inicial".
+    /// </summary>
+    public SetupPageObject RedoSetup()
+    {
+        _session.Tap(FlyoutButton);
+        _session.Tap(AppSession.Text(AppLabels.RedoSetupMenuItem));
+        return new SetupPageObject(_session).WaitUntilLoaded();
     }
 
     public bool IsLoaded => _session.IsVisible(AddEntryButton);

@@ -8,22 +8,27 @@ public partial class App : Application
 {
     private readonly AppShell _shell;
     private readonly IAppLockService _appLockService;
+    private readonly ISetupService _setupService;
     private bool _isLocked;
 
-    public App(AppShell shell, IAppLockService appLockService)
+    public App(AppShell shell, IAppLockService appLockService, ISetupService setupService)
     {
         InitializeComponent();
         _shell = shell;
         _appLockService = appLockService;
+        _setupService = setupService;
     }
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
         var window = new Window(_shell);
 
+        // A first run has no PIN yet, so the setup wizard and the lock screen never show up together.
         _shell.Loaded += async (_, _) =>
         {
-            if (await _appLockService.IsPinEnabledAsync())
+            if (await _setupService.ShouldShowAsync())
+                await _shell.ShowSetupAsync(isRerun: false);
+            else if (await _appLockService.IsPinEnabledAsync())
                 await LockAsync();
         };
         window.Stopped += (_, _) => _appLockService.OnAppBackgrounded();

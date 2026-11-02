@@ -220,6 +220,26 @@ public sealed class AppSession : IDisposable
     }
 
     /// <summary>
+    /// Scrolls the page content up, half a screen at a time, until the condition holds (e.g. an element that just
+    /// appeared below the fold is fully on screen).
+    /// </summary>
+    public void ScrollDownUntil(Func<bool> condition, string description, int maxScrolls = 5)
+    {
+        var size = Driver.Manage().Window.Size;
+        for (var i = 0; i < maxScrolls && !condition(); i++)
+            Driver.ExecuteScript("mobile: scrollGesture", new Dictionary<string, object>
+            {
+                ["left"] = size.Width / 10,
+                ["top"] = size.Height / 4,
+                ["width"] = size.Width * 8 / 10,
+                ["height"] = size.Height / 2,
+                ["direction"] = "down",
+                ["percent"] = 0.5
+            });
+        WaitFor(condition, description);
+    }
+
+    /// <summary>
     /// Swipes horizontally across the lower middle of the screen, below the month summary (which takes
     /// sideways swipes for its own pages). "left" moves the finger to the left.
     /// </summary>
