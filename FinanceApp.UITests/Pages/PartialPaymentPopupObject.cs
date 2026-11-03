@@ -26,9 +26,14 @@ public class PartialPaymentPopupObject
         _session = session;
     }
 
+    /// <summary>
+    /// The popup focuses the amount on open, which brings the keyboard up a moment later. It is closed here with
+    /// "Done": hiding it later, while it is still coming up, can press Back and dismiss the popup.
+    /// </summary>
     public PartialPaymentPopupObject WaitUntilOpen()
     {
         _session.WaitForVisible(AmountEntry);
+        _session.CloseKeyboardWithDoneOnceShown();
         return this;
     }
 
