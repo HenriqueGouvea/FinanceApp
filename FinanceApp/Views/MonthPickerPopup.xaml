@@ -23,8 +23,8 @@
                         HeightRequest="44"
                         Padding="0"
                         CornerRadius="22"
-                        BackgroundColor="#EDE7F6"
-                        TextColor="Purple"
+                        BackgroundColor="{StaticResource Secondary}"
+                        TextColor="{StaticResource Primary}"
                         Command="{Binding PreviousYearCommand}" />
                 <Label Grid.Column="1"
                        AutomationId="PickerYearLabel"
@@ -41,8 +41,8 @@
                         HeightRequest="44"
                         Padding="0"
                         CornerRadius="22"
-                        BackgroundColor="#EDE7F6"
-                        TextColor="Purple"
+                        BackgroundColor="{StaticResource Secondary}"
+                        TextColor="{StaticResource Primary}"
                         Command="{Binding NextYearCommand}" />
             </Grid>
 
@@ -61,10 +61,10 @@
                                 IsEnabled="{Binding IsEnabled}">
                             <Border.Triggers>
                                 <DataTrigger TargetType="Border" Binding="{Binding IsCurrent}" Value="True">
-                                    <Setter Property="Stroke" Value="Purple" />
+                                    <Setter Property="Stroke" Value="{StaticResource PrimaryBrush}" />
                                 </DataTrigger>
                                 <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
-                                    <Setter Property="BackgroundColor" Value="Purple" />
+                                    <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
                                 </DataTrigger>
                                 <DataTrigger TargetType="Border" Binding="{Binding IsEnabled}" Value="False">
                                     <Setter Property="Opacity" Value="0.35" />
@@ -94,7 +94,7 @@
 
             <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
                 <Button Grid.Column="0" AutomationId="CancelMonthPickerButton" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />
-                <Button Grid.Column="1" AutomationId="PickerCurrentMonthButton" Text="Mês atual" Command="{Binding SelectCurrentMonthCommand}" BackgroundColor="Purple" />
+                <Button Grid.Column="1" AutomationId="PickerCurrentMonthButton" Text="Mês atual" Command="{Binding SelectCurrentMonthCommand}" BackgroundColor="{StaticResource Primary}" />
             </Grid>
         </VerticalStackLayout>
     </Border>

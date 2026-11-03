@@ -23,7 +23,7 @@
                 <DataTemplate x:DataType="vm:PaymentSourceGroup">
                     <Label AutomationId="PaymentSourceGroupHeader"
                            Text="{Binding Title}"
-                           TextColor="Purple"
+                           TextColor="{StaticResource Primary}"
                            FontSize="13"
                            FontAttributes="Bold"
                            Padding="20,14,20,4" />
@@ -39,7 +39,7 @@
                                 WidthRequest="40" HeightRequest="40"
                                 StrokeThickness="0"
                                 StrokeShape="RoundRectangle 20"
-                                BackgroundColor="#EDE7F6">
+                                BackgroundColor="{StaticResource Secondary}">
                             <Label Text="{Binding Source.Type, Converter={x:Static converters:PaymentSourceTypeToIconConverter.Instance}}"
                                    FontSize="18"
                                    HorizontalOptions="Center" VerticalOptions="Center" />
@@ -66,14 +66,14 @@
                                    IsVisible="{Binding IsCreditCard}">
                                 <Label.Triggers>
                                     <DataTrigger TargetType="Label" Binding="{Binding IsOverLimit}" Value="True">
-                                        <Setter Property="TextColor" Value="#D32F2F" />
+                                        <Setter Property="TextColor" Value="#C2414B" />
                                     </DataTrigger>
                                 </Label.Triggers>
                             </Label>
                         </VerticalStackLayout>
                         <Border Grid.Column="2"
                                 AutomationId="DeletePaymentSourceButton"
-                                BackgroundColor="#D32F2F"
+                                BackgroundColor="#C2414B"
                                 StrokeThickness="0"
                                 StrokeShape="RoundRectangle 8"
                                 Padding="12,6"
@@ -91,8 +91,8 @@
         <Button AutomationId="AddPaymentSourceButton"
                 Text="+"
                 FontSize="24"
-                BackgroundColor="Purple"
-                TextColor="White"
+                BackgroundColor="{StaticResource Accent}"
+                TextColor="{StaticResource AccentText}"
                 CornerRadius="28"
                 HeightRequest="56"
                 WidthRequest="56"

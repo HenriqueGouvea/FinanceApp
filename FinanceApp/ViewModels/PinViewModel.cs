@@ -75,7 +75,7 @@ public partial class PinViewModel : ObservableObject
     [RelayCommand]
     async Task UnlockWithBiometrics()
     {
-        if (CanUseBiometrics && await _biometricService.AuthenticateAsync("Desbloquear o FinanceApp", "Usar PIN"))
+        if (CanUseBiometrics && await _biometricService.AuthenticateAsync("Desbloquear o Mensal", "Usar PIN"))
             await CompleteAsync();
     }
 

@@ -9,7 +9,7 @@
         <VerticalStackLayout Padding="20" Spacing="8">
             <!-- There is no account yet: the data can't be recovered elsewhere, but the app can still be locked -->
             <Border AutomationId="NoAccountNotice"
-                    BackgroundColor="#EDE7F6"
+                    BackgroundColor="{StaticResource Secondary}"
                     StrokeThickness="0"
                     StrokeShape="RoundRectangle 12"
                     Padding="16"
@@ -18,10 +18,10 @@
                     <Label Text="Seus dados ficam só neste aparelho"
                            FontSize="15"
                            FontAttributes="Bold"
-                           TextColor="Purple" />
+                           TextColor="{StaticResource Primary}" />
                     <Label FontSize="13"
                            TextColor="#424242"
-                           Text="O FinanceApp ainda não tem conta de usuário. Sem ela, não é possível recuperar seus dados em outro aparelho nem acessá-los pelo site quando ele existir. Mesmo assim, você pode proteger o app com um PIN e com a biometria do aparelho." />
+                           Text="O Mensal ainda não tem conta de usuário. Sem ela, não é possível recuperar seus dados em outro aparelho nem acessá-los pelo site quando ele existir. Mesmo assim, você pode proteger o app com um PIN e com a biometria do aparelho." />
                     <Label FontSize="13"
                            TextColor="#424242"
                            Text="Guarde bem o PIN: sem conta, ele não pode ser recuperado." />
@@ -44,7 +44,7 @@
                         IsToggled="{Binding IsPinEnabled, Mode=OneWay}"
                         InputTransparent="True"
                         OnColor="#CE93D8"
-                        ThumbColor="Purple"
+                        ThumbColor="{StaticResource Primary}"
                         VerticalOptions="Center" />
             </Grid>
 
@@ -72,7 +72,7 @@
                         IsEnabled="{Binding IsBiometricAvailable}"
                         InputTransparent="True"
                         OnColor="#CE93D8"
-                        ThumbColor="Purple"
+                        ThumbColor="{StaticResource Primary}"
                         VerticalOptions="Center" />
             </Grid>
         </VerticalStackLayout>

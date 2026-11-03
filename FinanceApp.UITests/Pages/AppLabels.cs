@@ -28,6 +28,8 @@ public static class AppLabels
     public const string AddNameAndPhoto = "Adicionar nome e foto";
     public const string CreditCardType = "💳 Cartão de crédito";
 
+    public const string SetupWelcomeTitle = "Bem-vindo ao Mensal!";
+    public const string Tagline = "Todas as contas, um só rumo.";
     public const string SetupSkip = "Pular";
     public const string SetupClose = "Fechar";
     public const string SetupContinue = "Continuar";

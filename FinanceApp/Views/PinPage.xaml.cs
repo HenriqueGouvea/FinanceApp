@@ -52,6 +52,6 @@ public partial class PinPage : ContentPage
         await DisplayAlertAsync(
             "Esqueci o PIN",
             "Sem uma conta, o PIN não pode ser recuperado. Para voltar a usar o app, apague os dados dele nas " +
-            "configurações do Android (Apps > FinanceApp > Armazenamento > Limpar dados). Todos os lançamentos serão perdidos.",
+            "configurações do Android (Apps > Mensal > Armazenamento > Limpar dados). Todos os lançamentos serão perdidos.",
             "Entendi");
 }
