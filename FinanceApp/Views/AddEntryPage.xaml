@@ -24,7 +24,7 @@
                     HeightRequest="44"
                     CornerRadius="22"
                     BackgroundColor="Transparent"
-                    TextColor="Purple"
+                    TextColor="{StaticResource Primary}"
                     VerticalOptions="Center"
                     SemanticProperties.Description="Voltar"
                     Clicked="OnBackClicked" />
@@ -56,7 +56,7 @@
                     <!-- Outcome (Despesa) column -->
                     <Grid Grid.Column="0">
                         <!-- Active state -->
-                        <Frame CornerRadius="19" BackgroundColor="Crimson" Padding="10,8"
+                        <Frame CornerRadius="19" BackgroundColor="{StaticResource Outcome}" Padding="10,8"
                                HasShadow="False" BorderColor="Transparent"
                                IsVisible="{Binding IsIncome, Converter={x:Static converters:InverseBoolConverter.Instance}}">
                             <Label Text="Despesa" TextColor="White" FontAttributes="Bold"
@@ -78,7 +78,7 @@
                     <!-- Income (Receita) column -->
                     <Grid Grid.Column="1">
                         <!-- Active state -->
-                        <Frame CornerRadius="19" BackgroundColor="SeaGreen" Padding="10,8"
+                        <Frame CornerRadius="19" BackgroundColor="{StaticResource Income}" Padding="10,8"
                                HasShadow="False" BorderColor="Transparent"
                                IsVisible="{Binding IsIncome}">
                             <Label Text="Receita" TextColor="White" FontAttributes="Bold"
@@ -144,7 +144,7 @@
                             AutomationId="EstimatedSwitch"
                             IsToggled="{Binding IsEstimated}"
                             OnColor="#B39DDB"
-                            ThumbColor="Purple"
+                            ThumbColor="{StaticResource Primary}"
                             VerticalOptions="Center" />
                 </Grid>
 
@@ -211,7 +211,7 @@
                                             Padding="0"
                                             HeightRequest="36"
                                             BackgroundColor="Transparent"
-                                            TextColor="#D32F2F"
+                                            TextColor="#C2414B"
                                             Command="{Binding DeletePaymentCommand, Source={RelativeSource AncestorType={x:Type vm:AddEntryViewModel}}, x:DataType=vm:AddEntryViewModel}"
                                             CommandParameter="{Binding .}" />
                                 </Grid>
@@ -256,7 +256,7 @@
 
             <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,10,0,0">
                 <Button Grid.Column="0" AutomationId="CancelEntryButton" Text="Cancelar" Clicked="OnBackClicked" BackgroundColor="Gray" />
-                <Button Grid.Column="1" AutomationId="SaveEntryButton" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="Purple" />
+                <Button Grid.Column="1" AutomationId="SaveEntryButton" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="{StaticResource Primary}" />
             </Grid>
         </VerticalStackLayout>
         </ScrollView>

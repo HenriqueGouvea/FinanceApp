@@ -10,23 +10,23 @@
              x:DataType="vm:MainViewModel"
              Title="Início">
     <ContentPage.Resources>
-        <Color x:Key="OutcomeAccent">#D32F2F</Color>
-        <Color x:Key="OutcomeTint">#FDECEC</Color>
-        <Color x:Key="IncomeAccent">#2E7D32</Color>
-        <Color x:Key="IncomeTint">#E8F5E9</Color>
+        <Color x:Key="OutcomeAccent">#C2414B</Color>
+        <Color x:Key="OutcomeTint">#FBEAEC</Color>
+        <Color x:Key="IncomeAccent">#1F8F63</Color>
+        <Color x:Key="IncomeTint">#E5F5EE</Color>
         <!-- Every other entry row: lighter than the section header tints, so rows never read as headers -->
-        <Color x:Key="OutcomeAlternateRow">#FEF4F4</Color>
-        <Color x:Key="IncomeAlternateRow">#F3F9F3</Color>
+        <Color x:Key="OutcomeAlternateRow">#FDF5F6</Color>
+        <Color x:Key="IncomeAlternateRow">#F3FBF7</Color>
         <!-- Same for incomes and outcomes: a paid outcome is good news, so it must not use the red outcome accent -->
-        <Color x:Key="PaidAccent">#2E7D32</Color>
+        <Color x:Key="PaidAccent">#1F8F63</Color>
         <Color x:Key="PartialAccent">#EF6C00</Color>
         <Color x:Key="PaidProgressFill">#81C784</Color>
         <Color x:Key="EstimatedAccent">#455A64</Color>
         <Color x:Key="EstimatedTint">#ECEFF1</Color>
-        <Color x:Key="MonthNavAccent">#6A1B9A</Color>
-        <Color x:Key="MonthNavTint">#EDE7F6</Color>
-        <Color x:Key="BillTint">#F3E5F5</Color>
-        <Color x:Key="BillAccent">#CE93D8</Color>
+        <Color x:Key="MonthNavAccent">#5B2A86</Color>
+        <Color x:Key="MonthNavTint">#EFE6F8</Color>
+        <Color x:Key="BillTint">#F3EAFB</Color>
+        <Color x:Key="BillAccent">#B48BDA</Color>
         <Style x:Key="MonthArrowButton" TargetType="Button">
             <Setter Property="FontSize" Value="26" />
             <Setter Property="Padding" Value="0" />
@@ -233,7 +233,7 @@
                     </controls:SlideOutPanel.IsOpen>
                     <HorizontalStackLayout Spacing="6">
                         <Border AutomationId="MarkPaidEntryAction"
-                                BackgroundColor="#2E7D32"
+                                BackgroundColor="#1F8F63"
                                 StrokeThickness="0"
                                 StrokeShape="RoundRectangle 8"
                                 Padding="16,0"
@@ -272,7 +272,7 @@
                                    VerticalOptions="Center" />
                         </Border>
                         <Border AutomationId="DeleteEntryAction"
-                                BackgroundColor="#D32F2F"
+                                BackgroundColor="#C2414B"
                                 StrokeThickness="0"
                                 StrokeShape="RoundRectangle 8"
                                 Padding="16,0">
@@ -403,7 +403,7 @@
                         </controls:SlideOutPanel.IsOpen>
                         <HorizontalStackLayout Spacing="6">
                             <Border AutomationId="PayCreditCardBillAction"
-                                    BackgroundColor="#2E7D32"
+                                    BackgroundColor="#1F8F63"
                                     StrokeThickness="0"
                                     StrokeShape="RoundRectangle 8"
                                     Padding="16,0"
@@ -535,11 +535,11 @@
                                     <Grid AutomationId="SummaryTotalsPage" ColumnDefinitions="*, *, *" ColumnSpacing="8">
                                         <VerticalStackLayout Grid.Column="0" HorizontalOptions="Center">
                                             <Label Text="Receitas" FontSize="12" TextColor="Gray"/>
-                                            <Label AutomationId="SummaryIncomeLabel" Text="{Binding TotalIncomes, Converter={x:Static converters:MoneyConverter.Instance}}" TextColor="Green" FontAttributes="Bold"/>
+                                            <Label AutomationId="SummaryIncomeLabel" Text="{Binding TotalIncomes, Converter={x:Static converters:MoneyConverter.Instance}}" TextColor="{StaticResource IncomeAccent}" FontAttributes="Bold"/>
                                         </VerticalStackLayout>
                                         <VerticalStackLayout Grid.Column="1" HorizontalOptions="Center">
                                             <Label Text="Despesas" FontSize="12" TextColor="Gray"/>
-                                            <Label AutomationId="SummaryOutcomeLabel" Text="{Binding TotalOutcomes, Converter={x:Static converters:MoneyConverter.Instance}}" TextColor="Red" FontAttributes="Bold"/>
+                                            <Label AutomationId="SummaryOutcomeLabel" Text="{Binding TotalOutcomes, Converter={x:Static converters:MoneyConverter.Instance}}" TextColor="{StaticResource OutcomeAccent}" FontAttributes="Bold"/>
                                         </VerticalStackLayout>
                                         <VerticalStackLayout Grid.Column="2" HorizontalOptions="Center">
                                             <Label Text="Balanço" FontSize="12" TextColor="Gray"/>
@@ -695,9 +695,9 @@
                 HeightRequest="40"
                 Padding="16,0"
                 CornerRadius="20"
-                BackgroundColor="#EDE7F6"
-                TextColor="Purple"
-                BorderColor="Purple"
+                BackgroundColor="{StaticResource Secondary}"
+                TextColor="{StaticResource Primary}"
+                BorderColor="{StaticResource Primary}"
                 BorderWidth="1"
                 HorizontalOptions="Center"
                 VerticalOptions="End"
@@ -705,8 +705,8 @@
         <Button AutomationId="AddEntryButton"
                 Text="+"
                 FontSize="24"
-                BackgroundColor="Purple"
-                TextColor="White"
+                BackgroundColor="{StaticResource Accent}"
+                TextColor="{StaticResource AccentText}"
                 CornerRadius="28"
                 HeightRequest="56"
                 WidthRequest="56"

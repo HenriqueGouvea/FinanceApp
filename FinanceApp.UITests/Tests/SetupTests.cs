@@ -29,10 +29,12 @@ public sealed class SetupTests : E2ETestBase
     }
 
     [Fact]
-    public void FirstRun_ShowsWelcomeStep()
+    public void FirstRun_ShowsWelcomeStepWithBrandAndTagline()
     {
         _setup.StepText.Should().Be(AppFormat.SetupStep(1));
         _setup.IsWelcomeStepVisible.Should().BeTrue();
+        _setup.WelcomeTitleText.Should().Be(AppLabels.SetupWelcomeTitle);
+        _setup.TaglineText.Should().Be(AppLabels.Tagline);
         _setup.SkipButtonText.Should().Be(AppLabels.SetupSkip);
         _setup.NextButtonText.Should().Be(AppLabels.SetupContinue);
         _setup.IsBackVisible.Should().BeFalse();

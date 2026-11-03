@@ -10,8 +10,8 @@ public sealed class AlternatingRowsTests : E2ETestBase
 {
     // Mirror OutcomeAlternateRow / IncomeAlternateRow in MainPage.xaml.
     private static readonly (byte R, byte G, byte B) White = (0xFF, 0xFF, 0xFF);
-    private static readonly (byte R, byte G, byte B) OutcomeAlternate = (0xFE, 0xF4, 0xF4);
-    private static readonly (byte R, byte G, byte B) IncomeAlternate = (0xF3, 0xF9, 0xF3);
+    private static readonly (byte R, byte G, byte B) OutcomeAlternate = (0xFD, 0xF5, 0xF6);
+    private static readonly (byte R, byte G, byte B) IncomeAlternate = (0xF3, 0xFB, 0xF7);
 
     public AlternatingRowsTests(AppiumServerFixture server) : base(server)
     {

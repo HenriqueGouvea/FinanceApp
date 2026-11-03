@@ -27,19 +27,19 @@
                     <Border Grid.Column="0"
                             AutomationId="PaymentSourceBankAccountTypeButton"
                             StrokeShape="RoundRectangle 18"
-                            Stroke="Purple"
+                            Stroke="{StaticResource PrimaryBrush}"
                             StrokeThickness="1"
                             BackgroundColor="Transparent"
                             Padding="6,8">
                         <Border.Triggers>
                             <DataTrigger TargetType="Border" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.BankAccount}">
-                                <Setter Property="BackgroundColor" Value="Purple" />
+                                <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
                             </DataTrigger>
                         </Border.Triggers>
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding SelectTypeCommand}" CommandParameter="{x:Static models:PaymentSourceType.BankAccount}" />
                         </Border.GestureRecognizers>
-                        <Label Text="🏦 Conta" HorizontalOptions="Center" VerticalOptions="Center" FontSize="13" TextColor="Purple">
+                        <Label Text="🏦 Conta" HorizontalOptions="Center" VerticalOptions="Center" FontSize="13" TextColor="{StaticResource Primary}">
                             <Label.Triggers>
                                 <DataTrigger TargetType="Label" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.BankAccount}">
                                     <Setter Property="TextColor" Value="White" />
@@ -51,19 +51,19 @@
                     <Border Grid.Column="1"
                             AutomationId="PaymentSourceCreditCardTypeButton"
                             StrokeShape="RoundRectangle 18"
-                            Stroke="Purple"
+                            Stroke="{StaticResource PrimaryBrush}"
                             StrokeThickness="1"
                             BackgroundColor="Transparent"
                             Padding="6,8">
                         <Border.Triggers>
                             <DataTrigger TargetType="Border" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.CreditCard}">
-                                <Setter Property="BackgroundColor" Value="Purple" />
+                                <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
                             </DataTrigger>
                         </Border.Triggers>
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding SelectTypeCommand}" CommandParameter="{x:Static models:PaymentSourceType.CreditCard}" />
                         </Border.GestureRecognizers>
-                        <Label Text="💳 Cartão de crédito" HorizontalOptions="Center" HorizontalTextAlignment="Center" VerticalOptions="Center" FontSize="13" TextColor="Purple">
+                        <Label Text="💳 Cartão de crédito" HorizontalOptions="Center" HorizontalTextAlignment="Center" VerticalOptions="Center" FontSize="13" TextColor="{StaticResource Primary}">
                             <Label.Triggers>
                                 <DataTrigger TargetType="Label" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.CreditCard}">
                                     <Setter Property="TextColor" Value="White" />
@@ -75,19 +75,19 @@
                     <Border Grid.Column="2"
                             AutomationId="PaymentSourceMealVoucherTypeButton"
                             StrokeShape="RoundRectangle 18"
-                            Stroke="Purple"
+                            Stroke="{StaticResource PrimaryBrush}"
                             StrokeThickness="1"
                             BackgroundColor="Transparent"
                             Padding="6,8">
                         <Border.Triggers>
                             <DataTrigger TargetType="Border" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.MealVoucher}">
-                                <Setter Property="BackgroundColor" Value="Purple" />
+                                <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
                             </DataTrigger>
                         </Border.Triggers>
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding SelectTypeCommand}" CommandParameter="{x:Static models:PaymentSourceType.MealVoucher}" />
                         </Border.GestureRecognizers>
-                        <Label Text="🍽️ Vale" HorizontalOptions="Center" VerticalOptions="Center" FontSize="13" TextColor="Purple">
+                        <Label Text="🍽️ Vale" HorizontalOptions="Center" VerticalOptions="Center" FontSize="13" TextColor="{StaticResource Primary}">
                             <Label.Triggers>
                                 <DataTrigger TargetType="Label" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.MealVoucher}">
                                     <Setter Property="TextColor" Value="White" />
@@ -157,7 +157,7 @@
 
                 <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,10,0,0">
                     <Button Grid.Column="0" AutomationId="CancelPaymentSourceButton" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />
-                    <Button Grid.Column="1" AutomationId="SavePaymentSourceButton" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="Purple" />
+                    <Button Grid.Column="1" AutomationId="SavePaymentSourceButton" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="{StaticResource Primary}" />
                 </Grid>
             </VerticalStackLayout>
         </ScrollView>

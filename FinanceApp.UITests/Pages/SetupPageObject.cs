@@ -20,6 +20,8 @@ public class SetupPageObject
     private static readonly By BackButton = AppSession.AutomationId("SetupBackButton");
     private static readonly By NextButton = AppSession.AutomationId("SetupNextButton");
     private static readonly By WelcomeStep = AppSession.AutomationId("SetupWelcomeStep");
+    private static readonly By WelcomeTitle = AppSession.AutomationId("SetupWelcomeTitleLabel");
+    private static readonly By Tagline = AppSession.AutomationId("SetupTaglineLabel");
     private static readonly By NameEntry = AppSession.AutomationId("SetupNameEntry");
     private static readonly By AvatarInitial = AppSession.AutomationId("SetupAvatarInitialLabel");
     private static readonly By SourceBalanceEntry = AppSession.AutomationId("SetupSourceBalanceEntry");
@@ -69,6 +71,10 @@ public class SetupPageObject
     public bool IsBackVisible => _session.IsVisible(BackButton);
 
     public bool IsWelcomeStepVisible => _session.IsVisible(WelcomeStep);
+
+    public string WelcomeTitleText => _session.WaitForVisible(WelcomeTitle).Text;
+
+    public string TaglineText => _session.WaitForVisible(Tagline).Text;
 
     public string NextButtonText => _session.WaitForVisible(NextButton).Text;
 
