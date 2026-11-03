@@ -149,15 +149,19 @@ public sealed class CreditCardBillTests : E2ETestBase
         MainPage
             .AddEntry(Netflix, AppLabels.Recurrent, 55.9m, paymentSource: Card)
             .AddEntry(Market, AppLabels.Recurrent, 600m, paymentSource: Card)
+            // Collapsed, so the account's entry listed after the bill stays on screen on small devices (CI's 320×640).
+            .ToggleBill(Card)
             .AddEntry(Rent, AppLabels.Recurrent, 1500m, paymentSource: Account);
 
         MainPage.RevealBillActions(Card);
         MainPage.RevealedBillActionText.Should().Be(AppLabels.MarkBillPaid);
         MainPage.PayBill(Card);
 
+        MainPage.WaitFor(() => MainPage.IsBillPaid(Card));
+        MainPage.IsEntryPaid(Rent).Should().BeFalse("only the card's entries are on its bill");
+        MainPage.ToggleBill(Card);
         MainPage.IsEntryPaid(Netflix).Should().BeTrue();
         MainPage.IsEntryPaid(Market).Should().BeTrue();
-        MainPage.IsEntryPaid(Rent).Should().BeFalse("only the card's entries are on its bill");
         MainPage.SwipeSummary("left").WaitForSummaryPage(SummaryPage.Paid);
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(655.9m));
         MainPage.SummaryToPayText.Should().Be(AppFormat.Money(1500m));

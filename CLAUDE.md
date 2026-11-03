@@ -58,6 +58,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Assert both the UI reaction and the persisted state (`GetEntryRowsAsync`, `GetMonthlyEntryRowsAsync`, `GetCategoryRowsAsync`) when a flow writes to the DB. Row types in `TableRows.cs` mirror the tables and must be updated when the schema changes.
 - The run shares one Appium session; before every test the app data is wiped and the app relaunched (empty DB, default categories seeded), so tests must not depend on each other. Creating a session per test was the main cost of the suite, so keep it shared.
 - On a timeout, a screenshot + page source are saved to `FinanceApp.UITests/TestResults/diagnostics/`. Check them first when debugging.
+- CI's emulator has a much smaller screen (320×640, mdpi) than the local one, so rows that fit locally can sit below the fold there. Tests must keep the rows they check on screen (e.g. collapse a credit card bill first). To reproduce a CI-only failure, run `adb shell wm size 320x640` and `adb shell wm density 160` (`reset` restores them) and rerun the test.
 
 ## Git & Pull Request Workflow
 - **Default branch:** `master` (there is no `dev` branch). Never commit directly to `master`.
