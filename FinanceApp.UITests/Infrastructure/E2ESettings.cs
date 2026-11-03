@@ -8,6 +8,16 @@ public static class E2ESettings
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(15);
 
     /// <summary>
+    /// How long a focused entry's keyboard may take to show up before assuming it won't.
+    /// </summary>
+    public static readonly TimeSpan KeyboardShowTimeout = TimeSpan.FromSeconds(3);
+
+    /// <summary>
+    /// How long to wait for the keyboard to close before sending its "Done" action again.
+    /// </summary>
+    public static readonly TimeSpan KeyboardDoneRetryInterval = TimeSpan.FromSeconds(1);
+
+    /// <summary>
     /// Each poll is a round trip to the device anyway, so a short interval costs little and avoids idling after the UI is ready.
     /// </summary>
     public static readonly TimeSpan PollingInterval = TimeSpan.FromMilliseconds(100);
