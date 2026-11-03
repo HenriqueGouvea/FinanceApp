@@ -56,4 +56,6 @@ public class PaymentSourceRow
     public string Name { get; set; } = string.Empty;
     public int Type { get; set; }
     public decimal Balance { get; set; }
+    public int? BillDueDay { get; set; }
+    public int? BillPaymentSourceId { get; set; }
 }

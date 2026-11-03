@@ -12,4 +12,13 @@ public class PaymentSource
     /// The balance set by the user: the account or voucher balance, or the card's limit.
     /// </summary>
     public decimal Balance { get; set; }
+    /// <summary>
+    /// Credit cards only: day of the month (1–31) the card's bill falls due, or null when not set.
+    /// Days past the end of a month fall on its last day (e.g. 31 is February 28th).
+    /// </summary>
+    public int? BillDueDay { get; set; }
+    /// <summary>
+    /// Credit cards only: the bank account that pays the card's bill, or null when not set.
+    /// </summary>
+    public int? BillPaymentSourceId { get; set; }
 }

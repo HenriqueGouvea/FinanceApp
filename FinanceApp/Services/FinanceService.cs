@@ -39,16 +39,17 @@ public class FinanceService : IFinanceService
         {
             var category = template.CategoryId is { } categoryId ? categoryLookup.GetValueOrDefault(categoryId) : null;
             var source = template.PaymentSourceId is { } sourceId ? sourceLookup.GetValueOrDefault(sourceId) : null;
+            var isOnCardBill = template.EntryType == FinancialEntryType.Outcome && source?.Type == PaymentSourceType.CreditCard;
+            // An outcome paid with a credit card falls due with the card's bill.
+            var dueDate = BuildDueDate(isOnCardBill ? source!.BillDueDay : template.DueDay, year, month);
+            var billAccount = isOnCardBill && source!.BillPaymentSourceId is { } accountId ? sourceLookup.GetValueOrDefault(accountId) : null;
 
             if (physicalLookup.TryGetValue(template.Id, out var record))
             {
                 if (record.IsCancelled)
                     continue;
 
-                var plannedAmount = record.OverrideAmount ?? template.Amount;
-                var status = GetEffectiveStatus(record);
-                // Paying more than planned (e.g. an estimated bill that came higher) raises the month's amount.
-                var effectiveAmount = Math.Max(plannedAmount, record.PaidAmount ?? 0);
+                var (plannedAmount, effectiveAmount, paidAmount, status) = GetMonthAmounts(template, record);
 
                 projections.Add(new MonthlyEntryProjection(
                     FinancialEntryId: template.Id,
@@ -61,17 +62,13 @@ public class FinanceService : IFinanceService
                     IsProjected: false,
                     InstallmentLabel: BuildInstallmentLabel(template, year, month),
                     InstallmentTotalAmount: BuildInstallmentTotal(template),
-                    PaidAmount: status switch
-                    {
-                        FinancialMonthlyEntryStatus.Paid => effectiveAmount,
-                        FinancialMonthlyEntryStatus.PartiallyPaid => record.PaidAmount ?? 0,
-                        _ => 0
-                    },
+                    PaidAmount: paidAmount,
                     IsEstimated: template.IsEstimated,
                     PlannedAmount: plannedAmount,
                     AllowsPartialPayment: template.AllowsPartialPayment,
-                    DueDate: BuildDueDate(template, year, month),
-                    PaymentSource: source
+                    DueDate: dueDate,
+                    PaymentSource: source,
+                    BillPaymentAccount: billAccount
                 ));
             }
             else
@@ -89,8 +86,9 @@ public class FinanceService : IFinanceService
                     InstallmentTotalAmount: BuildInstallmentTotal(template),
                     IsEstimated: template.IsEstimated,
                     AllowsPartialPayment: template.AllowsPartialPayment,
-                    DueDate: BuildDueDate(template, year, month),
-                    PaymentSource: source
+                    DueDate: dueDate,
+                    PaymentSource: source,
+                    BillPaymentAccount: billAccount
                 ));
             }
         }
@@ -164,6 +162,87 @@ public class FinanceService : IFinanceService
         {
             Console.WriteLine($"Error setting entry status: {ex.Message}");
         }
+    }
+
+    public async Task SetCreditCardBillStatusAsync(int cardId, int year, int month, FinancialMonthlyEntryStatus status)
+    {
+        var entries = await GetMergedEntriesForMonthAsync(year, month);
+        var billEntries = entries
+            .Where(e => e.IsOnCreditCardBill && e.PaymentSource!.Id == cardId && e.Status != status)
+            .ToList();
+
+        foreach (var entry in billEntries)
+            await SetEntryStatusAsync(entry.FinancialEntryId, year, month, status);
+    }
+
+    public async Task<IReadOnlyDictionary<int, decimal>> GetUsedCreditLimitsAsync(int year, int month)
+    {
+        var db = await _context.GetConnectionAsync();
+        var currentMonth = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Local);
+
+        var sources = await db.Table<PaymentSource>().ToListAsync();
+        var usedLimits = sources.Where(s => s.Type == PaymentSourceType.CreditCard).ToDictionary(s => s.Id, _ => 0m);
+
+        var templates = await db.Table<FinancialEntry>().ToListAsync();
+        var cardTemplates = templates
+            .Where(e => e.EntryType == FinancialEntryType.Outcome && e.PaymentSourceId is { } id && usedLimits.ContainsKey(id))
+            .ToList();
+        var cardTemplateIds = cardTemplates.Select(e => e.Id).ToHashSet();
+
+        var records = await db.Table<FinancialMonthlyEntry>().ToListAsync();
+        var recordLookup = records
+            .Where(r => cardTemplateIds.Contains(r.FinancialEntryId))
+            .ToDictionary(r => (r.FinancialEntryId, r.Year, r.Month));
+
+        foreach (var template in cardTemplates)
+        {
+            foreach (var target in GetMonthsUsingCreditLimit(template, currentMonth))
+            {
+                var record = recordLookup.GetValueOrDefault((template.Id, target.Year, target.Month));
+                if (record?.IsCancelled == true)
+                    continue;
+
+                var (_, effectiveAmount, paidAmount, _) = GetMonthAmounts(template, record);
+                usedLimits[template.PaymentSourceId!.Value] += effectiveAmount - paidAmount;
+            }
+        }
+
+        return usedLimits;
+    }
+
+    // A card outcome takes up the limit in each of its months up to the current one; a purchase in installments,
+    // in all of its months, since the card holds its whole remaining amount from the start.
+    private static IEnumerable<DateTime> GetMonthsUsingCreditLimit(FinancialEntry entry, DateTime currentMonth)
+    {
+        var firstOfStart = new DateTime(entry.StartDate.Year, entry.StartDate.Month, 1, 0, 0, 0, DateTimeKind.Local);
+        var lastMonth = entry.Recurrence == RecurrenceType.Installments
+            ? firstOfStart.AddMonths((entry.TotalInstallments ?? 0) - 1)
+            : currentMonth;
+
+        for (var target = firstOfStart; target <= lastMonth; target = target.AddMonths(1))
+            if (IsActiveForMonth(entry, target))
+                yield return target;
+    }
+
+    // The month's amounts: what was planned, the actual amount (paying more than planned, e.g. an estimated bill
+    // that came higher, raises it) and what was paid so far.
+    private static (decimal Planned, decimal Effective, decimal Paid, FinancialMonthlyEntryStatus Status) GetMonthAmounts(
+        FinancialEntry template, FinancialMonthlyEntry? record)
+    {
+        if (record is null)
+            return (template.Amount, template.Amount, 0, FinancialMonthlyEntryStatus.Pending);
+
+        var plannedAmount = record.OverrideAmount ?? template.Amount;
+        var status = GetEffectiveStatus(record);
+        var effectiveAmount = Math.Max(plannedAmount, record.PaidAmount ?? 0);
+        var paidAmount = status switch
+        {
+            FinancialMonthlyEntryStatus.Paid => effectiveAmount,
+            FinancialMonthlyEntryStatus.PartiallyPaid => record.PaidAmount ?? 0,
+            _ => 0
+        };
+
+        return (plannedAmount, effectiveAmount, paidAmount, status);
     }
 
     public Task SetPaidAmountAsync(int entryId, int year, int month, decimal paidAmount) =>
@@ -414,8 +493,8 @@ public class FinanceService : IFinanceService
         return $"{n}/{entry.TotalInstallments}";
     }
 
-    private static DateTime? BuildDueDate(FinancialEntry entry, int year, int month) =>
-        entry.DueDay is { } day
+    private static DateTime? BuildDueDate(int? dueDay, int year, int month) =>
+        dueDay is { } day
             ? new DateTime(year, month, Math.Clamp(day, 1, DateTime.DaysInMonth(year, month)), 0, 0, 0, DateTimeKind.Local)
             : null;
 

@@ -7,6 +7,9 @@ namespace FinanceApp.Tests.ViewModels;
 
 public class MonthViewModelTests
 {
+    private static readonly PaymentSource Nubank = new() { Id = 10, Name = "Nubank", Type = PaymentSourceType.CreditCard };
+    private static readonly PaymentSource Visa = new() { Id = 11, Name = "Visa", Type = PaymentSourceType.CreditCard };
+
     private readonly MonthViewModel _vm;
 
     public MonthViewModelTests()
@@ -322,6 +325,135 @@ public class MonthViewModelTests
 
         _vm.RevealedEntryId.Should().BeNull();
     }
+
+    // --- Credit card bills ---
+
+    [Fact]
+    public void CreditCardBills_GroupsCardOutcomesPerCard()
+    {
+        _vm.Entries.Add(MakeCardOutcome(1, Nubank, 100m));
+        _vm.Entries.Add(MakeCardOutcome(2, Visa, 50m));
+        _vm.Entries.Add(MakeCardOutcome(3, Nubank, 30m));
+
+        _vm.CreditCardBills.Select(b => (b.Card.Name, b.TotalAmount, b.EntryCount))
+            .Should().Equal(("Nubank", 130m, 2), ("Visa", 50m, 1));
+    }
+
+    [Fact]
+    public void OutcomeEntries_ExcludesOutcomesListedUnderABill()
+    {
+        _vm.Entries.Add(MakeCardOutcome(1, Nubank, 100m));
+        _vm.Entries.Add(MakeProjection(40m, FinancialEntryType.Outcome) with { FinancialEntryId = 2 });
+
+        _vm.OutcomeEntries.Select(e => e.FinancialEntryId).Should().Equal(2);
+    }
+
+    [Fact]
+    public void CreditCardBills_IncomeOnCard_IsNotOnTheBill()
+    {
+        _vm.Entries.Add(MakeCardOutcome(1, Nubank, 100m) with { EntryType = FinancialEntryType.Income });
+
+        _vm.CreditCardBills.Should().BeEmpty();
+        _vm.IncomeEntries.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Totals_CountOutcomesOnBillsOnlyOnce()
+    {
+        _vm.Entries.Add(MakeCardOutcome(1, Nubank, 100m, FinancialMonthlyEntryStatus.Paid, paidAmount: 100m));
+        _vm.Entries.Add(MakeCardOutcome(2, Nubank, 50m));
+        _vm.Entries.Add(MakeProjection(40m, FinancialEntryType.Outcome) with { FinancialEntryId = 3 });
+
+        _vm.TotalOutcomes.Should().Be(190m);
+        _vm.PaidOutcomes.Should().Be(100m);
+        _vm.PendingOutcomes.Should().Be(90m);
+        _vm.OutcomeCount.Should().Be(3);
+    }
+
+    [Fact]
+    public void CreditCardBills_AlternatingRowsRestartInEachBill()
+    {
+        _vm.Entries.Add(MakeCardOutcome(1, Nubank, 10m));
+        _vm.Entries.Add(MakeCardOutcome(2, Nubank, 20m));
+        _vm.Entries.Add(MakeCardOutcome(3, Visa, 30m));
+
+        var bills = _vm.CreditCardBills;
+
+        bills[0].Entries.Select(e => e.IsAlternateRow).Should().Equal(false, true);
+        bills[1].Entries.Select(e => e.IsAlternateRow).Should().Equal(false);
+    }
+
+    [Fact]
+    public void CreditCardBills_ExpandedByDefault()
+    {
+        _vm.Entries.Add(MakeCardOutcome(1, Nubank, 10m));
+
+        _vm.CreditCardBills.Single().IsExpanded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ToggleBill_CollapsesAndExpandsOnlyThatCard()
+    {
+        _vm.Entries.Add(MakeCardOutcome(1, Nubank, 10m));
+        _vm.Entries.Add(MakeCardOutcome(2, Visa, 10m));
+
+        _vm.ToggleBill(Nubank.Id);
+
+        _vm.CreditCardBills.Select(b => b.IsExpanded).Should().Equal(false, true);
+
+        _vm.ToggleBill(Nubank.Id);
+
+        _vm.CreditCardBills.Should().OnlyContain(b => b.IsExpanded);
+    }
+
+    [Fact]
+    public void ToggleBill_RaisesCreditCardBillsChangedAndHidesActions()
+    {
+        _vm.Entries.Add(MakeCardOutcome(1, Nubank, 10m));
+        _vm.RevealedEntryId = 1;
+        _vm.RevealedBillCardId = Nubank.Id;
+        var changed = new List<string?>();
+        _vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        _vm.ToggleBill(Nubank.Id);
+
+        changed.Should().Contain(nameof(MonthViewModel.CreditCardBills));
+        _vm.RevealedEntryId.Should().BeNull();
+        _vm.RevealedBillCardId.Should().BeNull();
+    }
+
+    [Fact]
+    public void HideEntryActions_ClearsRevealedBill()
+    {
+        _vm.RevealedBillCardId = Nubank.Id;
+
+        _vm.HideEntryActions();
+
+        _vm.RevealedBillCardId.Should().BeNull();
+    }
+
+    [Fact]
+    public void Entries_Changed_RaisesCreditCardBillsChanged()
+    {
+        var changed = new List<string?>();
+        _vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        _vm.Entries.Add(MakeCardOutcome(1, Nubank, 10m));
+
+        changed.Should().Contain(nameof(MonthViewModel.CreditCardBills));
+    }
+
+    private static MonthlyEntryProjection MakeCardOutcome(
+        int entryId,
+        PaymentSource card,
+        decimal amount,
+        FinancialMonthlyEntryStatus status = FinancialMonthlyEntryStatus.Pending,
+        decimal paidAmount = 0) =>
+        MakeProjection(amount, FinancialEntryType.Outcome, status, paidAmount) with
+        {
+            FinancialEntryId = entryId,
+            PaymentSource = card
+        };
 
     private static MonthlyEntryProjection MakeProjection(
         decimal amount,

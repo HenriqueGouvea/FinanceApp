@@ -70,7 +70,7 @@
         ContentTemplate="{DataTemplate views:SettingsPage}"
         Route="SettingsPage" />
 
-    <!-- Current balance of each account, card and voucher; tapping one opens it to update the balance -->
+    <!-- Current balance of each account and voucher, and the available limit of each credit card; tapping one opens it to update the balance -->
     <Shell.FlyoutFooter>
         <VerticalStackLayout x:Name="BalancesFooter"
                              x:DataType="vm:PaymentSourceBalancesViewModel"
@@ -98,30 +98,43 @@
             <ScrollView MaximumHeightRequest="240" IsVisible="{Binding HasSources}">
                 <VerticalStackLayout BindableLayout.ItemsSource="{Binding Sources}">
                     <BindableLayout.ItemTemplate>
-                        <DataTemplate x:DataType="models:PaymentSource">
+                        <DataTemplate x:DataType="models:PaymentSourceSummary">
                             <Grid AutomationId="FlyoutSourceRow" ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10" Padding="0,8">
                                 <Grid.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnSourceTapped" />
                                 </Grid.GestureRecognizers>
                                 <Label Grid.Column="0"
-                                       Text="{Binding Type, Converter={x:Static converters:PaymentSourceTypeToIconConverter.Instance}}"
+                                       Text="{Binding Source.Type, Converter={x:Static converters:PaymentSourceTypeToIconConverter.Instance}}"
                                        FontSize="16"
                                        VerticalOptions="Center" />
                                 <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
                                     <Label AutomationId="FlyoutSourceNameLabel"
-                                           Text="{Binding Name}"
+                                           Text="{Binding Source.Name}"
                                            FontSize="14"
                                            LineBreakMode="TailTruncation" />
-                                    <Label Text="{Binding Type, Converter={x:Static converters:PaymentSourceTypeToBalanceLabelConverter.Instance}}"
+                                    <Label Text="{Binding Source.Type, Converter={x:Static converters:PaymentSourceTypeToBalanceLabelConverter.Instance}}"
                                            FontSize="11"
-                                           TextColor="Gray" />
+                                           TextColor="Gray"
+                                           IsVisible="{Binding IsCreditCard, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
+                                    <Label AutomationId="FlyoutSourceLimitLabel"
+                                           Text="{Binding Source.Balance, Converter={x:Static converters:MoneyConverter.Instance}, StringFormat='Disponível de {0}'}"
+                                           FontSize="11"
+                                           TextColor="Gray"
+                                           IsVisible="{Binding IsCreditCard}" />
                                 </VerticalStackLayout>
+                                <!-- Credit cards show the limit still available, in red once it is exceeded -->
                                 <Label Grid.Column="2"
                                        AutomationId="FlyoutSourceBalanceLabel"
-                                       Text="{Binding Balance, Converter={x:Static converters:MoneyConverter.Instance}}"
+                                       Text="{Binding CurrentBalance, Converter={x:Static converters:MoneyConverter.Instance}}"
                                        FontSize="14"
                                        FontAttributes="Bold"
-                                       VerticalOptions="Center" />
+                                       VerticalOptions="Center">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsOverLimit}" Value="True">
+                                            <Setter Property="TextColor" Value="#D32F2F" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
                             </Grid>
                         </DataTemplate>
                     </BindableLayout.ItemTemplate>

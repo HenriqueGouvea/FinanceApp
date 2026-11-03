@@ -25,7 +25,7 @@ public partial class PaymentSourcesPage : ContentPage
         var popup = ResolvePopup();
         var vm = (PaymentSourceEditViewModel)popup.BindingContext;
 
-        vm.Prepare();
+        await vm.PrepareAsync();
         await ShowEditPopupAsync(popup, vm);
     }
 
@@ -36,7 +36,7 @@ public partial class PaymentSourcesPage : ContentPage
         var popup = ResolvePopup();
         var vm = (PaymentSourceEditViewModel)popup.BindingContext;
 
-        vm.PrepareForEdit(source);
+        await vm.PrepareForEditAsync(source);
         await ShowEditPopupAsync(popup, vm);
     }
 
@@ -65,7 +65,7 @@ public partial class PaymentSourcesPage : ContentPage
     }
 
     private static PaymentSource? GetPaymentSource(object? sender) =>
-        (sender as BindableObject)?.BindingContext as PaymentSource;
+        ((sender as BindableObject)?.BindingContext as PaymentSourceSummary)?.Source;
 
     private PaymentSourceEditPopup ResolvePopup() =>
         Handler?.MauiContext?.Services.GetService<PaymentSourceEditPopup>()

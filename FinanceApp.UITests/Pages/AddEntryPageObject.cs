@@ -20,6 +20,7 @@ public class AddEntryPageObject
     private static readonly By InstallmentsTotal = AppSession.AutomationId("InstallmentsTotalLabel");
     private const string CategoryPickerId = "CategoryPicker";
     private const string DueDayPickerId = "DueDayPicker";
+    private const string CreditCardBillDueHintId = "CreditCardBillDueHintLabel";
     private const string PaymentSourcePickerId = "PaymentSourcePicker";
     private const string PaymentSourcePickerLabelId = "PaymentSourcePickerLabel";
     private const string EstimatedSwitchId = "EstimatedSwitch";
@@ -141,6 +142,16 @@ public class AddEntryPageObject
     public bool AllowsPartialPayment => _session.ScrollTo(PartialPaymentSwitchId).GetAttribute("checked") == "true";
 
     public string PartialPaymentSwitchText => _session.ScrollTo(PartialPaymentSwitchLabelId).Text;
+
+    /// <summary>
+    /// "Valor estimado" is hidden for outcomes paid with a credit card.
+    /// </summary>
+    public bool IsEstimatedSwitchVisible => _session.TryScrollTo(EstimatedSwitchId) is not null;
+
+    /// <summary>
+    /// "Pagamento parcial" is hidden for outcomes paid with a credit card.
+    /// </summary>
+    public bool IsPartialPaymentSwitchVisible => _session.TryScrollTo(PartialPaymentSwitchId) is not null;
 
     public AddEntryPageObject SetAllowsPartialPayment(bool allowsPartialPayment)
     {
@@ -272,6 +283,26 @@ public class AddEntryPageObject
     }
 
     public string DueDayText => _session.ScrollTo(DueDayPickerId).Text;
+
+    public bool IsDueDayPickerVisible => _session.TryScrollTo(DueDayPickerId) is not null;
+
+    /// <summary>
+    /// Whether the "Pago com" picker comes before the "Vencimento" field, read with both on screen.
+    /// </summary>
+    public bool IsPaymentSourceAboveDueDate
+    {
+        get
+        {
+            var dueDate = _session.ScrollTo(DueDayPickerId).Location.Y;
+            var paymentSource = _session.WaitForVisible(AppSession.AutomationId(PaymentSourcePickerId)).Location.Y;
+            return paymentSource < dueDate;
+        }
+    }
+
+    /// <summary>
+    /// The line shown instead of the due day picker for an outcome paid with a credit card, or null when not shown.
+    /// </summary>
+    public string? CreditCardBillDueHintText => _session.TryScrollTo(CreditCardBillDueHintId)?.Text;
 
     /// <summary>
     /// Picks a due day (1–31), or <see cref="AppLabels.NoDueDay"/> when null. The options outgrow the dialog, so it is scrolled.

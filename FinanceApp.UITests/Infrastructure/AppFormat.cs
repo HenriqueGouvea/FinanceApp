@@ -43,6 +43,11 @@ public static class AppFormat
     /// </summary>
     public static string SourceBalance(string label, decimal balance) => $"{label}: {Money(balance)}";
 
+    /// <summary>
+    /// Available limit line of a credit card row (e.g. "Disponível: R$ 4.500,00").
+    /// </summary>
+    public static string AvailableLimit(decimal available) => $"Disponível: {Money(available)}";
+
 
     /// <summary>
     /// Progress line of the partial payment popup (e.g. "Já gasto: R$ 250,00 de R$ 800,00").

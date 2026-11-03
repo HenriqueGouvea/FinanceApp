@@ -30,7 +30,7 @@
                 </DataTemplate>
             </CollectionView.GroupHeaderTemplate>
             <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="models:PaymentSource">
+                <DataTemplate x:DataType="models:PaymentSourceSummary">
                     <Grid AutomationId="PaymentSourceRow" ColumnDefinitions="Auto, *, Auto" ColumnSpacing="14" Padding="20,10">
                         <Grid.GestureRecognizers>
                             <TapGestureRecognizer Tapped="OnPaymentSourceTapped" />
@@ -40,23 +40,35 @@
                                 StrokeThickness="0"
                                 StrokeShape="RoundRectangle 20"
                                 BackgroundColor="#EDE7F6">
-                            <Label Text="{Binding Type, Converter={x:Static converters:PaymentSourceTypeToIconConverter.Instance}}"
+                            <Label Text="{Binding Source.Type, Converter={x:Static converters:PaymentSourceTypeToIconConverter.Instance}}"
                                    FontSize="18"
                                    HorizontalOptions="Center" VerticalOptions="Center" />
                         </Border>
                         <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
                             <Label AutomationId="PaymentSourceNameLabel"
-                                   Text="{Binding Name}"
+                                   Text="{Binding Source.Name}"
                                    FontSize="16"
                                    FontAttributes="Bold" />
                             <!-- "Saldo" for accounts and vouchers, "Limite" for credit cards -->
                             <Label AutomationId="PaymentSourceBalanceLabel" FontSize="12" TextColor="Gray">
                                 <Label.Text>
                                     <MultiBinding StringFormat="{}{0}: {1}">
-                                        <Binding Path="Type" Converter="{x:Static converters:PaymentSourceTypeToBalanceLabelConverter.Instance}" />
-                                        <Binding Path="Balance" Converter="{x:Static converters:MoneyConverter.Instance}" />
+                                        <Binding Path="Source.Type" Converter="{x:Static converters:PaymentSourceTypeToBalanceLabelConverter.Instance}" />
+                                        <Binding Path="Source.Balance" Converter="{x:Static converters:MoneyConverter.Instance}" />
                                     </MultiBinding>
                                 </Label.Text>
+                            </Label>
+                            <!-- Credit cards: the limit minus what is unpaid on its bills and the installments still to come -->
+                            <Label AutomationId="PaymentSourceAvailableLimitLabel"
+                                   Text="{Binding AvailableLimit, Converter={x:Static converters:MoneyConverter.Instance}, StringFormat='Disponível: {0}'}"
+                                   FontSize="12"
+                                   TextColor="Gray"
+                                   IsVisible="{Binding IsCreditCard}">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label" Binding="{Binding IsOverLimit}" Value="True">
+                                        <Setter Property="TextColor" Value="#D32F2F" />
+                                    </DataTrigger>
+                                </Label.Triggers>
                             </Label>
                         </VerticalStackLayout>
                         <Border Grid.Column="2"

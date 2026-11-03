@@ -1,10 +1,14 @@
 using FinanceApp.Data;
 using FinanceApp.Models;
+using SQLite;
 
 namespace FinanceApp.Services;
 
 public class PaymentSourceService : IPaymentSourceService
 {
+    private const string UnlinkBillPaymentsSql =
+        $"UPDATE {nameof(PaymentSource)} SET {nameof(PaymentSource.BillPaymentSourceId)} = NULL WHERE {nameof(PaymentSource.BillPaymentSourceId)} = ?";
+
     private readonly IDatabaseContext _context;
 
     public PaymentSourceService(IDatabaseContext context)
@@ -27,10 +31,21 @@ public class PaymentSourceService : IPaymentSourceService
         var db = await _context.GetConnectionAsync();
         source.Name = source.Name.Trim();
 
+        // Only credit cards have a bill.
+        if (source.Type != PaymentSourceType.CreditCard)
+        {
+            source.BillDueDay = null;
+            source.BillPaymentSourceId = null;
+        }
+
         if (source.Id != 0)
             await db.UpdateAsync(source);
         else
             await db.InsertAsync(source);
+
+        // Only bank accounts pay bills: a source that stopped being one no longer pays any card's bill.
+        if (source.Type != PaymentSourceType.BankAccount)
+            await UnlinkBillPaymentsAsync(db, source.Id);
     }
 
     public async Task<int> CountEntriesAsync(int sourceId)
@@ -48,7 +63,11 @@ public class PaymentSourceService : IPaymentSourceService
             conn.Execute(
                 $"UPDATE {nameof(FinancialEntry)} SET {nameof(FinancialEntry.PaymentSourceId)} = NULL WHERE {nameof(FinancialEntry.PaymentSourceId)} = ?",
                 sourceId);
+            conn.Execute(UnlinkBillPaymentsSql, sourceId);
             conn.Delete<PaymentSource>(sourceId);
         });
     }
+
+    private static Task UnlinkBillPaymentsAsync(SQLiteAsyncConnection db, int accountId) =>
+        db.ExecuteAsync(UnlinkBillPaymentsSql, accountId);
 }

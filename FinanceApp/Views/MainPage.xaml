@@ -25,6 +25,8 @@
         <Color x:Key="EstimatedTint">#ECEFF1</Color>
         <Color x:Key="MonthNavAccent">#6A1B9A</Color>
         <Color x:Key="MonthNavTint">#EDE7F6</Color>
+        <Color x:Key="BillTint">#F3E5F5</Color>
+        <Color x:Key="BillAccent">#CE93D8</Color>
         <Style x:Key="MonthArrowButton" TargetType="Button">
             <Setter Property="FontSize" Value="26" />
             <Setter Property="Padding" Value="0" />
@@ -124,7 +126,7 @@
                                Text="{Binding DueDate, Converter={x:Static converters:DueDateToLabelConverter.Instance}}"
                                FontSize="11"
                                TextColor="Gray"
-                               IsVisible="{Binding HasDueDate}">
+                               IsVisible="{Binding ShowsDueDate}">
                             <Label.Triggers>
                                 <DataTrigger TargetType="Label" Binding="{Binding IsDueToday}" Value="True">
                                     <Setter Property="TextColor" Value="{StaticResource OutcomeAccent}" />
@@ -284,6 +286,160 @@
                     </HorizontalStackLayout>
                 </controls:SlideOutPanel>
             </Grid>
+        </DataTemplate>
+
+        <!-- A credit card's bill: one row with a single due date, and the card's outcomes listed under it -->
+        <DataTemplate x:Key="CreditCardBillTemplate" x:DataType="models:CreditCardBill">
+            <VerticalStackLayout AutomationId="CreditCardBill">
+                <Grid IsClippedToBounds="True" BackgroundColor="{StaticResource BillTint}">
+                    <Grid AutomationId="CreditCardBillRow" ColumnDefinitions="Auto, *, Auto, Auto, Auto" ColumnSpacing="10" Padding="14,10">
+                        <Grid.Behaviors>
+                            <toolkit:TouchBehavior LongPressDuration="1000"
+                                                   TouchGestureCompleted="OnBillTapped"
+                                                   LongPressCompleted="OnBillLongPressed" />
+                        </Grid.Behaviors>
+
+                        <Grid Grid.Column="0" WidthRequest="22" HeightRequest="22" VerticalOptions="Center">
+                            <Border AutomationId="CreditCardBillPendingIcon"
+                                    StrokeShape="RoundRectangle 11"
+                                    Stroke="#BDBDBD"
+                                    StrokeThickness="2"
+                                    BackgroundColor="Transparent"
+                                    IsVisible="{Binding IsPending}" />
+                            <Border AutomationId="CreditCardBillPartialIcon"
+                                    StrokeShape="RoundRectangle 11"
+                                    Stroke="{StaticResource PartialAccent}"
+                                    StrokeThickness="2"
+                                    BackgroundColor="Transparent"
+                                    IsVisible="{Binding IsPartiallyPaid}">
+                                <Border StrokeShape="RoundRectangle 5"
+                                        StrokeThickness="0"
+                                        BackgroundColor="{StaticResource PartialAccent}"
+                                        WidthRequest="10"
+                                        HeightRequest="10"
+                                        HorizontalOptions="Center"
+                                        VerticalOptions="Center" />
+                            </Border>
+                            <Border AutomationId="CreditCardBillPaidIcon"
+                                    StrokeShape="RoundRectangle 11"
+                                    StrokeThickness="0"
+                                    BackgroundColor="{StaticResource PaidAccent}"
+                                    IsVisible="{Binding IsPaid}">
+                                <Label Text="✓"
+                                       TextColor="White"
+                                       FontSize="13"
+                                       FontAttributes="Bold"
+                                       HorizontalOptions="Center"
+                                       VerticalOptions="Center" />
+                            </Border>
+                        </Grid>
+
+                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                            <Label AutomationId="CreditCardBillNameLabel"
+                                   Text="{Binding Card.Name, StringFormat='💳 Fatura {0}'}"
+                                   TextColor="{StaticResource MonthNavAccent}"
+                                   FontAttributes="Bold" />
+                            <!-- Turns red while it is due today and not yet paid -->
+                            <Label AutomationId="CreditCardBillDueDateLabel"
+                                   Text="{Binding DueDate, Converter={x:Static converters:DueDateToLabelConverter.Instance}}"
+                                   FontSize="11"
+                                   TextColor="Gray"
+                                   IsVisible="{Binding HasDueDate}">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label" Binding="{Binding IsDueToday}" Value="True">
+                                        <Setter Property="TextColor" Value="{StaticResource OutcomeAccent}" />
+                                        <Setter Property="FontAttributes" Value="Bold" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                            <Label AutomationId="CreditCardBillAccountLabel"
+                                   Text="{Binding PaymentAccount.Name, StringFormat='Débito em {0}'}"
+                                   FontSize="11"
+                                   TextColor="Gray"
+                                   IsVisible="{Binding HasPaymentAccount}" />
+                            <Label AutomationId="CreditCardBillCountLabel"
+                                   Text="{Binding EntryCount, StringFormat='{0} lançamento(s)'}"
+                                   FontSize="11"
+                                   TextColor="Gray" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="2"
+                               AutomationId="CreditCardBillStatusLabel"
+                               Text="Paga"
+                               TextColor="{StaticResource PaidAccent}"
+                               FontSize="11"
+                               FontAttributes="Bold"
+                               VerticalOptions="Center"
+                               IsVisible="{Binding IsPaid}" />
+                        <VerticalStackLayout Grid.Column="3" Spacing="2" VerticalOptions="Center">
+                            <Label AutomationId="CreditCardBillAmountLabel"
+                                   Text="{Binding TotalAmount, Converter={x:Static converters:MoneyConverter.Instance}}"
+                                   TextColor="{StaticResource OutcomeAccent}"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="End" />
+                            <Label AutomationId="CreditCardBillPaidLabel"
+                                   Text="{Binding PaidAmount, Converter={x:Static converters:MoneyConverter.Instance}}"
+                                   FontSize="11"
+                                   FontAttributes="Bold"
+                                   TextColor="{StaticResource PartialAccent}"
+                                   HorizontalOptions="End"
+                                   IsVisible="{Binding IsPartiallyPaid}" />
+                        </VerticalStackLayout>
+                        <controls:ExpandChevron Grid.Column="4"
+                                                IsExpanded="{Binding IsExpanded}"
+                                                AccentColor="{StaticResource MonthNavAccent}" />
+                    </Grid>
+
+                    <!-- Bill actions menu, slides in on long press -->
+                    <controls:SlideOutPanel HorizontalOptions="End"
+                                            BackgroundColor="#EEEEEE"
+                                            Padding="6">
+                        <controls:SlideOutPanel.IsOpen>
+                            <MultiBinding Converter="{x:Static converters:AreEqualConverter.Instance}">
+                                <Binding Path="Card.Id" />
+                                <Binding Path="RevealedBillCardId"
+                                         Source="{RelativeSource AncestorType={x:Type vm:MonthViewModel}}"
+                                         x:DataType="vm:MonthViewModel" />
+                            </MultiBinding>
+                        </controls:SlideOutPanel.IsOpen>
+                        <HorizontalStackLayout Spacing="6">
+                            <Border AutomationId="PayCreditCardBillAction"
+                                    BackgroundColor="#2E7D32"
+                                    StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 8"
+                                    Padding="16,0"
+                                    IsVisible="{Binding IsPaid, Converter={x:Static converters:InverseBoolConverter.Instance}}">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnToggleBillStatusClicked" />
+                                </Border.GestureRecognizers>
+                                <Label Text="Pagar fatura"
+                                       TextColor="White"
+                                       VerticalOptions="Center" />
+                            </Border>
+                            <Border AutomationId="MarkCreditCardBillPendingAction"
+                                    BackgroundColor="#757575"
+                                    StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 8"
+                                    Padding="16,0"
+                                    IsVisible="{Binding IsPaid}">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnToggleBillStatusClicked" />
+                                </Border.GestureRecognizers>
+                                <Label Text="Pendente"
+                                       TextColor="White"
+                                       VerticalOptions="Center" />
+                            </Border>
+                        </HorizontalStackLayout>
+                    </controls:SlideOutPanel>
+                </Grid>
+
+                <!-- Indented, with a bar in the bill's color, so the entries read as part of the bill -->
+                <Grid AutomationId="CreditCardBillEntries" ColumnDefinitions="Auto, *" IsVisible="{Binding IsExpanded}">
+                    <BoxView Grid.Column="0" WidthRequest="4" Margin="14,0,0,0" Color="{StaticResource BillAccent}" />
+                    <VerticalStackLayout Grid.Column="1"
+                                         BindableLayout.ItemsSource="{Binding Entries}"
+                                         BindableLayout.ItemTemplate="{StaticResource EntryRowTemplate}" />
+                </Grid>
+            </VerticalStackLayout>
         </DataTemplate>
     </ContentPage.Resources>
 
@@ -455,10 +611,13 @@
                                                                 AccentColor="{StaticResource OutcomeAccent}" />
                                     </Grid>
 
-                                    <CollectionView ItemsSource="{Binding OutcomeEntries}"
-                                                    ItemTemplate="{StaticResource EntryRowTemplate}"
-                                                    IsVisible="{Binding IsOutcomesExpanded}"
-                                                    SelectionMode="None" />
+                                    <VerticalStackLayout IsVisible="{Binding IsOutcomesExpanded}">
+                                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding CreditCardBills}"
+                                                             BindableLayout.ItemTemplate="{StaticResource CreditCardBillTemplate}" />
+                                        <CollectionView ItemsSource="{Binding OutcomeEntries}"
+                                                        ItemTemplate="{StaticResource EntryRowTemplate}"
+                                                        SelectionMode="None" />
+                                    </VerticalStackLayout>
                                 </VerticalStackLayout>
                             </Border>
 

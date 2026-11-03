@@ -133,8 +133,9 @@
                        TextColor="Gray"
                        IsVisible="{Binding InstallmentsTotal, Converter={x:Static converters:IsNotNullConverter.Instance}}" />
 
-                <!-- Estimated: the amount changes every month (e.g. energy bill, supermarket) -->
-                <Grid ColumnDefinitions="*, Auto" Margin="0,6,0,0">
+                <!-- Estimated: the amount changes every month (e.g. energy bill, supermarket). A credit card purchase has a known amount, charged at once -->
+                <Grid ColumnDefinitions="*, Auto" Margin="0,6,0,0"
+                      IsVisible="{Binding IsOnCreditCardBill, Converter={x:Static converters:InverseBoolConverter.Instance}}">
                     <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
                         <Label Text="Valor estimado" FontSize="14" />
                         <Label Text="Varia a cada mês, como luz ou mercado" FontSize="11" TextColor="Gray" />
@@ -147,8 +148,9 @@
                             VerticalOptions="Center" />
                 </Grid>
 
-                <!-- Partial payment: enables "Pagar parcial" for entries paid little by little (e.g. supermarket) -->
-                <Grid ColumnDefinitions="*, Auto" Margin="0,6,0,0">
+                <!-- Partial payment: enables "Pagar parcial" for entries paid little by little (e.g. supermarket); a credit card purchase is paid with its bill -->
+                <Grid ColumnDefinitions="*, Auto" Margin="0,6,0,0"
+                      IsVisible="{Binding IsOnCreditCardBill, Converter={x:Static converters:InverseBoolConverter.Instance}}">
                     <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
                         <Label AutomationId="PartialPaymentSwitchLabel" Text="{Binding PartialPaymentLabel}" FontSize="14" />
                         <Label Text="{Binding PartialPaymentHint}" FontSize="11" TextColor="Gray" />
@@ -219,23 +221,7 @@
                 </VerticalStackLayout>
             </VerticalStackLayout>
 
-            <!-- Due day, repeated every month for recurrent and installment entries -->
-            <VerticalStackLayout Spacing="2">
-                <Label Text="Vencimento" FontSize="12" TextColor="Gray" />
-                <Picker AutomationId="DueDayPicker"
-                        Title="Vencimento"
-                        ItemsSource="{Binding DueDays}"
-                        ItemDisplayBinding="{Binding ., Converter={x:Static converters:DueDayToLabelConverter.Instance}, x:DataType=x:Int32}"
-                        SelectedItem="{Binding SelectedDueDay}" />
-            </VerticalStackLayout>
-
-            <Picker AutomationId="CategoryPicker"
-                    Title="Categoria"
-                    ItemsSource="{Binding Categories}"
-                    ItemDisplayBinding="{Binding Name, x:DataType=models:FinancialCategory}"
-                    SelectedItem="{Binding SelectedCategory}" />
-
-            <!-- Account, card or voucher the entry is paid with ("Pago com") or received in ("Recebido em") -->
+            <!-- Account, card or voucher the entry is paid with ("Pago com") or received in ("Recebido em"); it comes first since a credit card decides the due date -->
             <VerticalStackLayout Spacing="2">
                 <Label AutomationId="PaymentSourcePickerLabel" Text="{Binding PaymentSourceLabel}" FontSize="12" TextColor="Gray" />
                 <Picker AutomationId="PaymentSourcePicker"
@@ -244,6 +230,29 @@
                         ItemDisplayBinding="{Binding Name, x:DataType=models:PaymentSource}"
                         SelectedItem="{Binding SelectedPaymentSource}" />
             </VerticalStackLayout>
+
+            <!-- Due day, repeated every month for recurrent and installment entries; outcomes paid with a credit card fall due with its bill -->
+            <VerticalStackLayout Spacing="2">
+                <Label Text="Vencimento" FontSize="12" TextColor="Gray" />
+                <Picker AutomationId="DueDayPicker"
+                        Title="Vencimento"
+                        ItemsSource="{Binding DueDays}"
+                        ItemDisplayBinding="{Binding ., Converter={x:Static converters:DueDayToLabelConverter.Instance}, x:DataType=x:Int32}"
+                        SelectedItem="{Binding SelectedDueDay}"
+                        IsVisible="{Binding IsOnCreditCardBill, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
+                <Label AutomationId="CreditCardBillDueHintLabel"
+                       Text="{Binding CreditCardBillDueHint}"
+                       FontSize="14"
+                       TextColor="Gray"
+                       Padding="0,8"
+                       IsVisible="{Binding IsOnCreditCardBill}" />
+            </VerticalStackLayout>
+
+            <Picker AutomationId="CategoryPicker"
+                    Title="Categoria"
+                    ItemsSource="{Binding Categories}"
+                    ItemDisplayBinding="{Binding Name, x:DataType=models:FinancialCategory}"
+                    SelectedItem="{Binding SelectedCategory}" />
 
             <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,10,0,0">
                 <Button Grid.Column="0" AutomationId="CancelEntryButton" Text="Cancelar" Clicked="OnBackClicked" BackgroundColor="Gray" />

@@ -113,6 +113,21 @@ public partial class MainViewModel : ObservableObject,
         await RefreshAllAsync();
     }
 
+    /// <summary>
+    /// Pays every entry of a credit card's bill, or turns a paid bill back to pending.
+    /// </summary>
+    public async Task ToggleCreditCardBillStatusAsync(CreditCardBill bill)
+    {
+        if (SelectedMonth is not { } month)
+            return;
+
+        month.HideEntryActions();
+
+        var status = bill.IsPaid ? FinancialMonthlyEntryStatus.Pending : FinancialMonthlyEntryStatus.Paid;
+        await _financeService.SetCreditCardBillStatusAsync(bill.Card.Id, month.Date.Year, month.Date.Month, status);
+        await RefreshAllAsync();
+    }
+
     public void GoToMonth(DateTime date)
     {
         var index = (date.Year - FirstMonthDate.Year) * 12 + date.Month - FirstMonthDate.Month;

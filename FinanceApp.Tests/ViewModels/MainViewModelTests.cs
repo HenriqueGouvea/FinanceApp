@@ -309,6 +309,54 @@ public class MainViewModelTests
         await _service.Received(5).GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>());
     }
 
+    // --- ToggleCreditCardBillStatusAsync ---
+
+    [Fact]
+    public async Task ToggleCreditCardBillStatusAsync_PendingBill_PaysItInSelectedMonth()
+    {
+        await _vm.InitializeAsync();
+        var selected = _vm.SelectedMonth!.Date;
+
+        await _vm.ToggleCreditCardBillStatusAsync(MakeBill(FinancialMonthlyEntryStatus.Pending));
+
+        await _service.Received(1).SetCreditCardBillStatusAsync(3, selected.Year, selected.Month, FinancialMonthlyEntryStatus.Paid);
+    }
+
+    [Fact]
+    public async Task ToggleCreditCardBillStatusAsync_PartiallyPaidBill_PaysIt()
+    {
+        await _vm.InitializeAsync();
+        var selected = _vm.SelectedMonth!.Date;
+
+        await _vm.ToggleCreditCardBillStatusAsync(MakeBill(FinancialMonthlyEntryStatus.PartiallyPaid));
+
+        await _service.Received(1).SetCreditCardBillStatusAsync(3, selected.Year, selected.Month, FinancialMonthlyEntryStatus.Paid);
+    }
+
+    [Fact]
+    public async Task ToggleCreditCardBillStatusAsync_PaidBill_MarksItPending()
+    {
+        await _vm.InitializeAsync();
+        var selected = _vm.SelectedMonth!.Date;
+
+        await _vm.ToggleCreditCardBillStatusAsync(MakeBill(FinancialMonthlyEntryStatus.Paid));
+
+        await _service.Received(1).SetCreditCardBillStatusAsync(3, selected.Year, selected.Month, FinancialMonthlyEntryStatus.Pending);
+    }
+
+    [Fact]
+    public async Task ToggleCreditCardBillStatusAsync_HidesActionsAndReloadsNearbyMonths()
+    {
+        await _vm.InitializeAsync();
+        _vm.SelectedMonth!.RevealedBillCardId = 3;
+        _service.ClearReceivedCalls();
+
+        await _vm.ToggleCreditCardBillStatusAsync(MakeBill(FinancialMonthlyEntryStatus.Pending));
+
+        _vm.SelectedMonth.RevealedBillCardId.Should().BeNull();
+        await _service.Received(5).GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>());
+    }
+
     // --- Month navigation ---
 
     [Fact]
@@ -513,4 +561,10 @@ public class MainViewModelTests
         IsProjected: true,
         InstallmentLabel: null,
         InstallmentTotalAmount: null);
+
+    private static CreditCardBill MakeBill(FinancialMonthlyEntryStatus status) => new(
+        Card: new PaymentSource { Id = 3, Name = "Nubank", Type = PaymentSourceType.CreditCard },
+        PaymentAccount: null,
+        DueDate: null,
+        Entries: [MakeProjection(7) with { Status = status }]);
 }

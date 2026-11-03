@@ -37,15 +37,24 @@ public partial class AppShell : Shell
         await Navigation.PushModalAsync(page, animated: isRerun);
     }
 
+    // Paying entries changes the credit cards' available limits, so the balances are refreshed each time the menu opens.
+    protected override async void OnPropertyChanged(string? propertyName = null)
+    {
+        base.OnPropertyChanged(propertyName);
+
+        if (propertyName == nameof(FlyoutIsPresented) && FlyoutIsPresented && _balancesViewModel is { } balances)
+            await balances.LoadCommand.ExecuteAsync(null);
+    }
+
     private async void OnSourceTapped(object? sender, TappedEventArgs e)
     {
-        if ((sender as BindableObject)?.BindingContext is not PaymentSource source || CurrentPage is not { } page) return;
+        if ((sender as BindableObject)?.BindingContext is not PaymentSourceSummary { Source: var source } || CurrentPage is not { } page) return;
 
         var popup = Handler?.MauiContext?.Services.GetService<PaymentSourceEditPopup>()
             ?? throw new InvalidOperationException("PaymentSourceEditPopup not found.");
         var vm = (PaymentSourceEditViewModel)popup.BindingContext;
 
-        vm.PrepareForEdit(source);
+        await vm.PrepareForEditAsync(source);
         vm.SetSaveCallback(async () =>
         {
             await popup.CloseAsync();
