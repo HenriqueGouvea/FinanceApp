@@ -181,6 +181,20 @@ public sealed class AppSession : IDisposable
         Tap(Text(text));
     }
 
+    /// <summary>
+    /// Taps a point of the screen given as fractions of its width and height, for areas with no element of their own
+    /// (e.g. the dimmed page beside the open hamburger menu).
+    /// </summary>
+    public void TapAt(double xFraction, double yFraction)
+    {
+        var size = Driver.Manage().Window.Size;
+        Driver.ExecuteScript("mobile: clickGesture", new Dictionary<string, object>
+        {
+            ["x"] = (int)(size.Width * xFraction),
+            ["y"] = (int)(size.Height * yFraction)
+        });
+    }
+
     public void LongPress(IWebElement element, int durationMs = 1500)
     {
         var center = Center(element.Location, element.Size);

@@ -572,14 +572,15 @@ public class MainPageObject
 
     /// <summary>
     /// Opens the hamburger menu, waits for the source's amount in "Saldo atual" (the available limit for a
-    /// credit card) to read <paramref name="expected"/>, and closes it again. The list reloads as the menu opens.
+    /// credit card) to read <paramref name="expected"/>, and closes it by tapping the dimmed page beside it (Back would leave the app). The list reloads as the menu opens.
     /// </summary>
     public MainPageObject WaitForMenuBalance(string sourceName, string expected)
     {
         _session.Tap(FlyoutButton);
         _session.WaitFor(() => ReadMenuBalance(sourceName) == expected, $"\"{sourceName}\" to show {expected} in the menu");
-        _session.PressBack();
+        _session.TapAt(0.92, 0.5);
         _session.WaitForGone(FlyoutGreeting);
+        WaitUntilLoaded();
         return this;
     }
 
