@@ -12,6 +12,7 @@ public class PaymentSourcesPageObject
     private static readonly By SourceRow = AppSession.AutomationId("PaymentSourceRow");
     private static readonly By SourceName = AppSession.AutomationId("PaymentSourceNameLabel");
     private static readonly By SourceBalance = AppSession.AutomationId("PaymentSourceBalanceLabel");
+    private static readonly By SourceAvailableLimit = AppSession.AutomationId("PaymentSourceAvailableLimitLabel");
     private static readonly By DeleteButton = AppSession.AutomationId("DeletePaymentSourceButton");
     private static readonly By GroupHeader = AppSession.AutomationId("PaymentSourceGroupHeader");
     private static readonly By NameEntry = AppSession.AutomationId("PaymentSourceNameEntry");
@@ -62,6 +63,32 @@ public class PaymentSourcesPageObject
     /// The row's balance line, e.g. "Saldo: R$ 1.000,00" (see <see cref="AppFormat.SourceBalance"/>).
     /// </summary>
     public string BalanceOf(string name) => FindRow(name).FindElement(SourceBalance).Text;
+
+    /// <summary>
+    /// A credit card row's available limit line, e.g. "Disponível: R$ 4.500,00" (see <see cref="AppFormat.AvailableLimit"/>),
+    /// or null for accounts and vouchers, which don't have one.
+    /// </summary>
+    public string? AvailableLimitOf(string name) =>
+        FindRow(name).FindElements(SourceAvailableLimit).FirstOrDefault(e => e.Displayed)?.Text;
+
+    /// <summary>
+    /// Waits for a credit card row to show that available limit, since the list reloads each time the page appears.
+    /// </summary>
+    public PaymentSourcesPageObject WaitForAvailableLimit(string name, string expected)
+    {
+        _session.WaitFor(() =>
+        {
+            try
+            {
+                return AvailableLimitOf(name) == expected;
+            }
+            catch (StaleElementReferenceException)
+            {
+                return false;
+            }
+        }, $"\"{name}\" to show \"{expected}\"");
+        return this;
+    }
 
     /// <summary>
     /// Opens the "+" popup, fills it and saves. <paramref name="type"/> is one of the AppFormat source types.

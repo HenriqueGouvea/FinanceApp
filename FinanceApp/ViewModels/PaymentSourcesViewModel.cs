@@ -11,16 +11,24 @@ namespace FinanceApp.ViewModels;
 public partial class PaymentSourcesViewModel : ObservableObject, IRecipient<PaymentSourcesChangedMessage>
 {
     private readonly IPaymentSourceService _paymentSourceService;
+    private readonly IFinanceService _financeService;
+    private readonly TimeProvider _timeProvider;
     private readonly IMessenger _messenger;
-    private List<PaymentSource> _sources = [];
+    private IReadOnlyList<PaymentSourceSummary> _sources = [];
 
     public ObservableCollection<PaymentSourceGroup> Groups { get; } = [];
 
     public bool IsEmpty => Groups.Count == 0;
 
-    public PaymentSourcesViewModel(IPaymentSourceService paymentSourceService, IMessenger messenger)
+    public PaymentSourcesViewModel(
+        IPaymentSourceService paymentSourceService,
+        IFinanceService financeService,
+        TimeProvider timeProvider,
+        IMessenger messenger)
     {
         _paymentSourceService = paymentSourceService;
+        _financeService = financeService;
+        _timeProvider = timeProvider;
         _messenger = messenger;
         Groups.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
         messenger.Register(this);
@@ -32,7 +40,11 @@ public partial class PaymentSourcesViewModel : ObservableObject, IRecipient<Paym
     [RelayCommand]
     public async Task LoadAsync()
     {
-        _sources = [.. await _paymentSourceService.GetAllAsync()];
+        var sources = await _paymentSourceService.GetAllAsync();
+        var today = _timeProvider.GetLocalNow();
+        var usedLimits = await _financeService.GetUsedCreditLimitsAsync(today.Year, today.Month);
+
+        _sources = PaymentSourceSummary.Build(sources, usedLimits);
         BuildGroups();
     }
 
@@ -60,7 +72,7 @@ public partial class PaymentSourcesViewModel : ObservableObject, IRecipient<Paym
 
     private void AddGroup(PaymentSourceType type, string title)
     {
-        var sources = _sources.Where(s => s.Type == type).ToList();
+        var sources = _sources.Where(s => s.Source.Type == type).ToList();
         if (sources.Count > 0)
             Groups.Add(new PaymentSourceGroup(type, title, sources));
     }

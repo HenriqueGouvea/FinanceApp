@@ -143,6 +143,16 @@ public class AddEntryPageObject
 
     public string PartialPaymentSwitchText => _session.ScrollTo(PartialPaymentSwitchLabelId).Text;
 
+    /// <summary>
+    /// "Valor estimado" is hidden for outcomes paid with a credit card.
+    /// </summary>
+    public bool IsEstimatedSwitchVisible => _session.TryScrollTo(EstimatedSwitchId) is not null;
+
+    /// <summary>
+    /// "Pagamento parcial" is hidden for outcomes paid with a credit card.
+    /// </summary>
+    public bool IsPartialPaymentSwitchVisible => _session.TryScrollTo(PartialPaymentSwitchId) is not null;
+
     public AddEntryPageObject SetAllowsPartialPayment(bool allowsPartialPayment)
     {
         _session.HideKeyboardIfShown();
@@ -275,6 +285,19 @@ public class AddEntryPageObject
     public string DueDayText => _session.ScrollTo(DueDayPickerId).Text;
 
     public bool IsDueDayPickerVisible => _session.TryScrollTo(DueDayPickerId) is not null;
+
+    /// <summary>
+    /// Whether the "Pago com" picker comes before the "Vencimento" field, read with both on screen.
+    /// </summary>
+    public bool IsPaymentSourceAboveDueDate
+    {
+        get
+        {
+            var dueDate = _session.ScrollTo(DueDayPickerId).Location.Y;
+            var paymentSource = _session.WaitForVisible(AppSession.AutomationId(PaymentSourcePickerId)).Location.Y;
+            return paymentSource < dueDate;
+        }
+    }
 
     /// <summary>
     /// The line shown instead of the due day picker for an outcome paid with a credit card, or null when not shown.

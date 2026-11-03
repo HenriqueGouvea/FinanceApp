@@ -28,6 +28,7 @@ public partial class AddEntryViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOnCreditCardBill))]
     [NotifyPropertyChangedFor(nameof(CreditCardBillDueHint))]
+    [NotifyPropertyChangedFor(nameof(ShowsPaidAmount))]
     PaymentSource? selectedPaymentSource;
     [ObservableProperty] FinancialEntryType entryType = FinancialEntryType.Outcome;
     [ObservableProperty] RecurrenceType? selectedRecurrence;
@@ -53,6 +54,7 @@ public partial class AddEntryViewModel : ObservableObject
     public string PaymentSourceLabel => IsIncome ? "Recebido em" : "Pago com";
     /// <summary>
     /// An outcome paid with a credit card falls due with the card's bill, so it has no due day of its own.
+    /// It is also neither estimated nor paid little by little: a card purchase has a known amount, paid with the bill.
     /// </summary>
     public bool IsOnCreditCardBill => !IsIncome && SelectedPaymentSource?.Type == PaymentSourceType.CreditCard;
     public string CreditCardBillDueHint => SelectedPaymentSource?.BillDueDay is { } day
@@ -60,9 +62,10 @@ public partial class AddEntryViewModel : ObservableObject
         : "Vence com a fatura do cartão de crédito";
     public bool HasPayments => Payments.Count > 0;
     /// <summary>
-    /// The month's paid amount is only edited for entries paid little by little, or to remove payments recorded before the flag was turned off.
+    /// The month's paid amount is only edited for entries paid little by little, or to remove payments recorded before the flag was turned off
+    /// (or before the entry moved to a credit card).
     /// </summary>
-    public bool ShowsPaidAmount => IsEditing && (AllowsPartialPayment || HasPayments);
+    public bool ShowsPaidAmount => IsEditing && ((AllowsPartialPayment && !IsOnCreditCardBill) || HasPayments);
     public bool IsEditing => _editingEntryId != 0;
     public double StructuralFieldsOpacity => IsEditing ? 0.4 : 1.0;
 
@@ -122,6 +125,7 @@ public partial class AddEntryViewModel : ObservableObject
         OnPropertyChanged(nameof(PartialPaymentHint));
         OnPropertyChanged(nameof(PaymentSourceLabel));
         OnPropertyChanged(nameof(IsOnCreditCardBill));
+        OnPropertyChanged(nameof(ShowsPaidAmount));
         FilterCategories();
     }
 
@@ -224,8 +228,8 @@ public partial class AddEntryViewModel : ObservableObject
             EntryType = EntryType,
             Recurrence = recurrence,
             TotalInstallments = TotalInstallments,
-            IsEstimated = IsEstimated,
-            AllowsPartialPayment = AllowsPartialPayment,
+            IsEstimated = IsEstimated && !IsOnCreditCardBill,
+            AllowsPartialPayment = AllowsPartialPayment && !IsOnCreditCardBill,
             DueDay = SelectedDueDay == NoDueDay || IsOnCreditCardBill ? null : SelectedDueDay
         };
 

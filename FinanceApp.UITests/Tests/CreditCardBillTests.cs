@@ -247,6 +247,103 @@ public sealed class CreditCardBillTests : E2ETestBase
         entryPage.CreditCardBillDueHintText.Should().Be(AppLabels.CreditCardBillDueHint);
     }
 
+    [Fact]
+    public void EntryPage_PaymentSourceComesBeforeTheDueDate()
+    {
+        MainPage.OpenAddEntry()
+            .EnterDescription(Netflix)
+            .SelectRecurrence(AppLabels.Recurrent)
+            .IsPaymentSourceAboveDueDate.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task EntryPage_OutcomeOnCreditCard_HidesEstimatedAndPartialPayment()
+    {
+        AddAccountAndCard(BillDueDay, Account);
+
+        var entryPage = MainPage.OpenAddEntry()
+            .EnterDescription(Market)
+            .SelectRecurrence(AppLabels.Recurrent)
+            .EnterAmount(600m)
+            .SetEstimated(true)
+            .SetAllowsPartialPayment(true)
+            .SelectPaymentSource(Card);
+
+        entryPage.IsEstimatedSwitchVisible.Should().BeFalse();
+        entryPage.IsPartialPaymentSwitchVisible.Should().BeFalse();
+
+        entryPage.SelectPaymentSource(Account);
+        entryPage.IsEstimatedSwitchVisible.Should().BeTrue();
+        entryPage.IsPartialPaymentSwitchVisible.Should().BeTrue();
+
+        entryPage.SelectPaymentSource(Card).Save();
+        MainPage.WaitForBill(Card);
+
+        var entry = (await GetEntryRowsAsync()).Single();
+        entry.IsEstimated.Should().BeFalse("a credit card purchase has a known amount");
+        entry.AllowsPartialPayment.Should().BeFalse("a credit card purchase is paid with the bill");
+    }
+
+    [Fact]
+    public void EntryPage_IncomeOnCreditCard_KeepsEstimatedAndPartialPayment()
+    {
+        AddAccountAndCard(BillDueDay, Account);
+
+        var entryPage = MainPage.OpenAddEntry()
+            .EnterDescription("Estorno E2E")
+            .SelectIncome()
+            .SelectRecurrence(AppLabels.Recurrent)
+            .SelectPaymentSource(Card);
+
+        entryPage.IsEstimatedSwitchVisible.Should().BeTrue();
+        entryPage.IsPartialPaymentSwitchVisible.Should().BeTrue();
+    }
+
+    // --- Credit limit ---
+
+    [Fact]
+    public void AvailableLimit_SubtractsUnpaidOutcomesAndFreesUpWhenTheBillIsPaid()
+    {
+        AddAccountAndCard(BillDueDay, Account);
+        MainPage
+            .AddEntry(Netflix, AppLabels.Recurrent, 55.9m, paymentSource: Card)
+            .AddEntry(Market, AppLabels.OneTime, 600m, paymentSource: Card)
+            .AddEntry(Rent, AppLabels.Recurrent, 1500m, paymentSource: Account);
+
+        var sources = MainPage.OpenPaymentSources().WaitForAvailableLimit(Card, AppFormat.AvailableLimit(4344.1m));
+        sources.BalanceOf(Card).Should().Be(AppFormat.SourceBalance(AppLabels.Limit, 5000m), "the limit itself stays as typed");
+        sources.AvailableLimitOf(Account).Should().BeNull("only credit cards have a limit");
+        sources.GoToEntries()
+            .WaitForMenuBalance(Card, AppFormat.Money(4344.1m))
+            .WaitForMenuBalance(Account, AppFormat.Money(2500m))
+            .PayBill(Card);
+
+        MainPage.WaitForMenuBalance(Card, AppFormat.Money(5000m));
+        MainPage.OpenPaymentSources().WaitForAvailableLimit(Card, AppFormat.AvailableLimit(5000m));
+    }
+
+    [Fact]
+    public void AvailableLimit_PurchaseInInstallments_TakesUpTheInstallmentsStillToCome()
+    {
+        const string phone = "Celular E2E";
+        AddAccountAndCard(BillDueDay, Account);
+        MainPage.AddEntry(phone, AppLabels.Installments, 200m, installments: "10", paymentSource: Card);
+
+        MainPage.OpenPaymentSources().WaitForAvailableLimit(Card, AppFormat.AvailableLimit(3000m)).GoToEntries();
+
+        MainPage.MarkPaid(phone);
+        MainPage.OpenPaymentSources().WaitForAvailableLimit(Card, AppFormat.AvailableLimit(3200m));
+    }
+
+    [Fact]
+    public void AvailableLimit_BeyondTheLimit_ShowsNegative()
+    {
+        MainPage.OpenPaymentSources().AddCreditCard(Card, 500m).GoToEntries();
+        MainPage.AddEntry(Market, AppLabels.OneTime, 650m, paymentSource: Card);
+
+        MainPage.OpenPaymentSources().WaitForAvailableLimit(Card, AppFormat.AvailableLimit(-150m));
+    }
+
     // --- Card changes ---
 
     [Fact]

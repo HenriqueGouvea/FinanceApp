@@ -1387,6 +1387,152 @@ public class FinanceServiceTests
         (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Should().BeEmpty();
     }
 
+    // --- GetUsedCreditLimitsAsync ---
+
+    [Fact]
+    public async Task GetUsedCreditLimitsAsync_CardWithoutEntries_ReturnsZeroForEveryCard()
+    {
+        var card = await SaveCardAsync();
+        var otherCard = await SaveCardAsync();
+
+        var used = await _service.GetUsedCreditLimitsAsync(2026, 4);
+
+        used.Should().BeEquivalentTo(new Dictionary<int, decimal> { [card.Id] = 0m, [otherCard.Id] = 0m });
+    }
+
+    [Fact]
+    public async Task GetUsedCreditLimitsAsync_RecurrentOutcome_CountsEveryUnpaidMonthUpToTheGivenOne()
+    {
+        var card = await SaveCardAsync();
+        await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+
+        var used = await _service.GetUsedCreditLimitsAsync(2026, 6);
+
+        used[card.Id].Should().Be(300m);
+    }
+
+    [Fact]
+    public async Task GetUsedCreditLimitsAsync_PaidMonths_FreeTheLimit()
+    {
+        var card = await SaveCardAsync();
+        var netflix = await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+        await _service.SetCreditCardBillStatusAsync(card.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+        await _service.SetEntryStatusAsync(netflix.Id, 2026, 5, FinancialMonthlyEntryStatus.Paid);
+
+        var used = await _service.GetUsedCreditLimitsAsync(2026, 6);
+
+        used[card.Id].Should().Be(100m);
+    }
+
+    [Fact]
+    public async Task GetUsedCreditLimitsAsync_PartialPayment_CountsOnlyWhatIsLeft()
+    {
+        var card = await SaveCardAsync();
+        var market = await SaveTemplateAsync(RecurrenceType.OneTime, paymentSourceId: card.Id);
+        await _service.AddPaymentAsync(market.Id, 2026, 4, 40m, AprilTenth, string.Empty);
+
+        var used = await _service.GetUsedCreditLimitsAsync(2026, 4);
+
+        used[card.Id].Should().Be(60m);
+    }
+
+    [Fact]
+    public async Task GetUsedCreditLimitsAsync_PaidMoreThanPlanned_FreesTheWholeLimit()
+    {
+        var card = await SaveCardAsync();
+        var market = await SaveTemplateAsync(RecurrenceType.OneTime, paymentSourceId: card.Id);
+        await _service.AddPaymentAsync(market.Id, 2026, 4, 150m, AprilTenth, string.Empty);
+
+        var used = await _service.GetUsedCreditLimitsAsync(2026, 4);
+
+        used[card.Id].Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task GetUsedCreditLimitsAsync_Installments_CountsTheInstallmentsStillToCome()
+    {
+        var card = await SaveCardAsync();
+        var phone = await SaveTemplateAsync(RecurrenceType.Installments, totalInstallments: 5, paymentSourceId: card.Id);
+        await _service.SetEntryStatusAsync(phone.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        var used = await _service.GetUsedCreditLimitsAsync(2026, 4);
+
+        used[card.Id].Should().Be(400m);
+    }
+
+    [Fact]
+    public async Task GetUsedCreditLimitsAsync_InstallmentsStartingLater_AlreadyTakeUpTheLimit()
+    {
+        var card = await SaveCardAsync();
+        await SaveTemplateAsync(RecurrenceType.Installments, totalInstallments: 3, paymentSourceId: card.Id);
+
+        var used = await _service.GetUsedCreditLimitsAsync(2026, 3);
+
+        used[card.Id].Should().Be(300m);
+    }
+
+    [Fact]
+    public async Task GetUsedCreditLimitsAsync_RecurrentAndOneTimeOfLaterMonths_DoNotCountYet()
+    {
+        var card = await SaveCardAsync();
+        await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+        await SaveTemplateAsync(RecurrenceType.OneTime, paymentSourceId: card.Id);
+
+        var used = await _service.GetUsedCreditLimitsAsync(2026, 3);
+
+        used[card.Id].Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task GetUsedCreditLimitsAsync_SkipsMonthsDeletedAndEndedEntries()
+    {
+        var card = await SaveCardAsync();
+        var netflix = await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+        await _service.DeleteEntryAsync(netflix.Id, 2026, 4, EntryDeleteScope.ThisMonth);
+        await _service.DeleteEntryAsync(netflix.Id, 2026, 6, EntryDeleteScope.ThisAndFuture);
+
+        var used = await _service.GetUsedCreditLimitsAsync(2026, 8);
+
+        used[card.Id].Should().Be(100m);
+    }
+
+    [Fact]
+    public async Task GetUsedCreditLimitsAsync_UsesTheMonthsOverriddenAmount()
+    {
+        var card = await SaveCardAsync();
+        var netflix = await SaveTemplateAsync(RecurrenceType.OneTime, paymentSourceId: card.Id);
+        await _service.SaveMonthlyEntryAsync(new FinancialMonthlyEntry
+        {
+            FinancialEntryId = netflix.Id,
+            Year = 2026,
+            Month = 4,
+            OverrideAmount = 70m
+        });
+
+        var used = await _service.GetUsedCreditLimitsAsync(2026, 4);
+
+        used[card.Id].Should().Be(70m);
+    }
+
+    [Fact]
+    public async Task GetUsedCreditLimitsAsync_IgnoresIncomesOtherSourcesAndOtherCards()
+    {
+        var card = await SaveCardAsync();
+        var otherCard = await SaveCardAsync();
+        var account = new PaymentSource { Name = "Itaú", Type = PaymentSourceType.BankAccount };
+        await new PaymentSourceService(_context).SaveAsync(account);
+        var refund = await SaveTemplateAsync(RecurrenceType.OneTime, paymentSourceId: card.Id);
+        refund.EntryType = FinancialEntryType.Income;
+        await _service.SaveEntryAsync(refund);
+        await SaveTemplateAsync(RecurrenceType.OneTime, paymentSourceId: account.Id);
+        await SaveTemplateAsync(RecurrenceType.OneTime);
+        await SaveTemplateAsync(RecurrenceType.OneTime, paymentSourceId: otherCard.Id);
+
+        var used = await _service.GetUsedCreditLimitsAsync(2026, 4);
+
+        used.Should().BeEquivalentTo(new Dictionary<int, decimal> { [card.Id] = 0m, [otherCard.Id] = 100m });
+    }
+
     private async Task<PaymentSource> SaveCardAsync(int? billDueDay = null, int? billPaymentSourceId = null)
     {
         var card = new PaymentSource

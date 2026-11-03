@@ -716,6 +716,33 @@ public class AddEntryViewModelTests
         await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.DueDay == 10));
     }
 
+    [Fact]
+    public async Task SaveCommand_OutcomeOnCreditCard_SavesNeitherEstimatedNorPartialPayment()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Recurrent;
+        _vm.IsEstimated = true;
+        _vm.AllowsPartialPayment = true;
+        _vm.SelectedPaymentSource = Card;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => !e.IsEstimated && !e.AllowsPartialPayment));
+    }
+
+    [Fact]
+    public async Task SaveCommand_IncomeOnCreditCard_KeepsEstimatedAndPartialPayment()
+    {
+        _vm.SelectIncomeCommand.Execute(null);
+        _vm.SelectedRecurrence = RecurrenceType.Recurrent;
+        _vm.IsEstimated = true;
+        _vm.AllowsPartialPayment = true;
+        _vm.SelectedPaymentSource = Card;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.IsEstimated && e.AllowsPartialPayment));
+    }
+
     // --- Partial payment flag ---
 
     [Fact]
@@ -808,6 +835,35 @@ public class AddEntryViewModelTests
         ]);
 
         await _vm.PrepareForEditAsync(MakeEntry(), June, 100m);
+
+        _vm.ShowsPaidAmount.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ShowsPaidAmount_FlaggedEntryMovedToCreditCard_IsFalse()
+    {
+        var entry = MakeEntry();
+        entry.AllowsPartialPayment = true;
+        await _vm.PrepareForEditAsync(entry, June);
+        var raised = new List<string?>();
+        _vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        _vm.SelectedPaymentSource = Card;
+
+        _vm.ShowsPaidAmount.Should().BeFalse();
+        raised.Should().Contain(nameof(AddEntryViewModel.ShowsPaidAmount));
+    }
+
+    [Fact]
+    public async Task ShowsPaidAmount_CreditCardEntryWithRecordedPayments_IsTrueSoTheyCanBeRemoved()
+    {
+        _service.GetPaymentsAsync(42, 2026, 6).Returns([
+            new FinancialPayment { Id = 1, Amount = 100m, Date = JuneTenth }
+        ]);
+        var entry = MakeEntry();
+        entry.PaymentSourceId = Card.Id;
+
+        await _vm.PrepareForEditAsync(entry, June, 100m);
 
         _vm.ShowsPaidAmount.Should().BeTrue();
     }

@@ -65,7 +65,7 @@ public partial class PaymentSourcesPage : ContentPage
     }
 
     private static PaymentSource? GetPaymentSource(object? sender) =>
-        (sender as BindableObject)?.BindingContext as PaymentSource;
+        ((sender as BindableObject)?.BindingContext as PaymentSourceSummary)?.Source;
 
     private PaymentSourceEditPopup ResolvePopup() =>
         Handler?.MauiContext?.Services.GetService<PaymentSourceEditPopup>()

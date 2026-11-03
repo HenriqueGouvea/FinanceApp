@@ -50,6 +50,9 @@ public class MainPageObject
     private static readonly By SwipeHint = AppSession.AutomationId("SwipeHintLabel");
     private static readonly By MonthPickerBadge = AppSession.AutomationId("MonthPickerBadge");
     private static readonly By FlyoutGreeting = AppSession.AutomationId("FlyoutGreetingLabel");
+    private static readonly By FlyoutSourceRow = AppSession.AutomationId("FlyoutSourceRow");
+    private static readonly By FlyoutSourceName = AppSession.AutomationId("FlyoutSourceNameLabel");
+    private static readonly By FlyoutSourceBalance = AppSession.AutomationId("FlyoutSourceBalanceLabel");
     private static readonly By Bill = AppSession.AutomationId("CreditCardBill");
     private static readonly By BillRow = AppSession.AutomationId("CreditCardBillRow");
     private static readonly By BillName = AppSession.AutomationId("CreditCardBillNameLabel");
@@ -565,6 +568,33 @@ public class MainPageObject
         _session.PressBack();
         _session.WaitForGone(FlyoutGreeting);
         return greeting;
+    }
+
+    /// <summary>
+    /// Opens the hamburger menu, waits for the source's amount in "Saldo atual" (the available limit for a
+    /// credit card) to read <paramref name="expected"/>, and closes it again. The list reloads as the menu opens.
+    /// </summary>
+    public MainPageObject WaitForMenuBalance(string sourceName, string expected)
+    {
+        _session.Tap(FlyoutButton);
+        _session.WaitFor(() => ReadMenuBalance(sourceName) == expected, $"\"{sourceName}\" to show {expected} in the menu");
+        _session.PressBack();
+        _session.WaitForGone(FlyoutGreeting);
+        return this;
+    }
+
+    private string? ReadMenuBalance(string sourceName)
+    {
+        try
+        {
+            return _session.Driver.FindElements(FlyoutSourceRow)
+                .FirstOrDefault(r => r.Displayed && r.FindElements(FlyoutSourceName).Any(n => n.Text == sourceName))
+                ?.FindElement(FlyoutSourceBalance).Text;
+        }
+        catch (StaleElementReferenceException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
