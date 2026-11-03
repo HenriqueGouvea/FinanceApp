@@ -294,14 +294,43 @@ public sealed class AppSession : IDisposable
     /// <summary>
     /// Closes the keyboard through its "Done" action. Unlike <see cref="HideKeyboardIfShown"/>, it can never fall
     /// back to pressing Back, which would dismiss a popup without saving.
+    /// The action is resent until the keyboard is gone: one sent while the keyboard is still coming up is ignored.
     /// </summary>
     public void CloseKeyboardWithDone()
     {
         if (!Driver.IsKeyboardShown())
             return;
 
-        Driver.ExecuteScript("mobile: performEditorAction", new Dictionary<string, object> { ["action"] = "done" });
-        WaitFor(() => !Driver.IsKeyboardShown(), "the keyboard to close");
+        var lastSent = DateTime.MinValue;
+        WaitFor(() =>
+        {
+            if (!Driver.IsKeyboardShown())
+                return true;
+
+            if (DateTime.UtcNow - lastSent >= E2ESettings.KeyboardDoneRetryInterval)
+            {
+                Driver.ExecuteScript("mobile: performEditorAction", new Dictionary<string, object> { ["action"] = "done" });
+                lastSent = DateTime.UtcNow;
+            }
+            return false;
+        }, "the keyboard to close");
+    }
+
+    /// <summary>
+    /// For an entry focused on open: the keyboard shows up asynchronously, if at all (e.g. not with a hardware keyboard).
+    /// </summary>
+    public void CloseKeyboardWithDoneOnceShown()
+    {
+        try
+        {
+            WaitFor(() => Driver.IsKeyboardShown(), "the keyboard to show", E2ESettings.KeyboardShowTimeout);
+        }
+        catch (WebDriverTimeoutException)
+        {
+            return;
+        }
+
+        CloseKeyboardWithDone();
     }
 
     public void HideKeyboardIfShown()
