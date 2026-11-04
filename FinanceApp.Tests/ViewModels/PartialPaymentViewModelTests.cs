@@ -158,7 +158,7 @@ public class PartialPaymentViewModelTests
     {
         var saved = false;
         _vm.Prepare(MakeProjection(), June, JuneTenth);
-        _vm.SetSaveCallback(() => saved = true);
+        _vm.SetSaveCallback(() => { saved = true; return Task.CompletedTask; });
         _vm.Amount = 120m;
         _vm.PaymentDate = JuneTenth.AddDays(3);
         _vm.PaymentDescription = "  Weekly groceries ";
@@ -167,6 +167,21 @@ public class PartialPaymentViewModelTests
 
         await _service.Received(1).AddPaymentAsync(7, 2026, 6, 120m, JuneTenth.AddDays(3), "Weekly groceries");
         saved.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SaveCommand_WhileCallbackRuns_CannotSaveAgain()
+    {
+        var closing = new TaskCompletionSource();
+        _vm.Prepare(MakeProjection(), June, JuneTenth);
+        _vm.SetSaveCallback(() => closing.Task);
+        _vm.Amount = 120m;
+
+        var save = _vm.SaveCommand.ExecuteAsync(null);
+
+        _vm.SaveCommand.CanExecute(null).Should().BeFalse("a second tap while the popup closes would record the payment twice");
+        closing.SetResult();
+        await save;
     }
 
     private static MonthlyEntryProjection MakeProjection(

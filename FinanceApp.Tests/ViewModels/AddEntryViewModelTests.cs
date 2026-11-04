@@ -499,12 +499,27 @@ public class AddEntryViewModelTests
     public async Task SaveCommand_InvokesOnSavedCallbackAfterSave()
     {
         FinancialEntry? captured = null;
-        _vm.SetSaveCallback(e => captured = e);
+        _vm.SetSaveCallback(e => { captured = e; return Task.CompletedTask; });
         _vm.SelectedRecurrence = RecurrenceType.OneTime;
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
         captured.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task SaveCommand_WhileCallbackRuns_CannotSaveAgain()
+    {
+        var closing = new TaskCompletionSource();
+        _vm.SetSaveCallback(_ => closing.Task);
+        _vm.SelectedRecurrence = RecurrenceType.OneTime;
+
+        var save = _vm.SaveCommand.ExecuteAsync(null);
+
+        _vm.SaveCommand.CanExecute(null).Should().BeFalse("a second tap while the page closes would save the entry twice");
+        closing.SetResult();
+        await save;
+        await _service.Received(1).SaveEntryAsync(Arg.Any<FinancialEntry>());
     }
 
     [Fact]

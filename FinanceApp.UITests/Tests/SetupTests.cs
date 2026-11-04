@@ -154,11 +154,16 @@ public sealed class SetupTests : E2ETestBase
         var again = main.RedoSetup();
         again.SkipButtonText.Should().Be(AppLabels.SetupClose);
         again.NameText.Should().Be(Name);
-        again.Next().Next().Next().SelectExpense(Internet, 100, dueDay: 20).Next();
+        // The account is typed but "Adicionar" isn't tapped: "Continuar" adds it.
+        again.Next().TypeSourceName(Account).Next().Next().SelectExpense(Internet, 100, dueDay: 20).Next();
         main = again.Finish();
 
         main.WaitForEntry(Rent).WaitForEntry(Internet);
         main.OutcomeTotalText.Should().Be(AppFormat.Money(1600));
         (await GetEntryRowsAsync()).Select(e => e.Description).Should().BeEquivalentTo([Rent, Internet]);
+        var account = (await GetPaymentSourceRowsAsync()).Should().ContainSingle().Subject;
+        (account.Name, account.Type).Should().Be((Account, AppFormat.BankAccount));
+        (await GetEntryRowsAsync()).Single(e => e.Description == Internet).PaymentSourceId.Should().Be(account.Id,
+            "the first account added pays the house expenses");
     }
 }

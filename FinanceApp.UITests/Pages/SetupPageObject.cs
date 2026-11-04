@@ -157,10 +157,7 @@ public class SetupPageObject
     {
         var count = SourceNames.Count;
 
-        var nameEntry = _session.ScrollTo("SetupSourceNameEntry");
-        nameEntry.Clear();
-        nameEntry.SendKeys(name);
-        _session.HideKeyboardIfShown();
+        TypeSourceName(name);
 
         _session.ScrollToAndTap(type switch
         {
@@ -174,6 +171,18 @@ public class SetupPageObject
 
         _session.ScrollToAndTap("SetupAddSourceButton");
         _session.WaitFor(() => SourceNames.Count == count + 1, $"\"{name}\" to be added");
+        return this;
+    }
+
+    /// <summary>
+    /// Types the new source's name without tapping "Adicionar".
+    /// </summary>
+    public SetupPageObject TypeSourceName(string name)
+    {
+        var nameEntry = _session.ScrollTo("SetupSourceNameEntry");
+        nameEntry.Clear();
+        nameEntry.SendKeys(name);
+        _session.HideKeyboardIfShown();
         return this;
     }
 
