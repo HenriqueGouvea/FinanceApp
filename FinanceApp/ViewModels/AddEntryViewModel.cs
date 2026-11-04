@@ -11,7 +11,7 @@ public partial class AddEntryViewModel : ObservableObject
     private readonly IFinanceService _financeService;
     private readonly ICategoryService _categoryService;
     private readonly IPaymentSourceService _paymentSourceService;
-    private Action<FinancialEntry>? _onSaved;
+    private Func<FinancialEntry, Task>? _onSaved;
     private DateTime _targetMonth;
     private int _editingEntryId;
     private DateTime? _editingEndDate;
@@ -246,12 +246,13 @@ public partial class AddEntryViewModel : ObservableObject
                 await _financeService.SetPaidAmountAsync(entry.Id, _editingMonth.Year, _editingMonth.Month, PaidAmount);
         }
 
-        _onSaved?.Invoke(entry);
+        if (_onSaved is not null)
+            await _onSaved(entry);
     }
 
     private bool CanSave() => SelectedRecurrence is not null;
 
-    public void SetSaveCallback(Action<FinancialEntry> onSaved)
+    public void SetSaveCallback(Func<FinancialEntry, Task> onSaved)
     {
         _onSaved = onSaved;
     }

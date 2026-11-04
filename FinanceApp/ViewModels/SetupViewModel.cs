@@ -214,6 +214,10 @@ public partial class SetupViewModel : ObservableObject
             return;
         }
 
+        // A source typed in the form but not added yet would otherwise be lost: "Continuar" reads as confirming it.
+        if (IsPaymentSourcesStep && CanAddSource())
+            AddSource();
+
         Step++;
         if (IsSummaryStep)
             BuildSummary();

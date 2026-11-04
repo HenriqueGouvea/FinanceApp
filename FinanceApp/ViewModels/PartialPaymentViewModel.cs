@@ -11,7 +11,7 @@ namespace FinanceApp.ViewModels;
 public partial class PartialPaymentViewModel : ObservableObject
 {
     private readonly IFinanceService _financeService;
-    private Action? _onSaved;
+    private Func<Task>? _onSaved;
     private int _entryId;
     private DateTime _month;
 
@@ -80,7 +80,7 @@ public partial class PartialPaymentViewModel : ObservableObject
         PaymentDate = date < MinimumDate ? MinimumDate : date > MaximumDate ? MaximumDate : date;
     }
 
-    public void SetSaveCallback(Action onSaved)
+    public void SetSaveCallback(Func<Task> onSaved)
     {
         _onSaved = onSaved;
     }
@@ -89,7 +89,8 @@ public partial class PartialPaymentViewModel : ObservableObject
     private async Task Save()
     {
         await _financeService.AddPaymentAsync(_entryId, _month.Year, _month.Month, Amount, PaymentDate, PaymentDescription.Trim());
-        _onSaved?.Invoke();
+        if (_onSaved is not null)
+            await _onSaved();
     }
 
     private bool CanSave() => Amount > 0;
