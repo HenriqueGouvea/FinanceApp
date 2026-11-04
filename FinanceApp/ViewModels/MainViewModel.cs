@@ -19,6 +19,7 @@ public partial class MainViewModel : ObservableObject,
     private const string IncomesExpandedKey = "incomes_expanded";
     private const string OutcomesExpandedKey = "outcomes_expanded";
     private const string ShowSwipeHintKey = "show_month_swipe_hint";
+    private const double CompactHeaderScrollY = 64;
 
     private static readonly DateTime FirstOfToday =
         new(DateTime.Today.Year, DateTime.Today.Month, 1, 0, 0, 0, DateTimeKind.Local);
@@ -27,6 +28,7 @@ public partial class MainViewModel : ObservableObject,
     ObservableCollection<MonthViewModel> months = [];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedMonth))]
     [NotifyPropertyChangedFor(nameof(IsAwayFromCurrentMonth))]
     [NotifyPropertyChangedFor(nameof(GoToCurrentMonthLabel))]
     [NotifyCanExecuteChangedFor(nameof(GoToPreviousMonthCommand))]
@@ -35,6 +37,12 @@ public partial class MainViewModel : ObservableObject,
 
     [ObservableProperty]
     bool showSwipeHint;
+
+    /// <summary>
+    /// The month header has scrolled out of view, so the top bar shows the month pill instead of the app name.
+    /// </summary>
+    [ObservableProperty]
+    bool isHeaderCompact;
 
     public MonthViewModel? SelectedMonth => Months.ElementAtOrDefault(CurrentPosition);
 
@@ -135,6 +143,11 @@ public partial class MainViewModel : ObservableObject,
             CurrentPosition = index;
     }
 
+    /// <summary>
+    /// Called as the selected month scrolls: past its month header the top bar takes over showing the month.
+    /// </summary>
+    public void UpdateHeaderCompact(double scrollY) => IsHeaderCompact = scrollY > CompactHeaderScrollY;
+
     [RelayCommand]
     void GoToCurrentMonth() => GoToMonth(FirstOfToday);
 
@@ -164,6 +177,8 @@ public partial class MainViewModel : ObservableObject,
 
     partial void OnCurrentPositionChanged(int value)
     {
+        IsHeaderCompact = false;
+
         foreach (var month in Months)
             month.HideEntryActions();
 

@@ -9,12 +9,12 @@
              x:DataType="vm:AddEntryViewModel"
              Shell.NavBarIsVisible="False"
              Shell.FlyoutBehavior="Disabled"
-             BackgroundColor="White">
+             BackgroundColor="{StaticResource CardBackground}">
 
     <Grid RowDefinitions="Auto, Auto, *">
 
         <!-- Header: the back button is always at hand, so leaving doesn't require scrolling down to "Cancelar" -->
-        <Grid Grid.Row="0" ColumnDefinitions="48, *, 48" Padding="4,8">
+        <Grid Grid.Row="0" ColumnDefinitions="48, *, 48" Padding="4,6">
             <Button Grid.Column="0"
                     AutomationId="BackButton"
                     Text="←"
@@ -31,95 +31,79 @@
             <Label Grid.Column="1"
                    AutomationId="EntryPageTitleLabel"
                    Text="{Binding PageTitle}"
-                   FontSize="20"
+                   FontSize="17"
                    FontAttributes="Bold"
                    HorizontalOptions="Center"
                    VerticalOptions="Center" />
         </Grid>
-        <BoxView Grid.Row="1" HeightRequest="1" Color="#E0E0E0" />
+        <BoxView Grid.Row="1" HeightRequest="1" Color="{StaticResource Line}" />
 
         <ScrollView Grid.Row="2">
-        <VerticalStackLayout Spacing="15" Padding="20,16,20,24">
+        <VerticalStackLayout Spacing="14" Padding="20,14,20,24">
             <Entry x:Name="DescriptionEntry" AutomationId="DescriptionEntry" Placeholder="Descrição" Text="{Binding Description}" />
 
-            <!-- Entry type swipe/tap toggle — disabled when editing (structural field) -->
-            <Frame AutomationId="EntryTypeToggle" CornerRadius="22" Padding="3" BorderColor="LightGray"
-                   BackgroundColor="#F0F0F0" HasShadow="False"
-                   IsEnabled="{Binding IsEditing, Converter={x:Static converters:InverseBoolConverter.Instance}}"
-                   Opacity="{Binding StructuralFieldsOpacity}">
-                <Frame.GestureRecognizers>
+            <!-- Entry type: swipe or tap; disabled when editing (structural field) -->
+            <Border AutomationId="EntryTypeToggle"
+                    Style="{StaticResource SegmentedControl}"
+                    IsEnabled="{Binding IsEditing, Converter={x:Static converters:InverseBoolConverter.Instance}}"
+                    Opacity="{Binding StructuralFieldsOpacity}">
+                <Border.GestureRecognizers>
                     <SwipeGestureRecognizer Direction="Right" Command="{Binding SelectIncomeCommand}" />
                     <SwipeGestureRecognizer Direction="Left"  Command="{Binding SelectOutcomeCommand}" />
-                </Frame.GestureRecognizers>
+                </Border.GestureRecognizers>
                 <Grid ColumnDefinitions="*, *" ColumnSpacing="3">
+                    <!-- Despesa: filled in red while selected, tappable otherwise -->
+                    <Border Grid.Column="0" Style="{StaticResource SegmentOption}" BackgroundColor="{StaticResource Outcome}"
+                            IsVisible="{Binding IsIncome, Converter={x:Static converters:InverseBoolConverter.Instance}}">
+                        <Label Text="Despesa" Style="{StaticResource SegmentLabel}" TextColor="White" FontAttributes="Bold" />
+                    </Border>
+                    <Border Grid.Column="0" AutomationId="SelectOutcomeButton" Style="{StaticResource SegmentOption}"
+                            IsVisible="{Binding IsIncome}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding SelectOutcomeCommand}" />
+                        </Border.GestureRecognizers>
+                        <Label Text="Despesa" Style="{StaticResource SegmentLabel}" />
+                    </Border>
 
-                    <!-- Outcome (Despesa) column -->
-                    <Grid Grid.Column="0">
-                        <!-- Active state -->
-                        <Frame CornerRadius="19" BackgroundColor="{StaticResource Outcome}" Padding="10,8"
-                               HasShadow="False" BorderColor="Transparent"
-                               IsVisible="{Binding IsIncome, Converter={x:Static converters:InverseBoolConverter.Instance}}">
-                            <Label Text="Despesa" TextColor="White" FontAttributes="Bold"
-                                   HorizontalOptions="Center" FontSize="13" />
-                        </Frame>
-                        <!-- Inactive state — tappable -->
-                        <Frame AutomationId="SelectOutcomeButton"
-                               CornerRadius="19" BackgroundColor="Transparent" Padding="10,8"
-                               HasShadow="False" BorderColor="Transparent"
-                               IsVisible="{Binding IsIncome}">
-                            <Frame.GestureRecognizers>
-                                <TapGestureRecognizer Command="{Binding SelectOutcomeCommand}" />
-                            </Frame.GestureRecognizers>
-                            <Label Text="Despesa" TextColor="Gray"
-                                   HorizontalOptions="Center" FontSize="13" />
-                        </Frame>
-                    </Grid>
-
-                    <!-- Income (Receita) column -->
-                    <Grid Grid.Column="1">
-                        <!-- Active state -->
-                        <Frame CornerRadius="19" BackgroundColor="{StaticResource Income}" Padding="10,8"
-                               HasShadow="False" BorderColor="Transparent"
-                               IsVisible="{Binding IsIncome}">
-                            <Label Text="Receita" TextColor="White" FontAttributes="Bold"
-                                   HorizontalOptions="Center" FontSize="13" />
-                        </Frame>
-                        <!-- Inactive state — tappable -->
-                        <Frame AutomationId="SelectIncomeButton"
-                               CornerRadius="19" BackgroundColor="Transparent" Padding="10,8"
-                               HasShadow="False" BorderColor="Transparent"
-                               IsVisible="{Binding IsIncome, Converter={x:Static converters:InverseBoolConverter.Instance}}">
-                            <Frame.GestureRecognizers>
-                                <TapGestureRecognizer Command="{Binding SelectIncomeCommand}" />
-                            </Frame.GestureRecognizers>
-                            <Label Text="Receita" TextColor="Gray"
-                                   HorizontalOptions="Center" FontSize="13" />
-                        </Frame>
-                    </Grid>
-
+                    <!-- Receita: filled in green while selected, tappable otherwise -->
+                    <Border Grid.Column="1" Style="{StaticResource SegmentOption}" BackgroundColor="{StaticResource Income}"
+                            IsVisible="{Binding IsIncome}">
+                        <Label Text="Receita" Style="{StaticResource SegmentLabel}" TextColor="White" FontAttributes="Bold" />
+                    </Border>
+                    <Border Grid.Column="1" AutomationId="SelectIncomeButton" Style="{StaticResource SegmentOption}"
+                            IsVisible="{Binding IsIncome, Converter={x:Static converters:InverseBoolConverter.Instance}}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding SelectIncomeCommand}" />
+                        </Border.GestureRecognizers>
+                        <Label Text="Receita" Style="{StaticResource SegmentLabel}" />
+                    </Border>
                 </Grid>
-            </Frame>
+            </Border>
 
-            <!-- Recurrence — disabled when editing (structural field) -->
-            <Picker AutomationId="RecurrencePicker"
-                    Title="Recorrência"
-                    ItemsSource="{Binding RecurrenceTypes}"
-                    ItemDisplayBinding="{Binding ., Converter={x:Static converters:RecurrenceTypeToLabelConverter.Instance}, x:DataType=models:RecurrenceType}"
-                    SelectedItem="{Binding SelectedRecurrence}"
-                    IsEnabled="{Binding IsEditing, Converter={x:Static converters:InverseBoolConverter.Instance}}"
-                    Opacity="{Binding StructuralFieldsOpacity}" />
+            <!-- Recurrence: disabled when editing (structural field) -->
+            <VerticalStackLayout Spacing="0">
+                <Label Text="Recorrência" Style="{StaticResource FieldCaption}" />
+                <Picker AutomationId="RecurrencePicker"
+                        Title="Recorrência"
+                        ItemsSource="{Binding RecurrenceTypes}"
+                        ItemDisplayBinding="{Binding ., Converter={x:Static converters:RecurrenceTypeToLabelConverter.Instance}, x:DataType=models:RecurrenceType}"
+                        SelectedItem="{Binding SelectedRecurrence}"
+                        IsEnabled="{Binding IsEditing, Converter={x:Static converters:InverseBoolConverter.Instance}}"
+                        Opacity="{Binding StructuralFieldsOpacity}" />
+            </VerticalStackLayout>
 
-            <Entry AutomationId="InstallmentsEntry"
-                   Placeholder="Nº de parcelas"
-                   Text="{Binding TotalInstallments}"
-                   Keyboard="Numeric"
-                   IsVisible="{Binding IsInstallments}" />
+            <VerticalStackLayout Spacing="0" IsVisible="{Binding IsInstallments}">
+                <Label Text="Nº de parcelas" Style="{StaticResource FieldCaption}" />
+                <Entry AutomationId="InstallmentsEntry"
+                       Placeholder="Nº de parcelas"
+                       Text="{Binding TotalInstallments}"
+                       Keyboard="Numeric" />
+            </VerticalStackLayout>
 
-            <!-- Amount — only shown once the recurrence defines what the amount means -->
-            <VerticalStackLayout Spacing="2" IsVisible="{Binding HasRecurrence}">
+            <!-- Amount: only shown once the recurrence defines what the amount means -->
+            <VerticalStackLayout Spacing="0" IsVisible="{Binding HasRecurrence}">
                 <Label Text="{Binding SelectedRecurrence, Converter={x:Static converters:RecurrenceTypeToAmountLabelConverter.Instance}}"
-                       FontSize="12"
-                       TextColor="Gray" />
+                       Style="{StaticResource FieldCaption}" />
                 <Entry AutomationId="AmountEntry"
                        Placeholder="{Binding SelectedRecurrence, Converter={x:Static converters:RecurrenceTypeToAmountLabelConverter.Instance}}"
                        Keyboard="Numeric">
@@ -129,47 +113,41 @@
                 </Entry>
                 <Label AutomationId="InstallmentsTotalLabel"
                        Text="{Binding InstallmentsTotal, Converter={x:Static converters:MoneyConverter.Instance}, StringFormat='Total: {0}'}"
-                       FontSize="12"
-                       TextColor="Gray"
+                       Style="{StaticResource Hint}"
                        IsVisible="{Binding InstallmentsTotal, Converter={x:Static converters:IsNotNullConverter.Instance}}" />
 
                 <!-- Estimated: the amount changes every month (e.g. energy bill, supermarket). A credit card purchase has a known amount, charged at once -->
-                <Grid ColumnDefinitions="*, Auto" Margin="0,6,0,0"
+                <Grid ColumnDefinitions="*, Auto" Margin="0,12,0,0"
                       IsVisible="{Binding IsOnCreditCardBill, Converter={x:Static converters:InverseBoolConverter.Instance}}">
                     <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
-                        <Label Text="Valor estimado" FontSize="14" />
-                        <Label Text="Varia a cada mês, como luz ou mercado" FontSize="11" TextColor="Gray" />
+                        <Label Text="Valor estimado" Style="{StaticResource RowTitle}" FontSize="14" />
+                        <Label Text="Varia a cada mês, como luz ou mercado" Style="{StaticResource Hint}" FontSize="11" />
                     </VerticalStackLayout>
                     <Switch Grid.Column="1"
                             AutomationId="EstimatedSwitch"
                             IsToggled="{Binding IsEstimated}"
-                            OnColor="#B39DDB"
-                            ThumbColor="{StaticResource Primary}"
                             VerticalOptions="Center" />
                 </Grid>
 
                 <!-- Partial payment: enables "Pagar parcial" for entries paid little by little (e.g. supermarket); a credit card purchase is paid with its bill -->
-                <Grid ColumnDefinitions="*, Auto" Margin="0,6,0,0"
+                <Grid ColumnDefinitions="*, Auto" Margin="0,10,0,0"
                       IsVisible="{Binding IsOnCreditCardBill, Converter={x:Static converters:InverseBoolConverter.Instance}}">
                     <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
-                        <Label AutomationId="PartialPaymentSwitchLabel" Text="{Binding PartialPaymentLabel}" FontSize="14" />
-                        <Label Text="{Binding PartialPaymentHint}" FontSize="11" TextColor="Gray" />
+                        <Label AutomationId="PartialPaymentSwitchLabel" Text="{Binding PartialPaymentLabel}" Style="{StaticResource RowTitle}" FontSize="14" />
+                        <Label Text="{Binding PartialPaymentHint}" Style="{StaticResource Hint}" FontSize="11" />
                     </VerticalStackLayout>
                     <Switch Grid.Column="1"
                             AutomationId="PartialPaymentSwitch"
                             IsToggled="{Binding AllowsPartialPayment}"
-                            OnColor="#FFCC80"
-                            ThumbColor="#EF6C00"
                             VerticalOptions="Center" />
                 </Grid>
             </VerticalStackLayout>
 
             <!-- Partial payment for the month the entry was opened from (e.g. supermarket spent so far) -->
-            <VerticalStackLayout Spacing="2" IsVisible="{Binding ShowsPaidAmount}">
+            <VerticalStackLayout Spacing="0" IsVisible="{Binding ShowsPaidAmount}">
                 <Label AutomationId="PaidAmountLabel"
                        Text="{Binding PaidAmountLabel}"
-                       FontSize="12"
-                       TextColor="Gray" />
+                       Style="{StaticResource FieldCaption}" />
                 <Entry AutomationId="PaidAmountEntry"
                        Placeholder="{Binding PaidAmountLabel}"
                        Keyboard="Numeric">
@@ -179,9 +157,9 @@
                 </Entry>
 
                 <!-- Partial payments recorded this month; a deleted one is only removed on save -->
-                <VerticalStackLayout Spacing="2" Margin="0,8,0,0" IsVisible="{Binding HasPayments}">
-                    <Label AutomationId="PaymentsHeaderLabel" Text="{Binding PaymentsHeader}" FontSize="12" TextColor="Gray" />
-                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Payments}" Spacing="2">
+                <VerticalStackLayout Spacing="0" Margin="0,10,0,0" IsVisible="{Binding HasPayments}">
+                    <Label AutomationId="PaymentsHeaderLabel" Text="{Binding PaymentsHeader}" Style="{StaticResource FieldCaption}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Payments}">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="vm:PaymentItem">
                                 <Grid AutomationId="PaymentRow" ColumnDefinitions="Auto, *, Auto, 36" ColumnSpacing="8">
@@ -189,7 +167,6 @@
                                            AutomationId="PaymentDateLabel"
                                            Text="{Binding Date, StringFormat='{0:dd/MM}'}"
                                            FontSize="13"
-                                           TextColor="Gray"
                                            VerticalOptions="Center" />
                                     <Label Grid.Column="1"
                                            AutomationId="PaymentDescriptionLabel"
@@ -211,7 +188,7 @@
                                             Padding="0"
                                             HeightRequest="36"
                                             BackgroundColor="Transparent"
-                                            TextColor="#C2414B"
+                                            TextColor="{StaticResource Outcome}"
                                             Command="{Binding DeletePaymentCommand, Source={RelativeSource AncestorType={x:Type vm:AddEntryViewModel}}, x:DataType=vm:AddEntryViewModel}"
                                             CommandParameter="{Binding .}" />
                                 </Grid>
@@ -222,8 +199,8 @@
             </VerticalStackLayout>
 
             <!-- Account, card or voucher the entry is paid with ("Pago com") or received in ("Recebido em"); it comes first since a credit card decides the due date -->
-            <VerticalStackLayout Spacing="2">
-                <Label AutomationId="PaymentSourcePickerLabel" Text="{Binding PaymentSourceLabel}" FontSize="12" TextColor="Gray" />
+            <VerticalStackLayout Spacing="0">
+                <Label AutomationId="PaymentSourcePickerLabel" Text="{Binding PaymentSourceLabel}" Style="{StaticResource FieldCaption}" />
                 <Picker AutomationId="PaymentSourcePicker"
                         Title="{Binding PaymentSourceLabel}"
                         ItemsSource="{Binding PaymentSources}"
@@ -232,8 +209,8 @@
             </VerticalStackLayout>
 
             <!-- Due day, repeated every month for recurrent and installment entries; outcomes paid with a credit card fall due with its bill -->
-            <VerticalStackLayout Spacing="2">
-                <Label Text="Vencimento" FontSize="12" TextColor="Gray" />
+            <VerticalStackLayout Spacing="0">
+                <Label Text="Vencimento" Style="{StaticResource FieldCaption}" />
                 <Picker AutomationId="DueDayPicker"
                         Title="Vencimento"
                         ItemsSource="{Binding DueDays}"
@@ -243,20 +220,35 @@
                 <Label AutomationId="CreditCardBillDueHintLabel"
                        Text="{Binding CreditCardBillDueHint}"
                        FontSize="14"
-                       TextColor="Gray"
+                       TextColor="{StaticResource Muted}"
                        Padding="0,8"
                        IsVisible="{Binding IsOnCreditCardBill}" />
             </VerticalStackLayout>
 
-            <Picker AutomationId="CategoryPicker"
-                    Title="Categoria"
-                    ItemsSource="{Binding Categories}"
-                    ItemDisplayBinding="{Binding Name, x:DataType=models:FinancialCategory}"
-                    SelectedItem="{Binding SelectedCategory}" />
+            <VerticalStackLayout Spacing="0">
+                <Label Text="Categoria" Style="{StaticResource FieldCaption}" />
+                <Picker AutomationId="CategoryPicker"
+                        Title="Categoria"
+                        ItemsSource="{Binding Categories}"
+                        ItemDisplayBinding="{Binding Name, x:DataType=models:FinancialCategory}"
+                        SelectedItem="{Binding SelectedCategory}" />
+            </VerticalStackLayout>
 
-            <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,10,0,0">
-                <Button Grid.Column="0" AutomationId="CancelEntryButton" Text="Cancelar" Clicked="OnBackClicked" BackgroundColor="Gray" />
-                <Button Grid.Column="1" AutomationId="SaveEntryButton" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="{StaticResource Primary}" />
+            <!-- Tells upfront what choosing a credit card changes -->
+            <Label AutomationId="CreditCardChoiceHintLabel"
+                   Text="Com um cartão de crédito em “Pago com”, o vencimento passa a ser o da fatura e “Valor estimado” e “Pagamento parcial” somem."
+                   Style="{StaticResource Hint}"
+                   IsVisible="{Binding IsIncome, Converter={x:Static converters:InverseBoolConverter.Instance}}">
+                <Label.Triggers>
+                    <DataTrigger TargetType="Label" Binding="{Binding IsOnCreditCardBill}" Value="True">
+                        <Setter Property="IsVisible" Value="False" />
+                    </DataTrigger>
+                </Label.Triggers>
+            </Label>
+
+            <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,6,0,0">
+                <Button Grid.Column="0" AutomationId="CancelEntryButton" Text="Cancelar" Style="{StaticResource SecondaryButton}" Clicked="OnBackClicked" />
+                <Button Grid.Column="1" AutomationId="SaveEntryButton" Text="Salvar" Command="{Binding SaveCommand}" />
             </Grid>
         </VerticalStackLayout>
         </ScrollView>

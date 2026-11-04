@@ -9,100 +9,87 @@
                x:Class="FinanceApp.Views.PaymentSourceEditPopup"
                x:DataType="vm:PaymentSourceEditViewModel">
 
-    <Border BackgroundColor="White"
-            StrokeShape="RoundRectangle 12"
-            Padding="20"
+    <Border Style="{StaticResource PopupCard}"
             WidthRequest="350"
             MaximumHeightRequest="620"
             VerticalOptions="Center">
 
         <ScrollView>
             <VerticalStackLayout Spacing="15">
-                <Label Text="{Binding PopupTitle}" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
+                <Label Text="{Binding PopupTitle}" Style="{StaticResource PopupTitle}" />
 
                 <Entry x:Name="NameEntry" AutomationId="PaymentSourceNameEntry" Placeholder="Nome (ex.: Nubank)" Text="{Binding Name}" MaxLength="30" />
 
                 <!-- Source type: decides whether the amount below is a balance or a credit limit -->
-                <Grid ColumnDefinitions="*, *, *" ColumnSpacing="8">
-                    <Border Grid.Column="0"
-                            AutomationId="PaymentSourceBankAccountTypeButton"
-                            StrokeShape="RoundRectangle 18"
-                            Stroke="{StaticResource PrimaryBrush}"
-                            StrokeThickness="1"
-                            BackgroundColor="Transparent"
-                            Padding="6,8">
-                        <Border.Triggers>
-                            <DataTrigger TargetType="Border" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.BankAccount}">
-                                <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
-                            </DataTrigger>
-                        </Border.Triggers>
-                        <Border.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding SelectTypeCommand}" CommandParameter="{x:Static models:PaymentSourceType.BankAccount}" />
-                        </Border.GestureRecognizers>
-                        <Label Text="🏦 Conta" HorizontalOptions="Center" VerticalOptions="Center" FontSize="13" TextColor="{StaticResource Primary}">
-                            <Label.Triggers>
-                                <DataTrigger TargetType="Label" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.BankAccount}">
-                                    <Setter Property="TextColor" Value="White" />
-                                    <Setter Property="FontAttributes" Value="Bold" />
+                <Border Style="{StaticResource SegmentedControl}">
+                    <Grid ColumnDefinitions="*, *, *" ColumnSpacing="3">
+                        <Border Grid.Column="0"
+                                AutomationId="PaymentSourceBankAccountTypeButton"
+                                Style="{StaticResource SegmentOption}">
+                            <Border.Triggers>
+                                <DataTrigger TargetType="Border" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.BankAccount}">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
                                 </DataTrigger>
-                            </Label.Triggers>
-                        </Label>
-                    </Border>
-                    <Border Grid.Column="1"
-                            AutomationId="PaymentSourceCreditCardTypeButton"
-                            StrokeShape="RoundRectangle 18"
-                            Stroke="{StaticResource PrimaryBrush}"
-                            StrokeThickness="1"
-                            BackgroundColor="Transparent"
-                            Padding="6,8">
-                        <Border.Triggers>
-                            <DataTrigger TargetType="Border" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.CreditCard}">
-                                <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
-                            </DataTrigger>
-                        </Border.Triggers>
-                        <Border.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding SelectTypeCommand}" CommandParameter="{x:Static models:PaymentSourceType.CreditCard}" />
-                        </Border.GestureRecognizers>
-                        <Label Text="💳 Cartão de crédito" HorizontalOptions="Center" HorizontalTextAlignment="Center" VerticalOptions="Center" FontSize="13" TextColor="{StaticResource Primary}">
-                            <Label.Triggers>
-                                <DataTrigger TargetType="Label" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.CreditCard}">
-                                    <Setter Property="TextColor" Value="White" />
-                                    <Setter Property="FontAttributes" Value="Bold" />
+                            </Border.Triggers>
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding SelectTypeCommand}" CommandParameter="{x:Static models:PaymentSourceType.BankAccount}" />
+                            </Border.GestureRecognizers>
+                            <Label Text="🏦 Conta" Style="{StaticResource SegmentLabel}">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.BankAccount}">
+                                        <Setter Property="TextColor" Value="White" />
+                                        <Setter Property="FontAttributes" Value="Bold" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                        </Border>
+                        <Border Grid.Column="1"
+                                AutomationId="PaymentSourceCreditCardTypeButton"
+                                Style="{StaticResource SegmentOption}">
+                            <Border.Triggers>
+                                <DataTrigger TargetType="Border" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.CreditCard}">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
                                 </DataTrigger>
-                            </Label.Triggers>
-                        </Label>
-                    </Border>
-                    <Border Grid.Column="2"
-                            AutomationId="PaymentSourceMealVoucherTypeButton"
-                            StrokeShape="RoundRectangle 18"
-                            Stroke="{StaticResource PrimaryBrush}"
-                            StrokeThickness="1"
-                            BackgroundColor="Transparent"
-                            Padding="6,8">
-                        <Border.Triggers>
-                            <DataTrigger TargetType="Border" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.MealVoucher}">
-                                <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
-                            </DataTrigger>
-                        </Border.Triggers>
-                        <Border.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding SelectTypeCommand}" CommandParameter="{x:Static models:PaymentSourceType.MealVoucher}" />
-                        </Border.GestureRecognizers>
-                        <Label Text="🍽️ Vale" HorizontalOptions="Center" VerticalOptions="Center" FontSize="13" TextColor="{StaticResource Primary}">
-                            <Label.Triggers>
-                                <DataTrigger TargetType="Label" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.MealVoucher}">
-                                    <Setter Property="TextColor" Value="White" />
-                                    <Setter Property="FontAttributes" Value="Bold" />
+                            </Border.Triggers>
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding SelectTypeCommand}" CommandParameter="{x:Static models:PaymentSourceType.CreditCard}" />
+                            </Border.GestureRecognizers>
+                            <Label Text="💳 Cartão de crédito" Style="{StaticResource SegmentLabel}">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.CreditCard}">
+                                        <Setter Property="TextColor" Value="White" />
+                                        <Setter Property="FontAttributes" Value="Bold" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                        </Border>
+                        <Border Grid.Column="2"
+                                AutomationId="PaymentSourceMealVoucherTypeButton"
+                                Style="{StaticResource SegmentOption}">
+                            <Border.Triggers>
+                                <DataTrigger TargetType="Border" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.MealVoucher}">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
                                 </DataTrigger>
-                            </Label.Triggers>
-                        </Label>
-                    </Border>
-                </Grid>
+                            </Border.Triggers>
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding SelectTypeCommand}" CommandParameter="{x:Static models:PaymentSourceType.MealVoucher}" />
+                            </Border.GestureRecognizers>
+                            <Label Text="🍽️ Vale" Style="{StaticResource SegmentLabel}">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label" Binding="{Binding Type}" Value="{x:Static models:PaymentSourceType.MealVoucher}">
+                                        <Setter Property="TextColor" Value="White" />
+                                        <Setter Property="FontAttributes" Value="Bold" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                        </Border>
+                    </Grid>
+                </Border>
 
                 <VerticalStackLayout Spacing="2">
                     <Label AutomationId="PaymentSourceBalanceFieldLabel"
                            Text="{Binding Type, Converter={x:Static converters:PaymentSourceTypeToBalanceLabelConverter.Instance}}"
-                           FontSize="12"
-                           TextColor="Gray" />
+                           Style="{StaticResource FieldCaption}" />
                     <Entry AutomationId="PaymentSourceBalanceEntry"
                            Placeholder="{Binding Type, Converter={x:Static converters:PaymentSourceTypeToBalanceLabelConverter.Instance}}"
                            Keyboard="Numeric">
@@ -115,7 +102,7 @@
                 <!-- Credit cards only: the bill groups the month's card outcomes, due on one day and paid by a bank account -->
                 <VerticalStackLayout AutomationId="CreditCardBillFields" Spacing="10" IsVisible="{Binding IsCreditCard}">
                     <VerticalStackLayout Spacing="2">
-                        <Label Text="Vencimento da fatura" FontSize="12" TextColor="Gray" />
+                        <Label Text="Vencimento da fatura" Style="{StaticResource FieldCaption}" />
                         <Picker AutomationId="BillDueDayPicker"
                                 Title="Vencimento da fatura"
                                 ItemsSource="{Binding BillDueDays}"
@@ -124,7 +111,7 @@
                     </VerticalStackLayout>
 
                     <VerticalStackLayout Spacing="2">
-                        <Label Text="Fatura paga com" FontSize="12" TextColor="Gray" />
+                        <Label Text="Fatura paga com" Style="{StaticResource FieldCaption}" />
                         <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6" IsVisible="{Binding HasBillPaymentAccounts}">
                             <Picker AutomationId="BillPaymentAccountPicker"
                                     Title="Fatura paga com"
@@ -139,25 +126,25 @@
                                     WidthRequest="36"
                                     HeightRequest="36"
                                     BackgroundColor="Transparent"
-                                    TextColor="Gray"
+                                    TextColor="{StaticResource Muted}"
                                     Command="{Binding ClearBillPaymentAccountCommand}"
                                     IsVisible="{Binding HasBillPaymentAccount}" />
                         </Grid>
                         <Label AutomationId="NoBillPaymentAccountsLabel"
                                Text="Cadastre uma conta bancária para escolher qual paga a fatura."
                                FontSize="12"
-                               TextColor="Gray"
+                               TextColor="{StaticResource Muted}"
                                IsVisible="{Binding HasBillPaymentAccounts, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
                     </VerticalStackLayout>
 
                     <Label Text="Os lançamentos pagos com este cartão de crédito aparecem juntos na fatura do mês, com um só vencimento."
                            FontSize="11"
-                           TextColor="Gray" />
+                           TextColor="{StaticResource Muted}" />
                 </VerticalStackLayout>
 
                 <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,10,0,0">
-                    <Button Grid.Column="0" AutomationId="CancelPaymentSourceButton" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />
-                    <Button Grid.Column="1" AutomationId="SavePaymentSourceButton" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="{StaticResource Primary}" />
+                    <Button Grid.Column="0" AutomationId="CancelPaymentSourceButton" Text="Cancelar" Clicked="OnCancelClicked" Style="{StaticResource SecondaryButton}" />
+                    <Button Grid.Column="1" AutomationId="SavePaymentSourceButton" Text="Salvar" Command="{Binding SaveCommand}" />
                 </Grid>
             </VerticalStackLayout>
         </ScrollView>

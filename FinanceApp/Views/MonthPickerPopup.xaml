@@ -6,9 +6,7 @@
                x:Class="FinanceApp.Views.MonthPickerPopup"
                x:DataType="vm:MonthPickerViewModel">
 
-    <Border BackgroundColor="White"
-            StrokeShape="RoundRectangle 12"
-            Padding="20"
+    <Border Style="{StaticResource PopupCard}"
             WidthRequest="330"
             VerticalOptions="Center">
 
@@ -57,7 +55,7 @@
                                 StrokeShape="RoundRectangle 10"
                                 Stroke="Transparent"
                                 StrokeThickness="2"
-                                BackgroundColor="#F5F5F5"
+                                BackgroundColor="{StaticResource AppBackground}"
                                 IsEnabled="{Binding IsEnabled}">
                             <Border.Triggers>
                                 <DataTrigger TargetType="Border" Binding="{Binding IsCurrent}" Value="True">
@@ -77,7 +75,7 @@
                             <Label AutomationId="MonthOptionLabel"
                                    Text="{Binding Label}"
                                    FontSize="15"
-                                   TextColor="Black"
+                                   TextColor="{StaticResource Ink}"
                                    HorizontalOptions="Center"
                                    VerticalOptions="Center">
                                 <Label.Triggers>
@@ -93,8 +91,8 @@
             </FlexLayout>
 
             <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
-                <Button Grid.Column="0" AutomationId="CancelMonthPickerButton" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />
-                <Button Grid.Column="1" AutomationId="PickerCurrentMonthButton" Text="Mês atual" Command="{Binding SelectCurrentMonthCommand}" BackgroundColor="{StaticResource Primary}" />
+                <Button Grid.Column="0" AutomationId="CancelMonthPickerButton" Text="Cancelar" Clicked="OnCancelClicked" Style="{StaticResource SecondaryButton}" />
+                <Button Grid.Column="1" AutomationId="PickerCurrentMonthButton" Text="Mês atual" Command="{Binding SelectCurrentMonthCommand}" />
             </Grid>
         </VerticalStackLayout>
     </Border>

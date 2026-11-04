@@ -518,6 +518,54 @@ public class MainViewModelTests
         raised.Should().BeTrue();
     }
 
+    // --- Compact header ---
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(64, false)]
+    [InlineData(65, true)]
+    [InlineData(400, true)]
+    public void UpdateHeaderCompact_PastTheMonthHeader_ShowsMonthInTopBar(double scrollY, bool expected)
+    {
+        _vm.UpdateHeaderCompact(scrollY);
+
+        _vm.IsHeaderCompact.Should().Be(expected);
+    }
+
+    [Fact]
+    public void UpdateHeaderCompact_ScrolledBackUp_ShowsAppNameAgain()
+    {
+        _vm.UpdateHeaderCompact(300);
+
+        _vm.UpdateHeaderCompact(10);
+
+        _vm.IsHeaderCompact.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CurrentPosition_Changes_ResetsCompactHeader()
+    {
+        await _vm.InitializeAsync();
+        _vm.UpdateHeaderCompact(300);
+
+        _vm.GoToNextMonthCommand.Execute(null);
+
+        _vm.IsHeaderCompact.Should().BeFalse("the new month starts with its header in view");
+    }
+
+    [Fact]
+    public async Task CurrentPosition_Changes_RaisesPropertyChangedForSelectedMonth()
+    {
+        await _vm.InitializeAsync();
+        var raised = new List<string?>();
+        _vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        _vm.GoToNextMonthCommand.Execute(null);
+
+        raised.Should().Contain(nameof(MainViewModel.SelectedMonth));
+        _vm.SelectedMonth!.Date.Should().Be(_vm.CurrentMonthDate.AddMonths(1));
+    }
+
     // --- Swipe hint ---
 
     [Fact]

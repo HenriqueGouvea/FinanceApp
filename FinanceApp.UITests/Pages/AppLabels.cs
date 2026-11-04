@@ -22,6 +22,7 @@ public static class AppLabels
     public const string CategoriesMenuItem = "Categorias";
     public const string PaymentSourcesMenuItem = "Contas e cartões";
     public const string SettingsMenuItem = "Configurações";
+    public const string IncomesCollapsedHint = "Toque em “Receitas” para mostrar os lançamentos de novo.";
     public const string SettingsUserSection = "Usuário";
     public const string SettingsSecuritySection = "Segurança";
     public const string SettingsGuideSection = "Guia inicial";

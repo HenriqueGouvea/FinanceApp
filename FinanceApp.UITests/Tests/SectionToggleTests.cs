@@ -23,8 +23,10 @@ public sealed class SectionToggleTests : E2ETestBase
         MainPage.IsEntryVisible("Freela E2E").Should().BeTrue();
         MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(1), "the header summary stays visible when collapsed");
         MainPage.ToggleOutcomes().WaitForEntry("Gasolina E2E");
+        MainPage.CollapsedSectionsHintText.Should().BeNull("both sections are expanded again");
 
         MainPage.ToggleIncomes().WaitForEntryGone("Freela E2E");
+        MainPage.CollapsedSectionsHintText.Should().Be(AppLabels.IncomesCollapsedHint);
 
         MainPage.GoToNextMonth().WaitForEntry("Gasolina E2E");
         MainPage.IsEntryVisible("Freela E2E").Should().BeFalse("the collapsed state is shared by all months");

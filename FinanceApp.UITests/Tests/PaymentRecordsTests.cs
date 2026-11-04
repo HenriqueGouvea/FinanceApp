@@ -33,7 +33,7 @@ public sealed class PaymentRecordsTests : E2ETestBase
 
         page.DeletePayment("Feira").Cancel();
 
-        MainPage.EntryPartialText("Mercado E2E").Should().Be(AppFormat.Money(250));
+        MainPage.EntryPaidSoFarText("Mercado E2E").Should().Be(AppFormat.Money(250));
         (await GetPaymentRowsAsync()).Should().HaveCount(2);
 
         page = MainPage.OpenEntry("Mercado E2E");
@@ -41,7 +41,7 @@ public sealed class PaymentRecordsTests : E2ETestBase
         page.PaidAmountText.Should().Be(AppFormat.Money(100));
         page.Save();
 
-        MainPage.WaitFor(() => MainPage.EntryPartialText("Mercado E2E") == AppFormat.Money(100));
+        MainPage.WaitFor(() => MainPage.EntryPaidSoFarText("Mercado E2E") == AppFormat.Money(100));
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(100));
         (await GetPaymentRowsAsync()).Should().ContainSingle().Which.Amount.Should().Be(100m);
         var record = (await GetMonthlyEntryRowsAsync()).Should().ContainSingle().Subject;

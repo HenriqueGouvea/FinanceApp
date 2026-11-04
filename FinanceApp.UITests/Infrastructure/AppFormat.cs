@@ -68,6 +68,16 @@ public static class AppFormat
     public static string StruckPlanned(decimal planned) => $"▲ {Money(planned)}";
 
     /// <summary>
+    /// The line under the amount paid so far of a partially paid entry, e.g. "de R$ 800,00".
+    /// </summary>
+    public static string OfPlanned(decimal planned) => $"de {Money(planned)}";
+
+    /// <summary>
+    /// An installment entry's total in its row details, e.g. "total R$ 300,00".
+    /// </summary>
+    public static string InstallmentTotal(decimal total) => $"total {Money(total)}";
+
+    /// <summary>
     /// Date of a recorded payment in the partial payment popup (e.g. "27/10").
     /// </summary>
     public static string PaymentDate(DateTime date) => date.ToString("dd/MM", Culture);

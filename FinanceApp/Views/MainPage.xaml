@@ -10,41 +10,40 @@
              x:DataType="vm:MainViewModel"
              Title="Início">
     <ContentPage.Resources>
-        <Color x:Key="OutcomeAccent">#C2414B</Color>
-        <Color x:Key="OutcomeTint">#FBEAEC</Color>
-        <Color x:Key="IncomeAccent">#1F8F63</Color>
-        <Color x:Key="IncomeTint">#E5F5EE</Color>
-        <!-- Every other entry row: lighter than the section header tints, so rows never read as headers -->
-        <Color x:Key="OutcomeAlternateRow">#FDF5F6</Color>
-        <Color x:Key="IncomeAlternateRow">#F3FBF7</Color>
-        <!-- Same for incomes and outcomes: a paid outcome is good news, so it must not use the red outcome accent -->
-        <Color x:Key="PaidAccent">#1F8F63</Color>
-        <Color x:Key="PartialAccent">#EF6C00</Color>
-        <Color x:Key="PaidProgressFill">#81C784</Color>
-        <Color x:Key="EstimatedAccent">#455A64</Color>
-        <Color x:Key="EstimatedTint">#ECEFF1</Color>
-        <Color x:Key="MonthNavAccent">#5B2A86</Color>
-        <Color x:Key="MonthNavTint">#EFE6F8</Color>
-        <Color x:Key="BillTint">#F3EAFB</Color>
-        <Color x:Key="BillAccent">#B48BDA</Color>
+        <!-- Month arrows on the plum header: light chevrons beside the month pill, with a 44dp touch area -->
         <Style x:Key="MonthArrowButton" TargetType="Button">
-            <Setter Property="FontSize" Value="26" />
+            <Setter Property="FontSize" Value="24" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="WidthRequest" Value="44" />
             <Setter Property="HeightRequest" Value="44" />
             <Setter Property="CornerRadius" Value="22" />
-            <Setter Property="BackgroundColor" Value="{StaticResource MonthNavTint}" />
-            <Setter Property="TextColor" Value="{StaticResource MonthNavAccent}" />
+            <Setter Property="BackgroundColor" Value="Transparent" />
+            <Setter Property="TextColor" Value="{StaticResource White}" />
+            <Setter Property="Opacity" Value="0.8" />
             <Setter Property="VerticalOptions" Value="Center" />
             <Style.Triggers>
                 <Trigger TargetType="Button" Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.35" />
+                    <Setter Property="Opacity" Value="0.25" />
                 </Trigger>
             </Style.Triggers>
         </Style>
 
+        <!-- Small grey detail under an entry's description ("Moradia · Vence 15/11 · 🏦 Conta") -->
+        <Style x:Key="EntryMeta" TargetType="Label">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="TextColor" Value="{StaticResource Muted}" />
+            <Setter Property="VerticalOptions" Value="Center" />
+        </Style>
+
+        <!-- Action of the long-press menu -->
+        <Style x:Key="EntryAction" TargetType="Border">
+            <Setter Property="StrokeThickness" Value="0" />
+            <Setter Property="StrokeShape" Value="RoundRectangle 10" />
+            <Setter Property="Padding" Value="14,0" />
+        </Style>
+
         <DataTemplate x:Key="EntryRowTemplate" x:DataType="models:MonthlyEntryProjection">
-            <Grid IsClippedToBounds="True" BackgroundColor="White">
+            <Grid IsClippedToBounds="True" BackgroundColor="{StaticResource CardBackground}">
                 <Grid.Triggers>
                     <MultiTrigger TargetType="Grid">
                         <MultiTrigger.Conditions>
@@ -61,134 +60,149 @@
                         <Setter Property="BackgroundColor" Value="{StaticResource IncomeAlternateRow}" />
                     </MultiTrigger>
                 </Grid.Triggers>
-                <Grid AutomationId="EntryRow" ColumnDefinitions="Auto, *, Auto, Auto" ColumnSpacing="10" Padding="14,10">
+                <BoxView HeightRequest="1" VerticalOptions="Start" Color="{StaticResource Line}" />
+
+                <Grid AutomationId="EntryRow" ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10" Padding="12,9">
                     <Grid.Behaviors>
                         <toolkit:TouchBehavior LongPressDuration="1000"
                                                TouchGestureCompleted="OnEntryTapped"
                                                LongPressCompleted="OnEntryLongPressed" />
                     </Grid.Behaviors>
 
-                    <!-- Status indicator: empty ring while pending, ring with a dot when partially paid, filled check once paid/received -->
+                    <!-- Status: grey ring while pending, orange ring when partially paid, green check once paid/received -->
                     <Grid Grid.Column="0" WidthRequest="22" HeightRequest="22" VerticalOptions="Center">
                         <Border AutomationId="EntryPendingIcon"
                                 StrokeShape="RoundRectangle 11"
-                                Stroke="#BDBDBD"
+                                Stroke="{StaticResource MutedBrush}"
                                 StrokeThickness="2"
                                 BackgroundColor="Transparent"
                                 IsVisible="{Binding IsPending}" />
                         <Border AutomationId="EntryPartialIcon"
                                 StrokeShape="RoundRectangle 11"
-                                Stroke="{StaticResource PartialAccent}"
-                                StrokeThickness="2"
+                                Stroke="{StaticResource PartialBrush}"
+                                StrokeThickness="3"
                                 BackgroundColor="Transparent"
-                                IsVisible="{Binding IsPartiallyPaid}">
-                            <Border StrokeShape="RoundRectangle 5"
-                                    StrokeThickness="0"
-                                    BackgroundColor="{StaticResource PartialAccent}"
-                                    WidthRequest="10"
-                                    HeightRequest="10"
-                                    HorizontalOptions="Center"
-                                    VerticalOptions="Center" />
-                        </Border>
+                                IsVisible="{Binding IsPartiallyPaid}" />
                         <Border AutomationId="EntryPaidIcon"
                                 StrokeShape="RoundRectangle 11"
                                 StrokeThickness="0"
-                                BackgroundColor="{StaticResource PaidAccent}"
+                                BackgroundColor="{StaticResource Paid}"
                                 IsVisible="{Binding IsPaid}">
                             <Label Text="✓"
                                    TextColor="White"
-                                   FontSize="13"
+                                   FontSize="12"
                                    FontAttributes="Bold"
                                    HorizontalOptions="Center"
                                    VerticalOptions="Center" />
                         </Border>
                     </Grid>
 
-                    <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
-                        <Label AutomationId="EntryDescriptionLabel" Text="{Binding Description}" FontAttributes="Bold"/>
-                        <HorizontalStackLayout Spacing="4"
-                                               IsVisible="{Binding Category, Converter={x:Static converters:IsNotNullConverter.Instance}}">
-                            <Label Text="{Binding Category.Icon}" FontSize="11"/>
+                    <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
+                        <!-- Description, with the "±" (estimated) and installment ("3/10") badges -->
+                        <HorizontalStackLayout Spacing="5" IsClippedToBounds="True">
+                            <Label AutomationId="EntryDescriptionLabel"
+                                   Text="{Binding Description}"
+                                   FontSize="14"
+                                   FontFamily="OpenSansSemibold"
+                                   LineBreakMode="TailTruncation"
+                                   VerticalOptions="Center" />
+                            <Border AutomationId="EntryEstimatedIcon" Style="{StaticResource Badge}" IsVisible="{Binding IsEstimated}">
+                                <Label Text="±" Style="{StaticResource BadgeLabel}" />
+                            </Border>
+                            <Border Style="{StaticResource Badge}"
+                                    IsVisible="{Binding InstallmentLabel, Converter={x:Static converters:IsNotNullConverter.Instance}}">
+                                <Label AutomationId="EntryInstallmentLabel" Text="{Binding InstallmentLabel}" Style="{StaticResource BadgeLabel}" />
+                            </Border>
+                        </HorizontalStackLayout>
+
+                        <!-- One line of details; each part after the category brings its own " · " -->
+                        <HorizontalStackLayout IsClippedToBounds="True">
                             <Label AutomationId="EntryCategoryLabel"
                                    Text="{Binding Category.Name}"
-                                   FontSize="11"
-                                   TextColor="{Binding Category.Color, Converter={x:Static converters:HexToColorConverter.Instance}}"/>
+                                   Style="{StaticResource EntryMeta}"
+                                   IsVisible="{Binding Category, Converter={x:Static converters:IsNotNullConverter.Instance}}" />
+                            <Label Text="Sem categoria"
+                                   Style="{StaticResource EntryMeta}"
+                                   IsVisible="{Binding Category, Converter={x:Static converters:IsNullConverter.Instance}}" />
+                            <HorizontalStackLayout IsVisible="{Binding IsPaid}">
+                                <Label Text=" · " Style="{StaticResource EntryMeta}" />
+                                <Label AutomationId="EntryStatusLabel"
+                                       Text="{Binding EntryType, Converter={x:Static converters:EntryTypeToPaidLabelConverter.Instance}}"
+                                       Style="{StaticResource EntryMeta}"
+                                       TextColor="{StaticResource Paid}"
+                                       FontAttributes="Bold" />
+                            </HorizontalStackLayout>
+                            <!-- Turns red while it is due today and not yet paid/received -->
+                            <HorizontalStackLayout IsVisible="{Binding ShowsDueDateInRow}">
+                                <Label Text=" · " Style="{StaticResource EntryMeta}" />
+                                <Label AutomationId="EntryDueDateLabel"
+                                       Text="{Binding DueDate, Converter={x:Static converters:DueDateToLabelConverter.Instance}}"
+                                       Style="{StaticResource EntryMeta}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsDueToday}" Value="True">
+                                            <Setter Property="TextColor" Value="{StaticResource Outcome}" />
+                                            <Setter Property="FontAttributes" Value="Bold" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout IsVisible="{Binding InstallmentTotalAmount, Converter={x:Static converters:IsNotNullConverter.Instance}}">
+                                <Label Text=" · " Style="{StaticResource EntryMeta}" />
+                                <Label AutomationId="EntryInstallmentTotalLabel"
+                                       Text="{Binding InstallmentTotalAmount, Converter={x:Static converters:MoneyConverter.Instance}, StringFormat='total {0}'}"
+                                       Style="{StaticResource EntryMeta}" />
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout IsVisible="{Binding ShowsPaymentSourceInRow}">
+                                <Label Style="{StaticResource EntryMeta}">
+                                    <Label.FormattedText>
+                                        <FormattedString>
+                                            <Span Text=" · " />
+                                            <Span Text="{Binding PaymentSource.Type, Converter={x:Static converters:PaymentSourceTypeToIconConverter.Instance}}" />
+                                            <Span Text=" " />
+                                        </FormattedString>
+                                    </Label.FormattedText>
+                                </Label>
+                                <Label AutomationId="EntryPaymentSourceLabel"
+                                       Text="{Binding PaymentSource.Name}"
+                                       Style="{StaticResource EntryMeta}" />
+                            </HorizontalStackLayout>
                         </HorizontalStackLayout>
-                        <HorizontalStackLayout Spacing="4" IsVisible="{Binding HasPaymentSource}">
-                            <Label Text="{Binding PaymentSource.Type, Converter={x:Static converters:PaymentSourceTypeToIconConverter.Instance}}" FontSize="11"/>
-                            <Label AutomationId="EntryPaymentSourceLabel"
-                                   Text="{Binding PaymentSource.Name}"
-                                   FontSize="11"
-                                   TextColor="Gray"/>
-                        </HorizontalStackLayout>
-                        <!-- Turns red while it is due today and not yet paid/received -->
-                        <Label AutomationId="EntryDueDateLabel"
-                               Text="{Binding DueDate, Converter={x:Static converters:DueDateToLabelConverter.Instance}}"
-                               FontSize="11"
-                               TextColor="Gray"
-                               IsVisible="{Binding ShowsDueDate}">
-                            <Label.Triggers>
-                                <DataTrigger TargetType="Label" Binding="{Binding IsDueToday}" Value="True">
-                                    <Setter Property="TextColor" Value="{StaticResource OutcomeAccent}" />
-                                    <Setter Property="FontAttributes" Value="Bold" />
-                                </DataTrigger>
-                            </Label.Triggers>
-                        </Label>
-                        <Label AutomationId="EntryInstallmentLabel"
-                               FontSize="11"
-                               TextColor="Gray"
-                               IsVisible="{Binding InstallmentLabel, Converter={x:Static converters:IsNotNullConverter.Instance}}">
-                            <Label.Text>
-                                <MultiBinding StringFormat="{}{0} · Total {1}">
-                                    <Binding Path="InstallmentLabel" />
-                                    <Binding Path="InstallmentTotalAmount" Converter="{x:Static converters:MoneyConverter.Instance}" />
-                                </MultiBinding>
-                            </Label.Text>
-                        </Label>
                     </VerticalStackLayout>
-                    <Label Grid.Column="2"
-                           AutomationId="EntryStatusLabel"
-                           Text="{Binding EntryType, Converter={x:Static converters:EntryTypeToPaidLabelConverter.Instance}}"
-                           TextColor="{StaticResource PaidAccent}"
-                           FontSize="11"
-                           FontAttributes="Bold"
-                           VerticalOptions="Center"
-                           IsVisible="{Binding IsPaid}"/>
-                    <!-- Everything about the amount stays on the right, the price first and the payment progress below it -->
-                    <VerticalStackLayout Grid.Column="3" Spacing="2" VerticalOptions="Center">
-                        <HorizontalStackLayout Spacing="4" HorizontalOptions="End">
-                            <!-- Estimated amounts (±) vary each month (e.g. energy bill, supermarket) -->
-                            <Border AutomationId="EntryEstimatedIcon"
-                                    BackgroundColor="{StaticResource EstimatedTint}"
-                                    StrokeThickness="0"
-                                    StrokeShape="RoundRectangle 9"
-                                    WidthRequest="18"
-                                    HeightRequest="18"
-                                    VerticalOptions="Center"
-                                    IsVisible="{Binding IsEstimated}">
-                                <Label Text="±"
-                                       FontSize="13"
-                                       FontAttributes="Bold"
-                                       TextColor="{StaticResource EstimatedAccent}"
-                                       HorizontalOptions="Center"
-                                       VerticalOptions="Center" />
-                            </Border>
-                            <Label AutomationId="EntryAmountLabel"
-                                   Text="{Binding EffectiveAmount, Converter={x:Static converters:MoneyConverter.Instance}}"
-                                   TextColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
-                                   FontAttributes="Bold"
-                                   VerticalOptions="Center"/>
-                        </HorizontalStackLayout>
-                        <Label AutomationId="EntryPartialLabel"
-                               Text="{Binding PaidAmount, Converter={x:Static converters:MoneyConverter.Instance}}"
-                               FontSize="11"
+
+                    <!-- Everything about the amount stays on the right: the amount, then the payment progress under it -->
+                    <VerticalStackLayout Grid.Column="2" Spacing="2" VerticalOptions="Center">
+                        <Label AutomationId="EntryAmountLabel"
+                               Text="{Binding ShownAmount, Converter={x:Static converters:MoneyConverter.Instance}}"
+                               FontSize="14"
                                FontAttributes="Bold"
-                               TextColor="{StaticResource PartialAccent}"
+                               HorizontalOptions="End" />
+                        <controls:PaymentProgressBar AutomationId="EntryPaymentProgress"
+                                                     WidthRequest="78"
+                                                     HorizontalOptions="End"
+                                                     PaidAmount="{Binding PaidAmount}"
+                                                     PlannedAmount="{Binding PlannedOrEffectiveAmount}"
+                                                     FillColor="{StaticResource Partial}"
+                                                     OverflowColor="{StaticResource Outcome}"
+                                                     IsVisible="{Binding ShowsPaymentProgress}">
+                            <controls:PaymentProgressBar.Triggers>
+                                <DataTrigger TargetType="controls:PaymentProgressBar" Binding="{Binding IsPaid}" Value="True">
+                                    <Setter Property="FillColor" Value="{StaticResource PaidProgressFill}" />
+                                </DataTrigger>
+                                <DataTrigger TargetType="controls:PaymentProgressBar" Binding="{Binding EntryType}" Value="{x:Static models:FinancialEntryType.Income}">
+                                    <Setter Property="OverflowColor" Value="{StaticResource Income}" />
+                                </DataTrigger>
+                            </controls:PaymentProgressBar.Triggers>
+                        </controls:PaymentProgressBar>
+                        <!-- Partially paid within the plan: the amount above is what was paid so far -->
+                        <Label AutomationId="EntryPartialLabel"
+                               Text="{Binding EffectiveAmount, Converter={x:Static converters:MoneyConverter.Instance}, StringFormat='de {0}'}"
+                               FontSize="10"
+                               TextColor="{StaticResource Muted}"
                                HorizontalOptions="End"
                                IsVisible="{Binding ShowsPaidSoFar}" />
-                        <!-- Paid beyond the planned amount (e.g. a supermarket above its estimate): the price above is what was paid -->
+                        <!-- Paid beyond the planned amount (e.g. a supermarket above its estimate): the amount above is what was paid -->
                         <Label AutomationId="EntryPlannedAmountLabel"
-                               FontSize="11"
+                               FontSize="10"
                                HorizontalOptions="End"
                                IsVisible="{Binding IsOverBudget}">
                             <Label.FormattedText>
@@ -197,31 +211,17 @@
                                           FontAttributes="Bold"
                                           TextColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}" />
                                     <Span Text="{Binding PlannedOrEffectiveAmount, Converter={x:Static converters:MoneyConverter.Instance}}"
-                                          TextColor="Gray"
+                                          TextColor="{StaticResource Muted}"
                                           TextDecorations="Strikethrough" />
                                 </FormattedString>
                             </Label.FormattedText>
                         </Label>
-                        <controls:PaymentProgressBar AutomationId="EntryPaymentProgress"
-                                                     WidthRequest="96"
-                                                     HorizontalOptions="End"
-                                                     PaidAmount="{Binding PaidAmount}"
-                                                     PlannedAmount="{Binding PlannedOrEffectiveAmount}"
-                                                     FillColor="{StaticResource PartialAccent}"
-                                                     OverflowColor="{Binding EntryType, Converter={x:Static converters:EntryTypeToColorConverter.Instance}}"
-                                                     IsVisible="{Binding ShowsPaymentProgress}">
-                            <controls:PaymentProgressBar.Triggers>
-                                <DataTrigger TargetType="controls:PaymentProgressBar" Binding="{Binding IsPaid}" Value="True">
-                                    <Setter Property="FillColor" Value="{StaticResource PaidProgressFill}" />
-                                </DataTrigger>
-                            </controls:PaymentProgressBar.Triggers>
-                        </controls:PaymentProgressBar>
                     </VerticalStackLayout>
                 </Grid>
 
                 <!-- Entry actions menu, slides in on long press -->
                 <controls:SlideOutPanel HorizontalOptions="End"
-                                        BackgroundColor="#EEEEEE"
+                                        BackgroundColor="{StaticResource Line}"
                                         Padding="6">
                     <controls:SlideOutPanel.IsOpen>
                         <MultiBinding Converter="{x:Static converters:AreEqualConverter.Instance}">
@@ -233,54 +233,50 @@
                     </controls:SlideOutPanel.IsOpen>
                     <HorizontalStackLayout Spacing="6">
                         <Border AutomationId="MarkPaidEntryAction"
-                                BackgroundColor="#1F8F63"
-                                StrokeThickness="0"
-                                StrokeShape="RoundRectangle 8"
-                                Padding="16,0"
+                                Style="{StaticResource EntryAction}"
+                                BackgroundColor="{StaticResource Paid}"
                                 IsVisible="{Binding IsPaid, Converter={x:Static converters:InverseBoolConverter.Instance}}">
                             <Border.GestureRecognizers>
                                 <TapGestureRecognizer Tapped="OnToggleStatusClicked" />
                             </Border.GestureRecognizers>
                             <Label Text="{Binding EntryType, Converter={x:Static converters:EntryTypeToMarkPaidLabelConverter.Instance}}"
                                    TextColor="White"
+                                   FontFamily="OpenSansSemibold"
                                    VerticalOptions="Center" />
                         </Border>
                         <Border AutomationId="PartialPaymentEntryAction"
-                                BackgroundColor="{StaticResource PartialAccent}"
-                                StrokeThickness="0"
-                                StrokeShape="RoundRectangle 8"
-                                Padding="16,0"
+                                Style="{StaticResource EntryAction}"
+                                BackgroundColor="{StaticResource Partial}"
                                 IsVisible="{Binding AllowsPartialPayment}">
                             <Border.GestureRecognizers>
                                 <TapGestureRecognizer Tapped="OnPartialPaymentClicked" />
                             </Border.GestureRecognizers>
                             <Label Text="{Binding EntryType, Converter={x:Static converters:EntryTypeToMarkPartialPaidLabelConverter.Instance}}"
                                    TextColor="White"
+                                   FontFamily="OpenSansSemibold"
                                    VerticalOptions="Center" />
                         </Border>
                         <Border AutomationId="MarkPendingEntryAction"
-                                BackgroundColor="#757575"
-                                StrokeThickness="0"
-                                StrokeShape="RoundRectangle 8"
-                                Padding="16,0"
+                                Style="{StaticResource EntryAction}"
+                                BackgroundColor="{StaticResource Muted}"
                                 IsVisible="{Binding IsPaid}">
                             <Border.GestureRecognizers>
                                 <TapGestureRecognizer Tapped="OnToggleStatusClicked" />
                             </Border.GestureRecognizers>
                             <Label Text="Pendente"
                                    TextColor="White"
+                                   FontFamily="OpenSansSemibold"
                                    VerticalOptions="Center" />
                         </Border>
                         <Border AutomationId="DeleteEntryAction"
-                                BackgroundColor="#C2414B"
-                                StrokeThickness="0"
-                                StrokeShape="RoundRectangle 8"
-                                Padding="16,0">
+                                Style="{StaticResource EntryAction}"
+                                BackgroundColor="{StaticResource Outcome}">
                             <Border.GestureRecognizers>
                                 <TapGestureRecognizer Tapped="OnDeleteEntryClicked" />
                             </Border.GestureRecognizers>
                             <Label Text="Excluir"
                                    TextColor="White"
+                                   FontFamily="OpenSansSemibold"
                                    VerticalOptions="Center" />
                         </Border>
                     </HorizontalStackLayout>
@@ -288,11 +284,13 @@
             </Grid>
         </DataTemplate>
 
-        <!-- A credit card's bill: one row with a single due date, and the card's outcomes listed under it -->
+        <!-- A credit card's bill: a lilac row marked on the left, with the card's outcomes listed under it -->
         <DataTemplate x:Key="CreditCardBillTemplate" x:DataType="models:CreditCardBill">
             <VerticalStackLayout AutomationId="CreditCardBill">
                 <Grid IsClippedToBounds="True" BackgroundColor="{StaticResource BillTint}">
-                    <Grid AutomationId="CreditCardBillRow" ColumnDefinitions="Auto, *, Auto, Auto, Auto" ColumnSpacing="10" Padding="14,10">
+                    <BoxView HeightRequest="1" VerticalOptions="Start" Color="{StaticResource Line}" />
+                    <BoxView WidthRequest="4" HorizontalOptions="Start" Color="{StaticResource BillAccent}" />
+                    <Grid AutomationId="CreditCardBillRow" ColumnDefinitions="Auto, *, Auto, Auto" ColumnSpacing="10" Padding="12,9">
                         <Grid.Behaviors>
                             <toolkit:TouchBehavior LongPressDuration="1000"
                                                    TouchGestureCompleted="OnBillTapped"
@@ -302,96 +300,101 @@
                         <Grid Grid.Column="0" WidthRequest="22" HeightRequest="22" VerticalOptions="Center">
                             <Border AutomationId="CreditCardBillPendingIcon"
                                     StrokeShape="RoundRectangle 11"
-                                    Stroke="#BDBDBD"
+                                    Stroke="{StaticResource MutedBrush}"
                                     StrokeThickness="2"
                                     BackgroundColor="Transparent"
                                     IsVisible="{Binding IsPending}" />
                             <Border AutomationId="CreditCardBillPartialIcon"
                                     StrokeShape="RoundRectangle 11"
-                                    Stroke="{StaticResource PartialAccent}"
-                                    StrokeThickness="2"
+                                    Stroke="{StaticResource PartialBrush}"
+                                    StrokeThickness="3"
                                     BackgroundColor="Transparent"
-                                    IsVisible="{Binding IsPartiallyPaid}">
-                                <Border StrokeShape="RoundRectangle 5"
-                                        StrokeThickness="0"
-                                        BackgroundColor="{StaticResource PartialAccent}"
-                                        WidthRequest="10"
-                                        HeightRequest="10"
-                                        HorizontalOptions="Center"
-                                        VerticalOptions="Center" />
-                            </Border>
+                                    IsVisible="{Binding IsPartiallyPaid}" />
                             <Border AutomationId="CreditCardBillPaidIcon"
                                     StrokeShape="RoundRectangle 11"
                                     StrokeThickness="0"
-                                    BackgroundColor="{StaticResource PaidAccent}"
+                                    BackgroundColor="{StaticResource Paid}"
                                     IsVisible="{Binding IsPaid}">
                                 <Label Text="✓"
                                        TextColor="White"
-                                       FontSize="13"
+                                       FontSize="12"
                                        FontAttributes="Bold"
                                        HorizontalOptions="Center"
                                        VerticalOptions="Center" />
                             </Border>
                         </Grid>
 
-                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                        <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
                             <Label AutomationId="CreditCardBillNameLabel"
                                    Text="{Binding Card.Name, StringFormat='💳 Fatura {0}'}"
-                                   TextColor="{StaticResource MonthNavAccent}"
-                                   FontAttributes="Bold" />
-                            <!-- Turns red while it is due today and not yet paid -->
-                            <Label AutomationId="CreditCardBillDueDateLabel"
-                                   Text="{Binding DueDate, Converter={x:Static converters:DueDateToLabelConverter.Instance}}"
-                                   FontSize="11"
-                                   TextColor="Gray"
-                                   IsVisible="{Binding HasDueDate}">
-                                <Label.Triggers>
-                                    <DataTrigger TargetType="Label" Binding="{Binding IsDueToday}" Value="True">
-                                        <Setter Property="TextColor" Value="{StaticResource OutcomeAccent}" />
-                                        <Setter Property="FontAttributes" Value="Bold" />
-                                    </DataTrigger>
-                                </Label.Triggers>
-                            </Label>
-                            <Label AutomationId="CreditCardBillAccountLabel"
-                                   Text="{Binding PaymentAccount.Name, StringFormat='Débito em {0}'}"
-                                   FontSize="11"
-                                   TextColor="Gray"
-                                   IsVisible="{Binding HasPaymentAccount}" />
-                            <Label AutomationId="CreditCardBillCountLabel"
-                                   Text="{Binding EntryCount, StringFormat='{0} lançamento(s)'}"
-                                   FontSize="11"
-                                   TextColor="Gray" />
+                                   FontSize="14"
+                                   FontFamily="OpenSansSemibold"
+                                   TextColor="{StaticResource Primary}"
+                                   LineBreakMode="TailTruncation" />
+                            <HorizontalStackLayout IsClippedToBounds="True">
+                                <!-- Turns red while it is due today and not yet paid -->
+                                <Label AutomationId="CreditCardBillDueDateLabel"
+                                       Text="{Binding DueDate, Converter={x:Static converters:DueDateToLabelConverter.Instance}}"
+                                       Style="{StaticResource EntryMeta}"
+                                       IsVisible="{Binding HasDueDate}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsDueToday}" Value="True">
+                                            <Setter Property="TextColor" Value="{StaticResource Outcome}" />
+                                            <Setter Property="FontAttributes" Value="Bold" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                                <Label Text=" · " Style="{StaticResource EntryMeta}" IsVisible="{Binding HasDueDate}" />
+                                <HorizontalStackLayout IsVisible="{Binding HasPaymentAccount}">
+                                    <Label AutomationId="CreditCardBillAccountLabel"
+                                           Text="{Binding PaymentAccount.Name, StringFormat='Débito em {0}'}"
+                                           Style="{StaticResource EntryMeta}" />
+                                    <Label Text=" · " Style="{StaticResource EntryMeta}" />
+                                </HorizontalStackLayout>
+                                <Label AutomationId="CreditCardBillCountLabel"
+                                       Text="{Binding EntryCount, StringFormat='{0} lançamento(s)'}"
+                                       Style="{StaticResource EntryMeta}" />
+                            </HorizontalStackLayout>
                         </VerticalStackLayout>
-                        <Label Grid.Column="2"
-                               AutomationId="CreditCardBillStatusLabel"
-                               Text="Paga"
-                               TextColor="{StaticResource PaidAccent}"
-                               FontSize="11"
-                               FontAttributes="Bold"
-                               VerticalOptions="Center"
-                               IsVisible="{Binding IsPaid}" />
-                        <VerticalStackLayout Grid.Column="3" Spacing="2" VerticalOptions="Center">
+
+                        <VerticalStackLayout Grid.Column="2" Spacing="1" VerticalOptions="Center">
                             <Label AutomationId="CreditCardBillAmountLabel"
                                    Text="{Binding TotalAmount, Converter={x:Static converters:MoneyConverter.Instance}}"
-                                   TextColor="{StaticResource OutcomeAccent}"
+                                   FontSize="14"
                                    FontAttributes="Bold"
                                    HorizontalOptions="End" />
+                            <Label AutomationId="CreditCardBillStatusLabel"
+                                   Text="Paga"
+                                   TextColor="{StaticResource Paid}"
+                                   FontSize="11"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="End"
+                                   IsVisible="{Binding IsPaid}" />
                             <Label AutomationId="CreditCardBillPaidLabel"
                                    Text="{Binding PaidAmount, Converter={x:Static converters:MoneyConverter.Instance}}"
                                    FontSize="11"
                                    FontAttributes="Bold"
-                                   TextColor="{StaticResource PartialAccent}"
+                                   TextColor="{StaticResource Partial}"
                                    HorizontalOptions="End"
                                    IsVisible="{Binding IsPartiallyPaid}" />
                         </VerticalStackLayout>
-                        <controls:ExpandChevron Grid.Column="4"
-                                                IsExpanded="{Binding IsExpanded}"
-                                                AccentColor="{StaticResource MonthNavAccent}" />
+                        <!-- Tapping the bill shows or hides its entries -->
+                        <Label Grid.Column="3"
+                               Text="▾"
+                               FontSize="13"
+                               TextColor="{StaticResource BillAccent}"
+                               VerticalOptions="Center">
+                            <Label.Triggers>
+                                <DataTrigger TargetType="Label" Binding="{Binding IsExpanded}" Value="False">
+                                    <Setter Property="Text" Value="▸" />
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
                     </Grid>
 
                     <!-- Bill actions menu, slides in on long press -->
                     <controls:SlideOutPanel HorizontalOptions="End"
-                                            BackgroundColor="#EEEEEE"
+                                            BackgroundColor="{StaticResource Line}"
                                             Padding="6">
                         <controls:SlideOutPanel.IsOpen>
                             <MultiBinding Converter="{x:Static converters:AreEqualConverter.Instance}">
@@ -403,45 +406,108 @@
                         </controls:SlideOutPanel.IsOpen>
                         <HorizontalStackLayout Spacing="6">
                             <Border AutomationId="PayCreditCardBillAction"
-                                    BackgroundColor="#1F8F63"
-                                    StrokeThickness="0"
-                                    StrokeShape="RoundRectangle 8"
-                                    Padding="16,0"
+                                    Style="{StaticResource EntryAction}"
+                                    BackgroundColor="{StaticResource Paid}"
                                     IsVisible="{Binding IsPaid, Converter={x:Static converters:InverseBoolConverter.Instance}}">
                                 <Border.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnToggleBillStatusClicked" />
                                 </Border.GestureRecognizers>
                                 <Label Text="Pagar fatura"
                                        TextColor="White"
+                                       FontFamily="OpenSansSemibold"
                                        VerticalOptions="Center" />
                             </Border>
                             <Border AutomationId="MarkCreditCardBillPendingAction"
-                                    BackgroundColor="#757575"
-                                    StrokeThickness="0"
-                                    StrokeShape="RoundRectangle 8"
-                                    Padding="16,0"
+                                    Style="{StaticResource EntryAction}"
+                                    BackgroundColor="{StaticResource Muted}"
                                     IsVisible="{Binding IsPaid}">
                                 <Border.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnToggleBillStatusClicked" />
                                 </Border.GestureRecognizers>
                                 <Label Text="Pendente"
                                        TextColor="White"
+                                       FontFamily="OpenSansSemibold"
                                        VerticalOptions="Center" />
                             </Border>
                         </HorizontalStackLayout>
                     </controls:SlideOutPanel>
                 </Grid>
 
-                <!-- Indented, with a bar in the bill's color, so the entries read as part of the bill -->
-                <Grid AutomationId="CreditCardBillEntries" ColumnDefinitions="Auto, *" IsVisible="{Binding IsExpanded}">
-                    <BoxView Grid.Column="0" WidthRequest="4" Margin="14,0,0,0" Color="{StaticResource BillAccent}" />
-                    <VerticalStackLayout Grid.Column="1"
-                                         BindableLayout.ItemsSource="{Binding Entries}"
-                                         BindableLayout.ItemTemplate="{StaticResource EntryRowTemplate}" />
-                </Grid>
+                <!-- Indented under the bill, so the entries read as part of it -->
+                <VerticalStackLayout AutomationId="CreditCardBillEntries"
+                                     Padding="22,0,0,0"
+                                     BackgroundColor="{StaticResource CardBackground}"
+                                     IsVisible="{Binding IsExpanded}"
+                                     BindableLayout.ItemsSource="{Binding Entries}"
+                                     BindableLayout.ItemTemplate="{StaticResource EntryRowTemplate}" />
             </VerticalStackLayout>
         </DataTemplate>
     </ContentPage.Resources>
+
+    <!-- Top bar: the app name (or, once the month header has scrolled away, the month) and the user's avatar -->
+    <Shell.TitleView>
+        <Grid ColumnDefinitions="*, Auto" Padding="0,0,14,0">
+            <Label AutomationId="AppBrandLabel"
+                   Grid.ColumnSpan="2"
+                   Text="Mensal"
+                   FontSize="17"
+                   FontAttributes="Bold"
+                   TextColor="White"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"
+                   TranslationX="-22"
+                   IsVisible="{Binding IsHeaderCompact, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
+            <Border AutomationId="CompactMonthButton"
+                    Grid.ColumnSpan="2"
+                    BackgroundColor="{StaticResource HeaderPill}"
+                    StrokeThickness="0"
+                    StrokeShape="RoundRectangle 17"
+                    Padding="14,5"
+                    HorizontalOptions="Center"
+                    VerticalOptions="Center"
+                    TranslationX="-22"
+                    IsVisible="{Binding IsHeaderCompact}">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnMonthTitleTapped" />
+                </Border.GestureRecognizers>
+                <HorizontalStackLayout Spacing="6">
+                    <Label AutomationId="CompactMonthTitleLabel"
+                           Text="{Binding SelectedMonth.MonthName}"
+                           FontSize="15"
+                           FontAttributes="Bold"
+                           TextColor="White"
+                           VerticalOptions="Center" />
+                    <Label Text="▾" FontSize="13" TextColor="White" VerticalOptions="Center" />
+                </HorizontalStackLayout>
+            </Border>
+            <!-- The user's initial or photo; opens the settings -->
+            <Border x:Name="HeaderAvatar"
+                    Grid.Column="1"
+                    x:DataType="vm:UserProfileViewModel"
+                    AutomationId="HeaderAvatar"
+                    WidthRequest="32"
+                    HeightRequest="32"
+                    StrokeShape="Ellipse"
+                    StrokeThickness="0"
+                    BackgroundColor="{StaticResource Accent}"
+                    VerticalOptions="Center">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnAvatarTapped" />
+                </Border.GestureRecognizers>
+                <Grid>
+                    <Label AutomationId="HeaderAvatarInitialLabel"
+                           Text="{Binding Initial}"
+                           FontSize="14"
+                           FontAttributes="Bold"
+                           TextColor="{StaticResource AccentText}"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"
+                           IsVisible="{Binding HasPhoto, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
+                    <Image Source="{Binding PhotoPath}" Aspect="AspectFill" IsVisible="{Binding HasPhoto}" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Shell.TitleView>
 
     <Grid>
         <!-- Programmatic jumps (month picker, "Mês atual") would otherwise animate through every month in between -->
@@ -451,214 +517,209 @@
                       Loop="False">
             <CarouselView.ItemTemplate>
                 <DataTemplate x:DataType="vm:MonthViewModel">
-                    <ScrollView x:Name="monthScroll">
-                        <VerticalStackLayout Padding="20"
-                                             Spacing="15"
-                                             MinimumHeightRequest="{Binding Height, Source={x:Reference monthScroll}, x:DataType=ScrollView}">
+                    <ScrollView x:Name="monthScroll" Scrolled="OnMonthScrolled">
+                        <VerticalStackLayout MinimumHeightRequest="{Binding Height, Source={x:Reference monthScroll}, x:DataType=ScrollView}">
                             <VerticalStackLayout.GestureRecognizers>
                                 <TapGestureRecognizer Command="{Binding HideEntryActionsCommand}" />
                             </VerticalStackLayout.GestureRecognizers>
 
-                            <!-- Month header: arrows step one month, the title pill opens the month/year picker -->
-                            <VerticalStackLayout Spacing="6">
-                                <Grid ColumnDefinitions="44, *, 44" ColumnSpacing="6">
-                                    <Button Grid.Column="0"
-                                            AutomationId="PreviousMonthButton"
-                                            Text="‹"
-                                            Style="{StaticResource MonthArrowButton}"
-                                            Command="{Binding GoToPreviousMonthCommand, Source={RelativeSource AncestorType={x:Type vm:MainViewModel}}, x:DataType=vm:MainViewModel}" />
+                            <!-- Plum header, continuing the top bar: the month, with the summary card overlapping its lower edge -->
+                            <Grid RowDefinitions="Auto, 26, Auto">
+                                <BoxView Grid.RowSpan="2" Color="{StaticResource Primary}" />
 
-                                    <Border Grid.Column="1"
-                                            AutomationId="MonthTitleButton"
-                                            HorizontalOptions="Center"
-                                            BackgroundColor="{StaticResource MonthNavTint}"
-                                            Stroke="{StaticResource MonthNavAccent}"
-                                            StrokeThickness="1"
-                                            StrokeShape="RoundRectangle 24"
-                                            Padding="14,8,8,8"
-                                            MinimumHeightRequest="44">
-                                        <Border.GestureRecognizers>
-                                            <TapGestureRecognizer Tapped="OnMonthTitleTapped" />
-                                        </Border.GestureRecognizers>
-                                        <!-- The badge has its own column so a long month name truncates instead of pushing it out of the pill -->
-                                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
-                                            <Label AutomationId="MonthTitleLabel"
-                                                   Text="{Binding MonthName}"
-                                                   FontSize="20"
-                                                   FontAttributes="Bold"
-                                                   LineBreakMode="TailTruncation"
-                                                   MaxLines="1"
-                                                   TextColor="{StaticResource MonthNavAccent}"
-                                                   VerticalOptions="Center" />
-                                            <Border Grid.Column="1"
-                                                    AutomationId="MonthPickerBadge"
-                                                    BackgroundColor="{StaticResource MonthNavAccent}"
-                                                    StrokeThickness="0"
-                                                    StrokeShape="RoundRectangle 12"
-                                                    WidthRequest="24"
-                                                    HeightRequest="24"
-                                                    VerticalOptions="Center">
-                                                <Label Text="▾"
-                                                       FontSize="16"
+                                <!-- Arrows step one month, the pill opens the month/year picker -->
+                                <VerticalStackLayout Grid.Row="0" Padding="16,2,16,6" Spacing="2">
+                                    <Grid ColumnDefinitions="44, Auto, 44" ColumnSpacing="6" HorizontalOptions="Center">
+                                        <Button Grid.Column="0"
+                                                AutomationId="PreviousMonthButton"
+                                                Text="‹"
+                                                Style="{StaticResource MonthArrowButton}"
+                                                Command="{Binding GoToPreviousMonthCommand, Source={RelativeSource AncestorType={x:Type vm:MainViewModel}}, x:DataType=vm:MainViewModel}" />
+
+                                        <Border Grid.Column="1"
+                                                AutomationId="MonthTitleButton"
+                                                BackgroundColor="{StaticResource HeaderPill}"
+                                                StrokeThickness="0"
+                                                StrokeShape="RoundRectangle 22"
+                                                Padding="18,8,14,8"
+                                                MinimumHeightRequest="44">
+                                            <Border.GestureRecognizers>
+                                                <TapGestureRecognizer Tapped="OnMonthTitleTapped" />
+                                            </Border.GestureRecognizers>
+                                            <!-- The badge has its own column so a long month name truncates instead of pushing it out of the pill -->
+                                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
+                                                <Label AutomationId="MonthTitleLabel"
+                                                       Text="{Binding MonthName}"
+                                                       FontSize="18"
+                                                       FontAttributes="Bold"
+                                                       LineBreakMode="TailTruncation"
+                                                       MaxLines="1"
                                                        TextColor="White"
-                                                       HorizontalOptions="Center"
                                                        VerticalOptions="Center" />
-                                            </Border>
-                                        </Grid>
-                                    </Border>
+                                                <Grid Grid.Column="1"
+                                                      AutomationId="MonthPickerBadge"
+                                                      WidthRequest="18"
+                                                      HeightRequest="18"
+                                                      VerticalOptions="Center">
+                                                    <Label Text="▾"
+                                                           FontSize="14"
+                                                           TextColor="White"
+                                                           HorizontalOptions="Center"
+                                                           VerticalOptions="Center" />
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
 
-                                    <Button Grid.Column="2"
-                                            AutomationId="NextMonthButton"
-                                            Text="›"
-                                            Style="{StaticResource MonthArrowButton}"
-                                            Command="{Binding GoToNextMonthCommand, Source={RelativeSource AncestorType={x:Type vm:MainViewModel}}, x:DataType=vm:MainViewModel}" />
-                                </Grid>
-
-                                <Label AutomationId="SwipeHintLabel"
-                                       Text="Toque no mês para escolher ou deslize para os lados"
-                                       FontSize="12"
-                                       TextColor="Gray"
-                                       HorizontalTextAlignment="Center"
-                                       IsVisible="{Binding ShowSwipeHint, Source={RelativeSource AncestorType={x:Type vm:MainViewModel}}, x:DataType=vm:MainViewModel}" />
-                            </VerticalStackLayout>
-
-                            <!-- Summary Bar: swipe sideways (or tap the dots) for the paid and received totals -->
-                            <Frame AutomationId="SummaryBar" BackgroundColor="#F0F0F0" CornerRadius="10" Padding="15,12,15,4">
-                                <Frame.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding HideEntryActionsCommand}" />
-                                </Frame.GestureRecognizers>
-                                <controls:SwipePager SelectedIndex="{Binding SummaryPage}" IndicatorColor="{StaticResource MonthNavAccent}">
-                                    <!-- The pager handles its own touches, so it needs its own "tap outside" too -->
-                                    <controls:SwipePager.GestureRecognizers>
-                                        <TapGestureRecognizer Command="{Binding HideEntryActionsCommand}" />
-                                    </controls:SwipePager.GestureRecognizers>
-                                    <Grid AutomationId="SummaryTotalsPage" ColumnDefinitions="*, *, *" ColumnSpacing="8">
-                                        <VerticalStackLayout Grid.Column="0" HorizontalOptions="Center">
-                                            <Label Text="Receitas" FontSize="12" TextColor="Gray"/>
-                                            <Label AutomationId="SummaryIncomeLabel" Text="{Binding TotalIncomes, Converter={x:Static converters:MoneyConverter.Instance}}" TextColor="{StaticResource IncomeAccent}" FontAttributes="Bold"/>
-                                        </VerticalStackLayout>
-                                        <VerticalStackLayout Grid.Column="1" HorizontalOptions="Center">
-                                            <Label Text="Despesas" FontSize="12" TextColor="Gray"/>
-                                            <Label AutomationId="SummaryOutcomeLabel" Text="{Binding TotalOutcomes, Converter={x:Static converters:MoneyConverter.Instance}}" TextColor="{StaticResource OutcomeAccent}" FontAttributes="Bold"/>
-                                        </VerticalStackLayout>
-                                        <VerticalStackLayout Grid.Column="2" HorizontalOptions="Center">
-                                            <Label Text="Balanço" FontSize="12" TextColor="Gray"/>
-                                            <Label AutomationId="SummaryBalanceLabel" Text="{Binding Balance, Converter={x:Static converters:MoneyConverter.Instance}}" FontAttributes="Bold"/>
-                                        </VerticalStackLayout>
+                                        <Button Grid.Column="2"
+                                                AutomationId="NextMonthButton"
+                                                Text="›"
+                                                Style="{StaticResource MonthArrowButton}"
+                                                Command="{Binding GoToNextMonthCommand, Source={RelativeSource AncestorType={x:Type vm:MainViewModel}}, x:DataType=vm:MainViewModel}" />
                                     </Grid>
 
-                                    <HorizontalStackLayout AutomationId="SummaryPaidPage" HorizontalOptions="Center" Spacing="40">
-                                        <VerticalStackLayout>
-                                            <Label Text="Pago" FontSize="12" TextColor="Gray"/>
-                                            <Label AutomationId="SummaryPaidLabel" Text="{Binding PaidOutcomes, Converter={x:Static converters:MoneyConverter.Instance}}" TextColor="{StaticResource PaidAccent}" FontAttributes="Bold"/>
-                                        </VerticalStackLayout>
-                                        <VerticalStackLayout>
-                                            <Label Text="A pagar" FontSize="12" TextColor="Gray"/>
-                                            <Label AutomationId="SummaryToPayLabel" Text="{Binding PendingOutcomes, Converter={x:Static converters:MoneyConverter.Instance}}" TextColor="{StaticResource OutcomeAccent}" FontAttributes="Bold"/>
-                                        </VerticalStackLayout>
-                                    </HorizontalStackLayout>
+                                    <Label AutomationId="SwipeHintLabel"
+                                           Text="Toque no mês para escolher ou deslize para os lados"
+                                           FontSize="12"
+                                           TextColor="{StaticResource BillAccent}"
+                                           HorizontalTextAlignment="Center"
+                                           IsVisible="{Binding ShowSwipeHint, Source={RelativeSource AncestorType={x:Type vm:MainViewModel}}, x:DataType=vm:MainViewModel}" />
+                                </VerticalStackLayout>
 
-                                    <HorizontalStackLayout AutomationId="SummaryReceivedPage" HorizontalOptions="Center" Spacing="40">
-                                        <VerticalStackLayout>
-                                            <Label Text="Recebido" FontSize="12" TextColor="Gray"/>
-                                            <Label AutomationId="SummaryReceivedLabel" Text="{Binding ReceivedIncomes, Converter={x:Static converters:MoneyConverter.Instance}}" TextColor="{StaticResource IncomeAccent}" FontAttributes="Bold"/>
-                                        </VerticalStackLayout>
-                                        <VerticalStackLayout>
-                                            <Label Text="A receber" FontSize="12" TextColor="Gray"/>
-                                            <Label AutomationId="SummaryToReceiveLabel" Text="{Binding PendingIncomes, Converter={x:Static converters:MoneyConverter.Instance}}" FontAttributes="Bold"/>
-                                        </VerticalStackLayout>
-                                    </HorizontalStackLayout>
-                                </controls:SwipePager>
-                            </Frame>
+                                <!-- Summary: swipe sideways (or tap the dots) for the paid and received totals -->
+                                <Border Grid.Row="1"
+                                        Grid.RowSpan="2"
+                                        AutomationId="SummaryBar"
+                                        Style="{StaticResource Card}"
+                                        Margin="14,0"
+                                        Padding="15,12,15,4">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding HideEntryActionsCommand}" />
+                                    </Border.GestureRecognizers>
+                                    <controls:SwipePager SelectedIndex="{Binding SummaryPage}" IndicatorColor="{StaticResource Primary}">
+                                        <!-- The pager handles its own touches, so it needs its own "tap outside" too -->
+                                        <controls:SwipePager.GestureRecognizers>
+                                            <TapGestureRecognizer Command="{Binding HideEntryActionsCommand}" />
+                                        </controls:SwipePager.GestureRecognizers>
+                                        <Grid AutomationId="SummaryTotalsPage" ColumnDefinitions="*, *, *" ColumnSpacing="6">
+                                            <VerticalStackLayout Grid.Column="0">
+                                                <Label Text="Receitas" FontSize="11" TextColor="{StaticResource Muted}" />
+                                                <Label AutomationId="SummaryIncomeLabel" Text="{Binding TotalIncomes, Converter={x:Static converters:MoneyConverter.Instance}}" FontSize="14" TextColor="{StaticResource Income}" FontAttributes="Bold" LineBreakMode="NoWrap" />
+                                            </VerticalStackLayout>
+                                            <VerticalStackLayout Grid.Column="1">
+                                                <Label Text="Despesas" FontSize="11" TextColor="{StaticResource Muted}" />
+                                                <Label AutomationId="SummaryOutcomeLabel" Text="{Binding TotalOutcomes, Converter={x:Static converters:MoneyConverter.Instance}}" FontSize="14" TextColor="{StaticResource Outcome}" FontAttributes="Bold" LineBreakMode="NoWrap" />
+                                            </VerticalStackLayout>
+                                            <VerticalStackLayout Grid.Column="2">
+                                                <Label Text="Balanço" FontSize="11" TextColor="{StaticResource Muted}" />
+                                                <Label AutomationId="SummaryBalanceLabel" Text="{Binding Balance, Converter={x:Static converters:MoneyConverter.Instance}}" FontSize="14" FontAttributes="Bold" LineBreakMode="NoWrap" />
+                                            </VerticalStackLayout>
+                                        </Grid>
 
-                            <!-- Outcomes Section -->
-                            <Border Stroke="{StaticResource OutcomeAccent}"
-                                    StrokeThickness="1"
-                                    StrokeShape="RoundRectangle 12"
-                                    BackgroundColor="White"
-                                    Padding="0"
-                                    Margin="0,10,0,0">
+                                        <Grid AutomationId="SummaryPaidPage" ColumnDefinitions="*, *" ColumnSpacing="6">
+                                            <VerticalStackLayout Grid.Column="0">
+                                                <Label Text="Pago" FontSize="11" TextColor="{StaticResource Muted}" />
+                                                <Label AutomationId="SummaryPaidLabel" Text="{Binding PaidOutcomes, Converter={x:Static converters:MoneyConverter.Instance}}" FontSize="14" TextColor="{StaticResource Paid}" FontAttributes="Bold" />
+                                            </VerticalStackLayout>
+                                            <VerticalStackLayout Grid.Column="1">
+                                                <Label Text="A pagar" FontSize="11" TextColor="{StaticResource Muted}" />
+                                                <Label AutomationId="SummaryToPayLabel" Text="{Binding PendingOutcomes, Converter={x:Static converters:MoneyConverter.Instance}}" FontSize="14" TextColor="{StaticResource Outcome}" FontAttributes="Bold" />
+                                            </VerticalStackLayout>
+                                        </Grid>
+
+                                        <Grid AutomationId="SummaryReceivedPage" ColumnDefinitions="*, *" ColumnSpacing="6">
+                                            <VerticalStackLayout Grid.Column="0">
+                                                <Label Text="Recebido" FontSize="11" TextColor="{StaticResource Muted}" />
+                                                <Label AutomationId="SummaryReceivedLabel" Text="{Binding ReceivedIncomes, Converter={x:Static converters:MoneyConverter.Instance}}" FontSize="14" TextColor="{StaticResource Income}" FontAttributes="Bold" />
+                                            </VerticalStackLayout>
+                                            <VerticalStackLayout Grid.Column="1">
+                                                <Label Text="A receber" FontSize="11" TextColor="{StaticResource Muted}" />
+                                                <Label AutomationId="SummaryToReceiveLabel" Text="{Binding PendingIncomes, Converter={x:Static converters:MoneyConverter.Instance}}" FontSize="14" FontAttributes="Bold" />
+                                            </VerticalStackLayout>
+                                        </Grid>
+                                    </controls:SwipePager>
+                                </Border>
+                            </Grid>
+
+                            <!-- Outcomes -->
+                            <Border Style="{StaticResource Card}" Margin="12,14,12,0">
                                 <VerticalStackLayout>
                                     <Grid AutomationId="OutcomesHeader"
-                                          ColumnDefinitions="Auto, *, Auto, Auto"
-                                          ColumnSpacing="12"
-                                          Padding="0,0,12,0"
+                                          ColumnDefinitions="Auto, *, Auto"
+                                          ColumnSpacing="8"
+                                          Padding="14,11"
                                           BackgroundColor="{StaticResource OutcomeTint}">
                                         <Grid.GestureRecognizers>
                                             <TapGestureRecognizer Command="{Binding ToggleOutcomesCommand}" />
                                         </Grid.GestureRecognizers>
-                                        <BoxView Grid.Column="0"
-                                                 WidthRequest="5"
-                                                 Color="{StaticResource OutcomeAccent}" />
-                                        <VerticalStackLayout Grid.Column="1" Padding="0,10">
-                                            <Label Text="Despesas"
-                                                   FontAttributes="Bold"
-                                                   FontSize="16"
-                                                   TextColor="{StaticResource OutcomeAccent}"/>
+                                        <Label Text="▾" FontSize="12" TextColor="{StaticResource Outcome}" VerticalOptions="Center">
+                                            <Label.Triggers>
+                                                <DataTrigger TargetType="Label" Binding="{Binding IsOutcomesExpanded}" Value="False">
+                                                    <Setter Property="Text" Value="▸" />
+                                                </DataTrigger>
+                                            </Label.Triggers>
+                                        </Label>
+                                        <HorizontalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                            <Label Text="Despesas" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource Outcome}" VerticalOptions="Center" />
+                                            <Label Text=" · " FontSize="11" TextColor="{StaticResource Outcome}" Opacity="0.75" VerticalOptions="Center" />
                                             <Label AutomationId="OutcomeCountLabel"
                                                    Text="{Binding OutcomeCount, StringFormat='{0} lançamento(s)'}"
-                                                   TextColor="Gray"
-                                                   FontSize="11"/>
-                                        </VerticalStackLayout>
+                                                   FontSize="11"
+                                                   TextColor="{StaticResource Outcome}"
+                                                   Opacity="0.75"
+                                                   VerticalOptions="Center" />
+                                        </HorizontalStackLayout>
                                         <Label Grid.Column="2"
                                                AutomationId="OutcomeTotalLabel"
                                                Text="{Binding TotalOutcomes, Converter={x:Static converters:MoneyConverter.Instance}}"
-                                               TextColor="{StaticResource OutcomeAccent}"
+                                               TextColor="{StaticResource Outcome}"
                                                FontAttributes="Bold"
-                                               VerticalOptions="Center"/>
-                                        <controls:ExpandChevron Grid.Column="3"
-                                                                IsExpanded="{Binding IsOutcomesExpanded}"
-                                                                AccentColor="{StaticResource OutcomeAccent}" />
+                                               VerticalOptions="Center" />
                                     </Grid>
 
                                     <VerticalStackLayout IsVisible="{Binding IsOutcomesExpanded}">
-                                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding CreditCardBills}"
-                                                             BindableLayout.ItemTemplate="{StaticResource CreditCardBillTemplate}" />
                                         <CollectionView ItemsSource="{Binding OutcomeEntries}"
                                                         ItemTemplate="{StaticResource EntryRowTemplate}"
                                                         SelectionMode="None" />
+                                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding CreditCardBills}"
+                                                             BindableLayout.ItemTemplate="{StaticResource CreditCardBillTemplate}" />
                                     </VerticalStackLayout>
                                 </VerticalStackLayout>
                             </Border>
 
-                            <!-- Incomes Section -->
-                            <Border Stroke="{StaticResource IncomeAccent}"
-                                    StrokeThickness="1"
-                                    StrokeShape="RoundRectangle 12"
-                                    BackgroundColor="White"
-                                    Padding="0"
-                                    Margin="0,10,0,0">
+                            <!-- Incomes -->
+                            <Border Style="{StaticResource Card}" Margin="12,12,12,0">
                                 <VerticalStackLayout>
                                     <Grid AutomationId="IncomesHeader"
-                                          ColumnDefinitions="Auto, *, Auto, Auto"
-                                          ColumnSpacing="12"
-                                          Padding="0,0,12,0"
+                                          ColumnDefinitions="Auto, *, Auto"
+                                          ColumnSpacing="8"
+                                          Padding="14,11"
                                           BackgroundColor="{StaticResource IncomeTint}">
                                         <Grid.GestureRecognizers>
                                             <TapGestureRecognizer Command="{Binding ToggleIncomesCommand}" />
                                         </Grid.GestureRecognizers>
-                                        <BoxView Grid.Column="0"
-                                                 WidthRequest="5"
-                                                 Color="{StaticResource IncomeAccent}" />
-                                        <VerticalStackLayout Grid.Column="1" Padding="0,10">
-                                            <Label Text="Receitas"
-                                                   FontAttributes="Bold"
-                                                   FontSize="16"
-                                                   TextColor="{StaticResource IncomeAccent}"/>
+                                        <Label Text="▾" FontSize="12" TextColor="{StaticResource Income}" VerticalOptions="Center">
+                                            <Label.Triggers>
+                                                <DataTrigger TargetType="Label" Binding="{Binding IsIncomesExpanded}" Value="False">
+                                                    <Setter Property="Text" Value="▸" />
+                                                </DataTrigger>
+                                            </Label.Triggers>
+                                        </Label>
+                                        <HorizontalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                            <Label Text="Receitas" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource Income}" VerticalOptions="Center" />
+                                            <Label Text=" · " FontSize="11" TextColor="{StaticResource Income}" Opacity="0.75" VerticalOptions="Center" />
                                             <Label AutomationId="IncomeCountLabel"
                                                    Text="{Binding IncomeCount, StringFormat='{0} lançamento(s)'}"
-                                                   TextColor="Gray"
-                                                   FontSize="11"/>
-                                        </VerticalStackLayout>
+                                                   FontSize="11"
+                                                   TextColor="{StaticResource Income}"
+                                                   Opacity="0.75"
+                                                   VerticalOptions="Center" />
+                                        </HorizontalStackLayout>
                                         <Label Grid.Column="2"
                                                AutomationId="IncomeTotalLabel"
                                                Text="{Binding TotalIncomes, Converter={x:Static converters:MoneyConverter.Instance}}"
-                                               TextColor="{StaticResource IncomeAccent}"
+                                               TextColor="{StaticResource Income}"
                                                FontAttributes="Bold"
-                                               VerticalOptions="Center"/>
-                                        <controls:ExpandChevron Grid.Column="3"
-                                                                IsExpanded="{Binding IsIncomesExpanded}"
-                                                                AccentColor="{StaticResource IncomeAccent}" />
+                                               VerticalOptions="Center" />
                                     </Grid>
 
                                     <CollectionView ItemsSource="{Binding IncomeEntries}"
@@ -668,8 +729,20 @@
                                 </VerticalStackLayout>
                             </Border>
 
-                            <!-- Bottom padding so FAB doesn't overlap last item -->
-                            <ContentView HeightRequest="80" />
+                            <!-- A collapsed section only shows its header, so this tells how to bring its entries back -->
+                            <Border AutomationId="CollapsedSectionsHint"
+                                    Style="{StaticResource Card}"
+                                    Margin="12,14,12,0"
+                                    Padding="14,12"
+                                    IsVisible="{Binding CollapsedSectionsHint, Converter={x:Static converters:IsNotNullConverter.Instance}}">
+                                <Label AutomationId="CollapsedSectionsHintLabel"
+                                       Text="{Binding CollapsedSectionsHint}"
+                                       FontSize="12"
+                                       TextColor="{StaticResource Muted}" />
+                            </Border>
+
+                            <!-- Bottom padding so the "+" button doesn't cover the last row -->
+                            <ContentView HeightRequest="96" />
 
                         </VerticalStackLayout>
                     </ScrollView>
@@ -682,6 +755,7 @@
                 FontSize="10"
                 HeightRequest="30"
                 WidthRequest="70"
+                Padding="0"
                 BackgroundColor="#33FF0000"
                 TextColor="Red"
                 HorizontalOptions="Start"
@@ -695,24 +769,17 @@
                 HeightRequest="40"
                 Padding="16,0"
                 CornerRadius="20"
-                BackgroundColor="{StaticResource Secondary}"
-                TextColor="{StaticResource Primary}"
-                BorderColor="{StaticResource Primary}"
-                BorderWidth="1"
+                BackgroundColor="{StaticResource Primary}"
+                TextColor="White"
                 HorizontalOptions="Center"
                 VerticalOptions="End"
-                Margin="0,0,0,28" />
+                Margin="0,0,0,28">
+            <Button.Shadow>
+                <Shadow Radius="12" Opacity="1" Brush="#40000000" Offset="0,4" />
+            </Button.Shadow>
+        </Button>
         <Button AutomationId="AddEntryButton"
-                Text="+"
-                FontSize="24"
-                BackgroundColor="{StaticResource Accent}"
-                TextColor="{StaticResource AccentText}"
-                CornerRadius="28"
-                HeightRequest="56"
-                WidthRequest="56"
-                HorizontalOptions="End"
-                VerticalOptions="End"
-                Margin="20"
+                Style="{StaticResource FabButton}"
                 Clicked="OnAddClicked" />
     </Grid>
 </ContentPage>

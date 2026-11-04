@@ -34,7 +34,7 @@ public sealed class OverBudgetTests : E2ETestBase
         using (new AssertionScope())
         {
             MainPage.EntryAmountText("Mercado E2E").Should().Be(AppFormat.Money(900));
-            MainPage.EntryPartialText("Mercado E2E").Should().BeNull("the struck planned amount replaces the amount paid so far");
+            MainPage.EntryPaidSoFarText("Mercado E2E").Should().BeNull("the struck planned amount replaces the amount paid so far");
             MainPage.IsEntryPaymentProgressVisible("Mercado E2E").Should().BeTrue();
             MainPage.IsEntryPartiallyPaid("Mercado E2E").Should().BeTrue("going over the estimate doesn't settle the month");
             MainPage.SummaryPaidText.Should().Be(AppFormat.Money(900));

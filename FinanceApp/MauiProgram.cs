@@ -29,6 +29,9 @@ public static class MauiProgram
                 handlers.AddHandler<SwipePager, SwipePagerHandler>();
 #endif
             });
+#if ANDROID
+        InputUnderline.Apply();
+#endif
 #if DEBUG
         builder.Logging.AddDebug();
 #endif

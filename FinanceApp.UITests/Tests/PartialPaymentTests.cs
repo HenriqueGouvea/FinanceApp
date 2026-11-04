@@ -42,7 +42,8 @@ public sealed class PartialPaymentTests : E2ETestBase
         popup.NewTotalText.Should().Be(AppFormat.PartialPaymentNewTotal(150));
         popup.EnterPaymentDescription("Feira").Save();
 
-        MainPage.WaitFor(() => MainPage.EntryPartialText("Mercado E2E") == AppFormat.Money(150));
+        MainPage.WaitFor(() => MainPage.EntryPaidSoFarText("Mercado E2E") == AppFormat.Money(150));
+        MainPage.EntryOfPlannedText("Mercado E2E").Should().Be(AppFormat.OfPlanned(800));
         MainPage.IsEntryPartiallyPaid("Mercado E2E").Should().BeTrue();
         MainPage.IsEntryPaymentProgressVisible("Mercado E2E").Should().BeTrue();
 
@@ -50,7 +51,7 @@ public sealed class PartialPaymentTests : E2ETestBase
         popup.ProgressText.Should().Be(AppFormat.PartialPaymentProgress(AppLabels.AlreadySpent, 150, 800));
         popup.EnterAmount(100m).Save();
 
-        MainPage.WaitFor(() => MainPage.EntryPartialText("Mercado E2E") == AppFormat.Money(250));
+        MainPage.WaitFor(() => MainPage.EntryPaidSoFarText("Mercado E2E") == AppFormat.Money(250));
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(250));
         MainPage.SummaryToPayText.Should().Be(AppFormat.Money(550));
 
@@ -66,7 +67,7 @@ public sealed class PartialPaymentTests : E2ETestBase
         MainPage.MarkPaid("Mercado E2E");
 
         MainPage.VisibleEntryStatuses.Should().ContainSingle().Which.Should().Be(AppLabels.Paid);
-        MainPage.EntryPartialText("Mercado E2E").Should().BeNull();
+        MainPage.EntryPaidSoFarText("Mercado E2E").Should().BeNull();
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(800));
         (await GetMonthlyEntryRowsAsync()).Should().ContainSingle().Which.Status.Should().Be(AppFormat.Paid);
     }
@@ -82,8 +83,8 @@ public sealed class PartialPaymentTests : E2ETestBase
         MainPage.WaitFor(() => MainPage.IsEntryPartiallyPaid("Mercado E2E"));
         using (new AssertionScope())
         {
-            MainPage.EntryPartialText("Mercado E2E").Should().Be(AppFormat.Money(250));
-            MainPage.EntryAmountText("Mercado E2E").Should().Be(AppFormat.Money(800));
+            MainPage.EntryPaidSoFarText("Mercado E2E").Should().Be(AppFormat.Money(250));
+            MainPage.EntryOfPlannedText("Mercado E2E").Should().Be(AppFormat.OfPlanned(800));
             MainPage.IsEntryPaid("Mercado E2E").Should().BeFalse();
             MainPage.SummaryPaidText.Should().Be(AppFormat.Money(250));
         }

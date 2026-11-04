@@ -18,10 +18,23 @@ public partial class MonthViewModel : ObservableObject
     bool isLoaded;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CollapsedSectionsHint))]
     bool isOutcomesExpanded = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CollapsedSectionsHint))]
     bool isIncomesExpanded = true;
+
+    /// <summary>
+    /// Tells how to show a collapsed section's entries again, or null while both sections are expanded.
+    /// </summary>
+    public string? CollapsedSectionsHint => (IsOutcomesExpanded, IsIncomesExpanded) switch
+    {
+        (false, false) => "Toque em “Despesas” ou “Receitas” para mostrar os lançamentos de novo.",
+        (false, true) => "Toque em “Despesas” para mostrar os lançamentos de novo.",
+        (true, false) => "Toque em “Receitas” para mostrar os lançamentos de novo.",
+        _ => null
+    };
 
     [ObservableProperty]
     int? revealedEntryId;

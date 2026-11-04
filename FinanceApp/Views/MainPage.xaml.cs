@@ -16,23 +16,37 @@ public partial class MainPage : ContentPage
     private const string AllMonthsOption = "Todos os meses";
 
     private readonly IFinanceService _financeService;
+    private readonly UserProfileViewModel _profileViewModel;
     private bool _isLongPressInProgress;
     private bool _isOpeningEntryPage;
 
-    public MainPage(MainViewModel viewModel, IFinanceService financeService)
+    public MainPage(MainViewModel viewModel, IFinanceService financeService, UserProfileViewModel profileViewModel)
     {
         InitializeComponent();
         BindingContext = viewModel;
         _financeService = financeService;
+        _profileViewModel = profileViewModel;
+        HeaderAvatar.BindingContext = profileViewModel;
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
 
+        _profileViewModel.Load();
         if (BindingContext is MainViewModel viewModel)
             await viewModel.InitializeCommand.ExecuteAsync(null);
     }
+
+    private void OnMonthScrolled(object? sender, ScrolledEventArgs e)
+    {
+        // The carousel keeps neighbour months alive; only the month on screen drives the top bar.
+        if (BindingContext is MainViewModel mainVm && (sender as BindableObject)?.BindingContext == mainVm.SelectedMonth)
+            mainVm.UpdateHeaderCompact(e.ScrollY);
+    }
+
+    private async void OnAvatarTapped(object? sender, TappedEventArgs e) =>
+        await Shell.Current.GoToAsync("//SettingsPage");
 
     private async void OnAddClicked(object sender, EventArgs e)
     {

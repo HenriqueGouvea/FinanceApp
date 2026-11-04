@@ -254,6 +254,32 @@ public class MonthViewModelTests
         _vm.RevealedEntryId.Should().BeNull();
     }
 
+    // --- Collapsed sections hint ---
+
+    [Theory]
+    [InlineData(true, true, null)]
+    [InlineData(false, true, "Toque em “Despesas” para mostrar os lançamentos de novo.")]
+    [InlineData(true, false, "Toque em “Receitas” para mostrar os lançamentos de novo.")]
+    [InlineData(false, false, "Toque em “Despesas” ou “Receitas” para mostrar os lançamentos de novo.")]
+    public void CollapsedSectionsHint_NamesTheCollapsedSections(bool outcomesExpanded, bool incomesExpanded, string? expected)
+    {
+        _vm.IsOutcomesExpanded = outcomesExpanded;
+        _vm.IsIncomesExpanded = incomesExpanded;
+
+        _vm.CollapsedSectionsHint.Should().Be(expected);
+    }
+
+    [Fact]
+    public void ToggleIncomesCommand_RaisesPropertyChangedForCollapsedSectionsHint()
+    {
+        var raised = new List<string?>();
+        _vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        _vm.ToggleIncomesCommand.Execute(null);
+
+        raised.Should().Contain(nameof(MonthViewModel.CollapsedSectionsHint));
+    }
+
     // --- Paid / pending summary ---
 
     [Fact]

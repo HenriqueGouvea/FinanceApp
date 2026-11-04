@@ -6,9 +6,7 @@
                xmlns:converters="clr-namespace:FinanceApp.Converters"
                x:Class="FinanceApp.Views.ProfileEditPopup"
                x:DataType="vm:ProfileEditViewModel">
-    <Border BackgroundColor="White"
-            StrokeShape="RoundRectangle 12"
-            Padding="20"
+    <Border Style="{StaticResource PopupCard}"
             WidthRequest="350"
             VerticalOptions="Center">
         <VerticalStackLayout Spacing="15">
@@ -46,7 +44,7 @@
                         Text="Remover foto"
                         FontSize="13"
                         BackgroundColor="Transparent"
-                        TextColor="#C2414B"
+                        TextColor="{StaticResource Outcome}"
                         IsVisible="{Binding HasPhoto}"
                         Command="{Binding RemovePhotoCommand}" />
             </HorizontalStackLayout>
@@ -54,8 +52,8 @@
             <Entry x:Name="NameEntry" AutomationId="ProfileNameEntry" Placeholder="Como podemos te chamar?" Text="{Binding Name}" MaxLength="40" />
 
             <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,10,0,0">
-                <Button Grid.Column="0" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />
-                <Button Grid.Column="1" AutomationId="SaveProfileButton" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="{StaticResource Primary}" />
+                <Button Grid.Column="0" Text="Cancelar" Clicked="OnCancelClicked" Style="{StaticResource SecondaryButton}" />
+                <Button Grid.Column="1" AutomationId="SaveProfileButton" Text="Salvar" Command="{Binding SaveCommand}" />
             </Grid>
         </VerticalStackLayout>
     </Border>
