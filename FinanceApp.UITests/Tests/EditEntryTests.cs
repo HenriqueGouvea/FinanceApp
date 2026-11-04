@@ -1,6 +1,7 @@
 using FinanceApp.UITests.Infrastructure;
 using FinanceApp.UITests.Pages;
 using FluentAssertions;
+using FluentAssertions.Execution;
 
 namespace FinanceApp.UITests.Tests;
 
@@ -8,29 +9,26 @@ namespace FinanceApp.UITests.Tests;
 [Trait("Category", "E2E")]
 public sealed class EditEntryTests : E2ETestBase
 {
-    public EditEntryTests(AppiumServerFixture server) : base(server)
+    public EditEntryTests(AppiumServerFixture server) : base(server, data => data.AddEntry("Academia E2E", 90m))
     {
-        MainPage.AddEntry("Academia E2E", AppLabels.Recurrent, 90m);
     }
 
     [Fact]
-    public void EditEntry_TapEntry_OpensPrefilledPageWithStructuralFieldsLocked()
+    [Trait("Smoke", "true")]
+    public async Task EditEntry_ChangeDescriptionAndAmount_UpdatesListInEveryMonthAndDatabase()
     {
-        var popup = MainPage.OpenEntry("Academia E2E");
+        var page = MainPage.OpenEntry("Academia E2E");
+        using (new AssertionScope())
+        {
+            page.TitleText.Should().Be(AppLabels.EditEntryTitle);
+            page.DescriptionText.Should().Be("Academia E2E");
+            page.AmountText.Should().Be(AppFormat.Money(90));
+            page.RecurrenceText.Should().Be(AppLabels.Recurrent);
+            page.IsRecurrenceEnabled.Should().BeFalse("recurrence is a structural field");
+            page.IsEntryTypeEnabled.Should().BeFalse("entry type is a structural field");
+        }
 
-        popup.TitleText.Should().Be(AppLabels.EditEntryTitle);
-        popup.DescriptionText.Should().Be("Academia E2E");
-        popup.AmountText.Should().Be(AppFormat.Money(90));
-        popup.RecurrenceText.Should().Be(AppLabels.Recurrent);
-        popup.IsRecurrenceEnabled.Should().BeFalse("recurrence is a structural field");
-        popup.IsEntryTypeEnabled.Should().BeFalse("entry type is a structural field");
-    }
-
-    [Fact]
-    public async Task EditEntry_ChangeDescriptionAndAmount_UpdatesListAndDatabase()
-    {
-        MainPage.OpenEntry("Academia E2E")
-            .EnterDescription("Academia Premium E2E")
+        page.EnterDescription("Academia Premium E2E")
             .EnterAmount(150)
             .Save();
 
@@ -49,7 +47,7 @@ public sealed class EditEntryTests : E2ETestBase
     }
 
     [Fact]
-    public async Task EditEntry_BackButton_DiscardsChanges()
+    public async Task EditEntry_BackButtonOrSystemBack_DiscardsChanges()
     {
         MainPage.OpenEntry("Academia E2E")
             .EnterDescription("Academia Alterada E2E")
@@ -58,22 +56,16 @@ public sealed class EditEntryTests : E2ETestBase
 
         MainPage.WaitForEntry("Academia E2E");
         MainPage.IsEntryVisible("Academia Alterada E2E").Should().BeFalse();
-        MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(90));
 
-        var row = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
-        row.Description.Should().Be("Academia E2E");
-        row.Amount.Should().Be(90m);
-    }
-
-    [Fact]
-    public async Task EditEntry_SystemBack_DiscardsChanges()
-    {
         MainPage.OpenEntry("Academia E2E")
             .EnterAmount(150)
             .PressSystemBack();
 
         MainPage.WaitForEntry("Academia E2E");
         MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(90));
-        (await GetEntryRowsAsync()).Should().ContainSingle().Which.Amount.Should().Be(90m);
+
+        var row = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
+        row.Description.Should().Be("Academia E2E");
+        row.Amount.Should().Be(90m);
     }
 }

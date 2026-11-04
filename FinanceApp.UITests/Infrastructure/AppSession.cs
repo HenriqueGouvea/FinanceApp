@@ -14,6 +14,8 @@ namespace FinanceApp.UITests.Infrastructure;
 /// </summary>
 public sealed class AppSession : IDisposable
 {
+    private byte[]? _emptyDatabase;
+
     public AndroidDriver Driver { get; }
     public DeviceDatabase Database { get; }
 
@@ -51,13 +53,36 @@ public sealed class AppSession : IDisposable
 
     /// <summary>
     /// Wipes the app's data (which also stops it) and launches it again, as a new session would but without
-    /// the cost of starting one.
+    /// the cost of starting one. When <paramref name="seed"/> is given, the app starts with the default categories
+    /// plus whatever it writes, so the first-run wizard skips itself and the entries page shows up directly.
     /// </summary>
-    public void RestartWithEmptyData()
+    public void RestartWithEmptyData(Action<SQLite.SQLiteConnection>? seed = null)
     {
-        Driver.ExecuteScript("mobile: clearApp", new Dictionary<string, object> { ["appId"] = E2ESettings.AppPackage });
+        if (seed is not null)
+            _emptyDatabase ??= CaptureEmptyDatabase();
+
+        ClearApp();
+        if (seed is not null)
+            Database.Push(_emptyDatabase!, seed);
         Driver.ActivateApp(E2ESettings.AppPackage);
     }
+
+    /// <summary>
+    /// The database a fresh install creates (tables and default categories), taken once per run as the base of
+    /// every seeded test. Seeding before the app starts saves the extra cold start of seeding a running app.
+    /// </summary>
+    private byte[] CaptureEmptyDatabase()
+    {
+        ClearApp();
+        Driver.ActivateApp(E2ESettings.AppPackage);
+        // The wizard only shows once the database is ready.
+        WaitForVisible(AutomationId("SetupStepLabel"), TimeSpan.FromSeconds(60));
+        Driver.TerminateApp(E2ESettings.AppPackage);
+        return Database.Pull();
+    }
+
+    private void ClearApp() =>
+        Driver.ExecuteScript("mobile: clearApp", new Dictionary<string, object> { ["appId"] = E2ESettings.AppPackage });
 
     /// <summary>
     /// Stops the app and launches it again keeping its data, i.e. a cold start (where the PIN lock shows up).
@@ -67,11 +92,6 @@ public sealed class AppSession : IDisposable
         Driver.TerminateApp(E2ESettings.AppPackage);
         Driver.ActivateApp(E2ESettings.AppPackage);
     }
-
-    /// <summary>
-    /// Sends the app to the background (as the home button does) and brings it back once the duration is over.
-    /// </summary>
-    public void SendToBackground(TimeSpan duration) => Driver.BackgroundApp(duration);
 
     /// <summary>
     /// Leaves the app (e.g. after Back closed it), then brings it back without restarting it.
@@ -357,7 +377,19 @@ public sealed class AppSession : IDisposable
 
         try
         {
-            return wait.Until(condition);
+            return wait.Until(d =>
+            {
+                try
+                {
+                    return condition(d);
+                }
+                // While a cold-started app loads its first screen, UiAutomator2 may fail to read the window at all.
+                // That only means "not there yet", so keep polling.
+                catch (UnknownErrorException ex) when (ex.Message.Contains("root AccessibilityNodeInfo"))
+                {
+                    return default!;
+                }
+            });
         }
         catch (WebDriverTimeoutException ex)
         {

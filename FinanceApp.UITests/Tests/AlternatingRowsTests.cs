@@ -1,9 +1,14 @@
 using FinanceApp.UITests.Infrastructure;
 using FinanceApp.UITests.Pages;
 using FluentAssertions;
+using FluentAssertions.Execution;
 
 namespace FinanceApp.UITests.Tests;
 
+/// <summary>
+/// The tints sampled from the rendered rows. Which rows alternate (per section, after deletes) is covered by the
+/// MonthViewModel tests.
+/// </summary>
 [Collection(E2ECollection.Name)]
 [Trait("Category", "E2E")]
 public sealed class AlternatingRowsTests : E2ETestBase
@@ -13,49 +18,27 @@ public sealed class AlternatingRowsTests : E2ETestBase
     private static readonly (byte R, byte G, byte B) OutcomeAlternate = (0xFD, 0xF5, 0xF6);
     private static readonly (byte R, byte G, byte B) IncomeAlternate = (0xF3, 0xFB, 0xF7);
 
-    public AlternatingRowsTests(AppiumServerFixture server) : base(server)
+    public AlternatingRowsTests(AppiumServerFixture server) : base(server, data =>
+    {
+        data.AddEntry("Aluguel E2E", 1000m, AppFormat.OneTime);
+        data.AddEntry("Internet E2E", 100m, AppFormat.OneTime);
+        data.AddEntry("Salário E2E", 5000m, AppFormat.OneTime, isIncome: true);
+        data.AddEntry("Freela E2E", 800m, AppFormat.OneTime, isIncome: true);
+    })
     {
     }
 
     [Fact]
-    public void OutcomeList_ThreeEntries_TintsEveryOtherRowRed()
+    public void EntryLists_TintEveryOtherRowInTheSectionsColor()
     {
-        MainPage.AddEntry("Aluguel E2E", AppLabels.OneTime, 1000m);
-        MainPage.AddEntry("Internet E2E", AppLabels.OneTime, 100m);
-        MainPage.AddEntry("Academia E2E", AppLabels.OneTime, 90m);
+        var outcomes = MainPage.VisibleEntryDescriptions.Where(d => d is "Aluguel E2E" or "Internet E2E").ToList();
 
-        ShouldAlternate(MainPage.VisibleEntryDescriptions, OutcomeAlternate);
+        using (new AssertionScope())
+        {
+            MainPage.EntryRowBackground(outcomes[0]).Should().Be(White);
+            MainPage.EntryRowBackground(outcomes[1]).Should().Be(OutcomeAlternate);
+            MainPage.EntryRowBackground("Salário E2E").Should().Be(White, "the income list restarts the alternation");
+            MainPage.EntryRowBackground("Freela E2E").Should().Be(IncomeAlternate);
+        }
     }
-
-    [Fact]
-    public void IncomeList_TwoEntries_TintsSecondRowGreenAndKeepsOutcomesApart()
-    {
-        MainPage.AddEntry("Aluguel E2E", AppLabels.OneTime, 1000m);
-        MainPage.AddEntry("Salário E2E", AppLabels.OneTime, 5000m, isIncome: true);
-        MainPage.AddEntry("Freela E2E", AppLabels.OneTime, 800m, isIncome: true);
-
-        BackgroundOf("Aluguel E2E").Should().Be(White, "the outcome list restarts the alternation");
-        ShouldAlternate(["Salário E2E", "Freela E2E"], IncomeAlternate);
-    }
-
-    [Fact]
-    public void OutcomeList_FirstEntryDeleted_AlternationFollowsNewOrder()
-    {
-        MainPage.AddEntry("Presente E2E", AppLabels.OneTime, 80m);
-        MainPage.AddEntry("Internet E2E", AppLabels.OneTime, 100m);
-        MainPage.AddEntry("Academia E2E", AppLabels.OneTime, 90m);
-        var first = MainPage.VisibleEntryDescriptions[0];
-
-        MainPage.DeleteEntry(first, AppLabels.Delete).WaitForEntryGone(first);
-
-        ShouldAlternate(MainPage.VisibleEntryDescriptions, OutcomeAlternate);
-    }
-
-    private void ShouldAlternate(IReadOnlyList<string> descriptions, (byte R, byte G, byte B) alternate)
-    {
-        for (var i = 0; i < descriptions.Count; i++)
-            BackgroundOf(descriptions[i]).Should().Be(i % 2 == 1 ? alternate : White, $"\"{descriptions[i]}\" is row {i + 1}");
-    }
-
-    private (byte R, byte G, byte B) BackgroundOf(string description) => MainPage.EntryRowBackground(description);
 }

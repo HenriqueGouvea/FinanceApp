@@ -25,7 +25,6 @@ public class AddEntryPageObject
     private const string PaymentSourcePickerLabelId = "PaymentSourcePickerLabel";
     private const string EstimatedSwitchId = "EstimatedSwitch";
     private const string PartialPaymentSwitchId = "PartialPaymentSwitch";
-    private const string PartialPaymentSwitchLabelId = "PartialPaymentSwitchLabel";
     private const string PaidAmountEntryId = "PaidAmountEntry";
     private const string PaidAmountLabelId = "PaidAmountLabel";
     private const string PaymentsHeaderId = "PaymentsHeaderLabel";
@@ -34,7 +33,6 @@ public class AddEntryPageObject
     private static readonly By PaymentDescription = AppSession.AutomationId("PaymentDescriptionLabel");
     private static readonly By PaymentAmount = AppSession.AutomationId("PaymentAmountLabel");
     private static readonly By DeletePaymentButton = AppSession.AutomationId("DeletePaymentButton");
-    private static readonly By PickerDialogOption = MobileBy.Id("android:id/text1");
     private const string SaveButtonId = "SaveEntryButton";
     private const string CancelButtonId = "CancelEntryButton";
 
@@ -95,14 +93,6 @@ public class AddEntryPageObject
         return this;
     }
 
-    public AddEntryPageObject SelectOutcome()
-    {
-        _session.HideKeyboardIfShown();
-        _session.Tap(SelectOutcomeButton);
-        _session.WaitForGone(SelectOutcomeButton);
-        return this;
-    }
-
     /// <summary>
     /// The MAUI Picker renders as a native dialog on Android, so the option is located by its label.
     /// </summary>
@@ -140,8 +130,6 @@ public class AddEntryPageObject
     }
 
     public bool AllowsPartialPayment => _session.ScrollTo(PartialPaymentSwitchId).GetAttribute("checked") == "true";
-
-    public string PartialPaymentSwitchText => _session.ScrollTo(PartialPaymentSwitchLabelId).Text;
 
     /// <summary>
     /// "Valor estimado" is hidden for outcomes paid with a credit card.
@@ -251,22 +239,11 @@ public class AddEntryPageObject
         return this;
     }
 
-    /// <summary>
-    /// Opens the category picker's native dialog, reads its options and dismisses it without choosing.
-    /// </summary>
-    public IReadOnlyList<string> CategoryOptions() => PickerOptions(CategoryPickerId);
-
-    public IReadOnlyList<string> RecurrenceOptions() => PickerOptions(RecurrencePickerId);
-
-    public string CategoryText => _session.ScrollTo(CategoryPickerId).Text;
-
     public AddEntryPageObject SelectPaymentSource(string sourceName)
     {
         PickOption(PaymentSourcePickerId, sourceName);
         return this;
     }
-
-    public IReadOnlyList<string> PaymentSourceOptions() => PickerOptions(PaymentSourcePickerId);
 
     public string PaymentSourceText => _session.ScrollTo(PaymentSourcePickerId).Text;
 
@@ -370,17 +347,6 @@ public class AddEntryPageObject
         entry.Clear();
         entry.SendKeys(text);
         _session.HideKeyboardIfShown();
-    }
-
-    private IReadOnlyList<string> PickerOptions(string pickerId)
-    {
-        _session.HideKeyboardIfShown();
-        _session.ScrollToAndTap(pickerId);
-        _session.WaitForVisible(PickerDialogOption);
-        var options = _session.VisibleTexts(PickerDialogOption);
-        _session.PressBack();
-        _session.WaitForGone(PickerDialogOption);
-        return options;
     }
 
     private void PickOption(string pickerId, string optionLabel)

@@ -31,12 +31,6 @@ public class MonthPickerPopupObject
 
     public int Year => int.Parse(_session.WaitForVisible(YearLabel).Text);
 
-    public IReadOnlyList<string> MonthLabels => _session.VisibleTexts(MonthOptionLabel);
-
-    public bool IsPreviousYearEnabled => _session.WaitForVisible(PreviousYearButton).Enabled;
-
-    public bool IsNextYearEnabled => _session.WaitForVisible(NextYearButton).Enabled;
-
     public MonthPickerPopupObject ShowYear(int year)
     {
         while (Year != year)
@@ -48,11 +42,6 @@ public class MonthPickerPopupObject
 
         return this;
     }
-
-    /// <summary>
-    /// Enabled state of the month cell in the year currently shown.
-    /// </summary>
-    public bool IsMonthEnabled(DateTime month) => FindMonthOption(month).Enabled;
 
     /// <summary>
     /// Switches to the month's year if needed and taps it; the picker closes on selection.

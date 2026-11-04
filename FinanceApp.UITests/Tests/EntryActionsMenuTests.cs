@@ -8,40 +8,25 @@ namespace FinanceApp.UITests.Tests;
 [Trait("Category", "E2E")]
 public sealed class EntryActionsMenuTests : E2ETestBase
 {
-    public EntryActionsMenuTests(AppiumServerFixture server) : base(server)
+    public EntryActionsMenuTests(AppiumServerFixture server) : base(server, data => data.AddEntry("Farmácia E2E", 45m, AppFormat.OneTime))
     {
-        MainPage.AddEntry("Farmácia E2E", AppLabels.OneTime, 45m);
     }
 
     [Fact]
-    public void LongPress_Entry_RevealsDeleteAction()
+    public void LongPress_Entry_RevealsActionsHiddenByTappingOutsideOrOnTheEntry()
     {
         MainPage.IsDeleteActionRevealed.Should().BeFalse();
 
         MainPage.RevealActions("Farmácia E2E");
-
         MainPage.IsDeleteActionRevealed.Should().BeTrue();
         MainPage.RevealedStatusActionText.Should().Be(AppLabels.MarkPaid);
-    }
-
-    [Fact]
-    public void TapOutside_MenuOpen_HidesDeleteAction()
-    {
-        MainPage.RevealActions("Farmácia E2E");
 
         MainPage.TapSummaryBar();
-
         MainPage.WaitForActionsHidden();
-    }
 
-    [Fact]
-    public void TapEntry_MenuOpen_HidesMenuWithoutOpeningEditPopup()
-    {
         MainPage.RevealActions("Farmácia E2E");
-
         MainPage.TapEntry("Farmácia E2E");
-
         MainPage.WaitForActionsHidden();
-        new AddEntryPageObject(Session).IsOpen.Should().BeFalse();
+        new AddEntryPageObject(Session).IsOpen.Should().BeFalse("tapping the entry only closes the menu");
     }
 }

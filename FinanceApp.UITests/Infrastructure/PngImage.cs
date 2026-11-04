@@ -32,9 +32,6 @@ public sealed class PngImage
         return (_pixels[offset], _pixels[offset + 1], _pixels[offset + 2]);
     }
 
-    public IEnumerable<(byte R, byte G, byte B)> Pixels() =>
-        Enumerable.Range(0, Height).SelectMany(y => Enumerable.Range(0, Width).Select(x => GetPixel(x, y)));
-
     public static PngImage Decode(byte[] png)
     {
         int width = 0, height = 0, bytesPerPixel = 0;

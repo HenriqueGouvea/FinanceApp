@@ -8,26 +8,22 @@ namespace FinanceApp.UITests.Tests;
 [Trait("Category", "E2E")]
 public sealed class SectionToggleTests : E2ETestBase
 {
-    public SectionToggleTests(AppiumServerFixture server) : base(server)
+    public SectionToggleTests(AppiumServerFixture server) : base(server, data =>
     {
-        MainPage.AddEntry("Gasolina E2E", AppLabels.Recurrent, 300m);
-        MainPage.AddEntry("Freela E2E", AppLabels.Recurrent, 800m, isIncome: true);
+        data.AddEntry("Gasolina E2E", 300m);
+        data.AddEntry("Freela E2E", 800m, isIncome: true);
+    })
+    {
     }
 
     [Fact]
-    public void TapOutcomesHeader_Expanded_TogglesOnlyOutcomeEntries()
+    public void TapSectionHeaders_TogglesOnlyThatSectionInEveryMonth()
     {
         MainPage.ToggleOutcomes().WaitForEntryGone("Gasolina E2E");
-
         MainPage.IsEntryVisible("Freela E2E").Should().BeTrue();
         MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(1), "the header summary stays visible when collapsed");
-
         MainPage.ToggleOutcomes().WaitForEntry("Gasolina E2E");
-    }
 
-    [Fact]
-    public void TapIncomesHeader_Expanded_CollapsesInEveryMonth()
-    {
         MainPage.ToggleIncomes().WaitForEntryGone("Freela E2E");
 
         MainPage.GoToNextMonth().WaitForEntry("Gasolina E2E");

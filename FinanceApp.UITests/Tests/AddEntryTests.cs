@@ -1,6 +1,7 @@
 using FinanceApp.UITests.Infrastructure;
 using FinanceApp.UITests.Pages;
 using FluentAssertions;
+using FluentAssertions.Execution;
 
 namespace FinanceApp.UITests.Tests;
 
@@ -13,32 +14,37 @@ public sealed class AddEntryTests : E2ETestBase
     }
 
     [Fact]
+    [Trait("Smoke", "true")]
     public async Task AddEntry_OneTimeOutcome_ShowsInCurrentMonthAndPersists()
     {
         MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(0));
 
-        var popup = MainPage.OpenAddEntry();
-        popup.TitleText.Should().Be(AppLabels.NewEntryTitle);
-        popup.IsAmountVisible.Should().BeFalse("the amount field only appears once a recurrence is chosen");
+        var page = MainPage.OpenAddEntry().WaitForDescriptionFocus();
+        page.TitleText.Should().Be(AppLabels.NewEntryTitle);
+        page.IsAmountVisible.Should().BeFalse("the amount field only appears once a recurrence is chosen");
 
-        popup.EnterDescription("Aluguel E2E")
-             .SelectRecurrence(AppLabels.OneTime);
-        popup.IsAmountVisible.Should().BeTrue();
-        popup.IsInstallmentsVisible.Should().BeFalse();
+        page.EnterDescription("Celular E2E")
+            .SelectRecurrence(AppLabels.OneTime);
+        page.IsInstallmentsVisible.Should().BeFalse();
+        page.AmountText.Should().Be(AppFormat.Money(0));
 
-        popup.EnterAmount(1500)
-             .Save();
+        page.EnterAmount(1234.56m);
+        page.AmountText.Should().Be("R$ 1.234,56", "typed digits fill the currency mask from the cents");
+        page.Save();
 
-        MainPage.WaitForEntry("Aluguel E2E");
-        MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(1));
-        MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(1500));
-        MainPage.SummaryOutcomeText.Should().Be(AppFormat.Money(1500));
-        MainPage.SummaryBalanceText.Should().Be(AppFormat.Money(-1500));
-        MainPage.VisibleEntryAmounts.Should().ContainSingle().Which.Should().Be(AppFormat.Money(1500));
+        MainPage.WaitForEntry("Celular E2E");
+        using (new AssertionScope())
+        {
+            MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(1));
+            MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(1234.56m));
+            MainPage.SummaryOutcomeText.Should().Be(AppFormat.Money(1234.56m));
+            MainPage.SummaryBalanceText.Should().Be(AppFormat.Money(-1234.56m));
+            MainPage.VisibleEntryAmounts.Should().ContainSingle().Which.Should().Be(AppFormat.Money(1234.56m));
+        }
 
         var row = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
-        row.Description.Should().Be("Aluguel E2E");
-        row.Amount.Should().Be(1500m);
+        row.Description.Should().Be("Celular E2E");
+        row.Amount.Should().Be(1234.56m);
         row.Recurrence.Should().Be(AppFormat.OneTime);
         row.EntryType.Should().Be(AppFormat.Outcome);
         row.StartDate.Date.Should().Be(AppFormat.CurrentMonth);
@@ -46,76 +52,42 @@ public sealed class AddEntryTests : E2ETestBase
     }
 
     [Fact]
-    public async Task AddEntry_AmountField_MasksTypedDigitsAsCurrency()
-    {
-        var popup = MainPage.OpenAddEntry()
-            .EnterDescription("Celular E2E")
-            .SelectRecurrence(AppLabels.OneTime);
-        popup.AmountText.Should().Be(AppFormat.Money(0));
-
-        popup.EnterAmount(1234.56m);
-        popup.AmountText.Should().Be(AppFormat.Money(1234.56m)).And.Be("R$ 1.234,56");
-        popup.Save();
-
-        MainPage.WaitForEntry("Celular E2E");
-        MainPage.VisibleEntryAmounts.Should().ContainSingle().Which.Should().Be("R$ 1.234,56");
-        MainPage.OutcomeTotalText.Should().Be("R$ 1.234,56");
-        MainPage.SummaryBalanceText.Should().Be("-R$ 1.234,56");
-
-        (await GetEntryRowsAsync()).Should().ContainSingle().Which.Amount.Should().Be(1234.56m);
-    }
-
-    [Fact]
-    public void AddEntry_RecurrencePicker_ExplainsRecurrentOption()
-    {
-        var popup = MainPage.OpenAddEntry();
-
-        popup.RecurrenceOptions().Should().Equal(AppLabels.OneTime, "Todo mês (recorrente)", AppLabels.Installments);
-    }
-
-    [Fact]
-    public async Task AddEntry_Income_ShowsInIncomeSectionAndUpdatesBalance()
+    public async Task AddEntry_RecurrentIncome_ShowsInIncomeSectionFromStartMonthOnwards()
     {
         MainPage.AddEntry("Salário E2E", AppLabels.Recurrent, 5000m, isIncome: true);
 
-        MainPage.IncomeCountText.Should().Be(AppFormat.EntryCount(1));
-        MainPage.IncomeTotalText.Should().Be(AppFormat.Money(5000));
-        MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(0));
-        MainPage.SummaryIncomeText.Should().Be(AppFormat.Money(5000));
-        MainPage.SummaryBalanceText.Should().Be(AppFormat.Money(5000));
+        using (new AssertionScope())
+        {
+            MainPage.IncomeCountText.Should().Be(AppFormat.EntryCount(1));
+            MainPage.IncomeTotalText.Should().Be(AppFormat.Money(5000));
+            MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(0));
+            MainPage.SummaryIncomeText.Should().Be(AppFormat.Money(5000));
+            MainPage.SummaryBalanceText.Should().Be(AppFormat.Money(5000));
+        }
+
+        MainPage.GoToNextMonth().WaitForEntry("Salário E2E");
+        MainPage.GoToPreviousMonth().GoToPreviousMonth();
+        MainPage.IsEntryVisible("Salário E2E").Should().BeFalse("a recurrent entry starts in the month it was created");
 
         var row = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
         row.EntryType.Should().Be(AppFormat.Income);
-        row.Recurrence.Should().Be(AppFormat.Recurrent);
-    }
-
-    [Fact]
-    public async Task AddEntry_Recurrent_AppearsFromStartMonthOnwards()
-    {
-        MainPage.AddEntry("Internet E2E", AppLabels.Recurrent, 120m);
-
-        MainPage.GoToNextMonth().WaitForEntry("Internet E2E");
-        MainPage.GoToNextMonth().WaitForEntry("Internet E2E");
-        MainPage.GoToPreviousMonth().GoToPreviousMonth().GoToPreviousMonth();
-        MainPage.IsEntryVisible("Internet E2E").Should().BeFalse("a recurrent entry starts in the month it was created");
-
-        var row = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
         row.Recurrence.Should().Be(AppFormat.Recurrent);
         row.TotalInstallments.Should().BeNull();
         (await GetMonthlyEntryRowsAsync()).Should().BeEmpty("projections are virtual until the user acts on a month");
     }
 
     [Fact]
+    [Trait("Smoke", "true")]
     public async Task AddEntry_Installments_ShowsInstallmentLabelForExactlyNMonths()
     {
-        var popup = MainPage.OpenAddEntry()
+        var page = MainPage.OpenAddEntry()
             .EnterDescription("Notebook E2E")
             .SelectRecurrence(AppLabels.Installments);
-        popup.IsInstallmentsVisible.Should().BeTrue();
+        page.IsInstallmentsVisible.Should().BeTrue();
 
-        popup.EnterInstallments("3").EnterAmount(100);
-        popup.InstallmentsTotalText.Should().Be($"Total: {AppFormat.Money(300)}");
-        popup.Save();
+        page.EnterInstallments("3").EnterAmount(100);
+        page.InstallmentsTotalText.Should().Be($"Total: {AppFormat.Money(300)}");
+        page.Save();
 
         MainPage.WaitForEntry("Notebook E2E");
         MainPage.VisibleInstallmentLabels.Should().ContainSingle().Which.Should().Be($"1/3 · Total {AppFormat.Money(300)}");
@@ -135,85 +107,52 @@ public sealed class AddEntryTests : E2ETestBase
     }
 
     [Fact]
-    public async Task AddEntry_WithCategory_ShowsCategoryChipAndLinksCategory()
+    public async Task AddEntry_CancelBackButtonOrSystemBack_DiscardsAndReturnsToMonth()
     {
-        MainPage.AddEntry("Supermercado E2E", AppLabels.OneTime, 350m, category: "Mercado");
+        var month = AppFormat.CurrentMonth.AddMonths(1);
+        MainPage.GoToNextMonth();
 
-        MainPage.VisibleEntryCategories.Should().ContainSingle().Which.Should().Be("Mercado");
-
-        var category = (await GetCategoryRowsAsync()).Single(c => c.Name == "Mercado");
-        var row = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
-        row.CategoryId.Should().Be(category.Id);
-    }
-
-    [Fact]
-    public async Task AddEntry_Cancelled_DoesNotPersist()
-    {
-        var popup = MainPage.OpenAddEntry()
+        MainPage.OpenAddEntry()
             .EnterDescription("Descartado E2E")
             .SelectRecurrence(AppLabels.OneTime)
-            .EnterAmount(10);
+            .EnterAmount(10)
+            .Cancel();
+        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(month));
 
-        popup.Cancel();
+        var page = MainPage.OpenAddEntry()
+            .EnterDescription("Descartado E2E")
+            .SelectRecurrence(AppLabels.Recurrent)
+            .EnterAmount(10)
+            .ScrollToEnd();
+        page.IsBackButtonVisible.Should().BeTrue("the header stays on screen while the form scrolls");
+        page.GoBack();
+        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(month));
 
+        MainPage.OpenAddEntry()
+            .EnterDescription("Descartado E2E")
+            .SelectRecurrence(AppLabels.OneTime)
+            .EnterAmount(10)
+            .PressSystemBack();
+
+        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(month));
         MainPage.IsEntryVisible("Descartado E2E").Should().BeFalse();
         MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(0));
         (await GetEntryRowsAsync()).Should().BeEmpty();
     }
 
     [Fact]
-    public void AddEntry_OpenPage_FocusesDescriptionWithoutTapping()
-    {
-        var page = MainPage.OpenAddEntry().WaitForDescriptionFocus();
-
-        page.TitleText.Should().Be(AppLabels.NewEntryTitle);
-    }
-
-    [Fact]
-    public async Task AddEntry_BackButtonAfterScrollingToEnd_DiscardsAndReturnsToMonth()
+    public async Task AddEntry_SavedFromAnotherMonth_StartsAndStaysInThatMonth()
     {
         var month = AppFormat.CurrentMonth.AddMonths(1);
         MainPage.GoToNextMonth();
 
-        var page = MainPage.OpenAddEntry()
-            .EnterDescription("Voltar E2E")
-            .SelectRecurrence(AppLabels.Recurrent)
-            .EnterAmount(10)
-            .ScrollToEnd();
-
-        page.IsBackButtonVisible.Should().BeTrue("the header stays on screen while the form scrolls");
-        page.GoBack();
-
-        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(month));
-        MainPage.IsEntryVisible("Voltar E2E").Should().BeFalse();
-        MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(0));
-        (await GetEntryRowsAsync()).Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task AddEntry_SystemBack_DiscardsAndReturnsToMonth()
-    {
-        MainPage.OpenAddEntry()
-            .EnterDescription("Voltar Android E2E")
-            .SelectRecurrence(AppLabels.OneTime)
-            .EnterAmount(10)
-            .PressSystemBack();
-
-        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth));
-        MainPage.IsEntryVisible("Voltar Android E2E").Should().BeFalse();
-        (await GetEntryRowsAsync()).Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task AddEntry_SavedFromAnotherMonth_ReturnsToThatMonthWithTheEntry()
-    {
-        var month = AppFormat.CurrentMonth.AddMonths(1);
-        MainPage.GoToNextMonth();
-
-        MainPage.AddEntry("Mês seguinte E2E", AppLabels.OneTime, 40m);
+        MainPage.AddEntry("Viagem E2E", AppLabels.OneTime, 40m);
 
         MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(month));
         MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(40));
+        MainPage.GoToPreviousMonth();
+        MainPage.IsEntryVisible("Viagem E2E").Should().BeFalse();
+
         var row = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
         row.StartDate.Date.Should().Be(month);
     }

@@ -13,7 +13,6 @@ public class PinPageObject
     private static readonly By ErrorLabel = AppSession.AutomationId("PinErrorLabel");
     private static readonly By CancelButton = AppSession.AutomationId("PinCancelButton");
     private static readonly By ForgotPinButton = AppSession.AutomationId("ForgotPinButton");
-    private static readonly By DeleteKey = AppSession.AutomationId("PinDeleteKey");
 
     private readonly AppSession _session;
 
@@ -39,8 +38,6 @@ public class PinPageObject
 
     public bool IsCancelVisible => _session.IsVisible(CancelButton);
 
-    public bool IsForgotPinVisible => _session.IsVisible(ForgotPinButton);
-
     public PinPageObject WaitForTitle(string title)
     {
         _session.WaitForText(TitleLabel, title);
@@ -60,12 +57,6 @@ public class PinPageObject
     {
         foreach (var digit in digits)
             _session.Tap(AppSession.AutomationId($"PinKey{digit}"));
-        return this;
-    }
-
-    public PinPageObject DeleteDigit()
-    {
-        _session.Tap(DeleteKey);
         return this;
     }
 

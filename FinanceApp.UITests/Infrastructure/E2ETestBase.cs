@@ -5,6 +5,9 @@ namespace FinanceApp.UITests.Infrastructure;
 /// <summary>
 /// Relaunches the app with empty data before each test (xUnit creates one instance per test), skips the first-run
 /// setup wizard and lands on the entries page. Tests of the wizard itself pass <c>skipSetup: false</c> and start on it.
+/// Tests whose arrange is just "this data already exists" pass a <c>seed</c> that writes it straight into the
+/// database (see <see cref="SeedData"/>): creating it through the UI costs ~10 s per entry. Keep the UI for the
+/// behaviour under test.
 /// Derived classes must carry [Collection(E2ECollection.Name)] so they share the Appium server and session.
 /// </summary>
 public abstract class E2ETestBase
@@ -12,11 +15,18 @@ public abstract class E2ETestBase
     protected AppSession Session { get; }
     protected MainPageObject MainPage { get; }
 
-    protected E2ETestBase(AppiumServerFixture server, bool skipSetup = true)
+    protected E2ETestBase(AppiumServerFixture server, Action<SeedData>? seed = null, bool skipSetup = true)
     {
-        Session = server.StartApp();
+        Session = server.StartApp(seed is null ? null : db => seed(new SeedData(db)));
         try
         {
+            if (seed is not null)
+            {
+                // Any entry or payment source makes the wizard skip itself.
+                MainPage = new MainPageObject(Session).WaitUntilLoaded();
+                return;
+            }
+
             var setup = new SetupPageObject(Session).WaitUntilLoaded();
             MainPage = skipSetup ? setup.Skip() : new MainPageObject(Session);
         }

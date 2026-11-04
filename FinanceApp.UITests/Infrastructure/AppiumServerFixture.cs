@@ -48,23 +48,30 @@ public sealed class AppiumServerFixture : IDisposable
     }
 
     /// <summary>
-    /// Returns the app freshly launched with empty data. The first call creates the session, which installs the app
-    /// and wipes its data on its own.
+    /// Returns the app freshly launched with empty data, or with the data <paramref name="seed"/> writes.
+    /// The first call creates the session, which installs the app and wipes its data on its own.
     /// </summary>
-    public AppSession StartApp()
+    public AppSession StartApp(Action<SQLite.SQLiteConnection>? seed = null)
     {
         if (_session is null)
-            return _session = new AppSession(this);
+        {
+            _session = new AppSession(this);
+            if (seed is null)
+                return _session;
+        }
 
         try
         {
-            _session.RestartWithEmptyData();
+            _session.RestartWithEmptyData(seed);
             return _session;
         }
         catch (WebDriverException)
         {
             DiscardSession();
-            return _session = new AppSession(this);
+            _session = new AppSession(this);
+            if (seed is not null)
+                _session.RestartWithEmptyData(seed);
+            return _session;
         }
     }
 

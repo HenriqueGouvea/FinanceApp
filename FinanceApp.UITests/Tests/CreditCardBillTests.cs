@@ -1,9 +1,15 @@
 using FinanceApp.UITests.Infrastructure;
 using FinanceApp.UITests.Pages;
 using FluentAssertions;
+using FluentAssertions.Execution;
 
 namespace FinanceApp.UITests.Tests;
 
+/// <summary>
+/// Setting up a card's bill, buying with the card, the bill row, paying it and the available limit. Which entries a
+/// bill groups, its status, due date and limit rules are covered by the FinanceService, PaymentSourceService,
+/// MonthViewModel, CreditCardBill and AddEntryViewModel tests.
+/// </summary>
 [Collection(E2ECollection.Name)]
 [Trait("Category", "E2E")]
 public sealed class CreditCardBillTests : E2ETestBase
@@ -19,31 +25,28 @@ public sealed class CreditCardBillTests : E2ETestBase
     private static readonly DateTime BillDueDate =
         new(AppFormat.CurrentMonth.Year, AppFormat.CurrentMonth.Month, BillDueDay);
 
-    public CreditCardBillTests(AppiumServerFixture server) : base(server)
+    public CreditCardBillTests(AppiumServerFixture server) : base(server, data =>
     {
-    }
-
-    // --- Card setup ---
-
-    [Theory]
-    [InlineData(AppFormat.BankAccount, false)]
-    [InlineData(AppFormat.CreditCard, true)]
-    [InlineData(AppFormat.MealVoucher, false)]
-    public void PaymentSourcePopup_BillFields_OnlyShowForCreditCards(int type, bool expected)
+        var account = data.AddPaymentSource(Account, AppFormat.BankAccount, 2500m);
+        var card = data.AddPaymentSource(Card, AppFormat.CreditCard, 5000m, BillDueDay, account);
+        data.AddEntry(Netflix, 55.9m, paymentSourceId: card);
+        data.AddEntry(Market, 600m, AppFormat.OneTime, paymentSourceId: card);
+        data.AddEntry(Rent, 1500m, paymentSourceId: account);
+    })
     {
-        MainPage.OpenPaymentSources().AreBillFieldsVisibleFor(type).Should().Be(expected);
     }
 
     [Fact]
     public async Task AddCreditCard_WithBillDueDayAndAccount_Persists()
     {
         MainPage.OpenPaymentSources()
-            .AddPaymentSource(Account, AppFormat.BankAccount, 2500m)
-            .AddCreditCard(Card, 5000m, BillDueDay, Account);
+            .AddPaymentSource("Inter E2E", AppFormat.BankAccount, 100m)
+            .AddCreditCard("Visa E2E", 3000m, BillDueDay, "Inter E2E");
 
         var sources = await GetPaymentSourceRowsAsync();
-        var account = sources.Single(s => s.Name == Account);
-        var card = sources.Single(s => s.Name == Card);
+        var account = sources.Single(s => s.Name == "Inter E2E");
+        var card = sources.Single(s => s.Name == "Visa E2E");
+        card.Type.Should().Be(AppFormat.CreditCard);
         card.BillDueDay.Should().Be(BillDueDay);
         card.BillPaymentSourceId.Should().Be(account.Id);
         account.BillDueDay.Should().BeNull();
@@ -51,118 +54,80 @@ public sealed class CreditCardBillTests : E2ETestBase
     }
 
     [Fact]
-    public void BillPaymentAccount_OffersOnlyBankAccounts()
+    public async Task EntryPage_OutcomeOnCreditCard_FallsDueWithTheBillAndHidesEstimatedAndPartialPayment()
     {
-        var sources = MainPage.OpenPaymentSources()
-            .AddPaymentSource(Account, AppFormat.BankAccount, 2500m)
-            .AddPaymentSource("Alelo E2E", AppFormat.MealVoucher, 600m)
-            .AddPaymentSource("Visa E2E", AppFormat.CreditCard, 3000m)
-            .AddCreditCard(Card, 5000m);
+        var page = MainPage.OpenAddEntry()
+            .EnterDescription("Spotify E2E")
+            .SelectRecurrence(AppLabels.Recurrent)
+            .EnterAmount(21.9m)
+            .SelectDueDay(25)
+            .SetEstimated(true)
+            .SetAllowsPartialPayment(true)
+            .SelectPaymentSource(Card);
 
-        sources.BillPaymentAccountOptions(Card).Should().Equal(Account);
+        using (new AssertionScope())
+        {
+            page.IsDueDayPickerVisible.Should().BeFalse();
+            page.CreditCardBillDueHintText.Should().Be(AppLabels.CreditCardBillDueHintFor(BillDueDay));
+            page.IsEstimatedSwitchVisible.Should().BeFalse();
+            page.IsPartialPaymentSwitchVisible.Should().BeFalse();
+        }
+
+        page.SelectPaymentSource(Account);
+        using (new AssertionScope())
+        {
+            page.IsDueDayPickerVisible.Should().BeTrue();
+            page.DueDayText.Should().Be(AppLabels.DueDay(25), "switching back keeps the day picked before");
+            page.IsEstimatedSwitchVisible.Should().BeTrue();
+            page.IsPartialPaymentSwitchVisible.Should().BeTrue();
+        }
+
+        page.SelectPaymentSource(Card).Save();
+        MainPage.WaitFor(() => MainPage.BillCountText(Card) == AppFormat.EntryCount(3));
+
+        var entry = (await GetEntryRowsAsync()).Single(e => e.Description == "Spotify E2E");
+        entry.DueDay.Should().BeNull("the entry falls due with the bill");
+        entry.IsEstimated.Should().BeFalse("a credit card purchase has a known amount");
+        entry.AllowsPartialPayment.Should().BeFalse("a credit card purchase is paid with the bill");
     }
 
     [Fact]
-    public void BillPaymentAccount_NoBankAccount_ExplainsHowToAddOne()
+    public void Bill_CardOutcomes_GroupedWithTotalDueDateAndAccountAndCollapsible()
     {
-        var sources = MainPage.OpenPaymentSources().AddCreditCard(Card, 5000m);
-
-        sources.BillPaymentAccountOptions(Card).Should().BeEmpty();
-    }
-
-    // --- Bill row ---
-
-    [Fact]
-    public void AddOutcomesOnCreditCard_GroupedUnderBillWithTotalDueDateAndAccount()
-    {
-        AddAccountAndCard(BillDueDay, Account);
-        MainPage
-            .AddEntry(Netflix, AppLabels.Recurrent, 55.9m, paymentSource: Card)
-            .AddEntry(Market, AppLabels.Recurrent, 600m, paymentSource: Card)
-            .AddEntry(Rent, AppLabels.Recurrent, 1500m, paymentSource: Account);
-
-        MainPage.VisibleBillNames.Should().Equal(AppLabels.BillName(Card));
-        MainPage.BillAmountText(Card).Should().Be(AppFormat.Money(655.9m));
-        MainPage.BillCountText(Card).Should().Be(AppFormat.EntryCount(2));
-        MainPage.BillDueDateText(Card).Should().Be(AppFormat.DueDate(BillDueDate));
-        MainPage.BillAccountText(Card).Should().Be(AppLabels.BillAccount(Account));
-        MainPage.BillEntryDescriptions(Card).Should().Equal(Netflix, Market);
-        MainPage.EntryDueDateText(Netflix).Should().BeNull("entries on a bill fall due with it, so only the bill shows the date");
-
-        MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(2155.9m), "the bill groups entries that are already counted");
-        MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(3));
-        MainPage.SummaryOutcomeText.Should().Be(AppFormat.Money(2155.9m));
-    }
-
-    [Fact]
-    public void Bill_CardWithoutDueDayOrAccount_ShowsNeither()
-    {
-        MainPage.OpenPaymentSources().AddCreditCard(Card, 5000m).GoToEntries();
-        MainPage.AddEntry(Netflix, AppLabels.Recurrent, 55.9m, paymentSource: Card);
-
-        MainPage.BillDueDateText(Card).Should().BeNull();
-        MainPage.BillAccountText(Card).Should().BeNull();
-    }
-
-    [Fact]
-    public void IncomeReceivedOnCreditCard_IsNotOnTheBill()
-    {
-        AddAccountAndCard(BillDueDay, Account);
-        MainPage.AddEntry("Estorno E2E", AppLabels.Recurrent, 30m, isIncome: true, paymentSource: Card);
-
-        MainPage.VisibleBillNames.Should().BeEmpty();
-    }
-
-    [Fact]
-    public void TapBill_CollapsesAndExpandsItsEntries()
-    {
-        AddAccountAndCard(BillDueDay, Account);
-        MainPage.AddEntry(Netflix, AppLabels.Recurrent, 55.9m, paymentSource: Card);
+        using (new AssertionScope())
+        {
+            MainPage.VisibleBillNames.Should().Equal(AppLabels.BillName(Card));
+            MainPage.BillAmountText(Card).Should().Be(AppFormat.Money(655.9m));
+            MainPage.BillCountText(Card).Should().Be(AppFormat.EntryCount(2));
+            MainPage.BillDueDateText(Card).Should().Be(AppFormat.DueDate(BillDueDate));
+            MainPage.BillAccountText(Card).Should().Be(AppLabels.BillAccount(Account));
+            MainPage.BillEntryDescriptions(Card).Should().Equal(Netflix, Market);
+            MainPage.EntryDueDateText(Netflix).Should().BeNull("entries on a bill fall due with it, so only the bill shows the date");
+            MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(2155.9m), "the bill groups entries that are already counted");
+            MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(3));
+        }
 
         MainPage.ToggleBill(Card);
         MainPage.BillEntryDescriptions(Card).Should().BeEmpty();
         MainPage.IsEntryVisible(Netflix).Should().BeFalse();
-        MainPage.BillAmountText(Card).Should().Be(AppFormat.Money(55.9m));
+        MainPage.BillAmountText(Card).Should().Be(AppFormat.Money(655.9m));
 
         MainPage.ToggleBill(Card);
-        MainPage.BillEntryDescriptions(Card).Should().Equal(Netflix);
+        MainPage.BillEntryDescriptions(Card).Should().Equal(Netflix, Market);
     }
 
     [Fact]
-    public void Bill_RecurrentEntries_ShowsInEveryMonthWithThatMonthsDueDate()
+    [Trait("Smoke", "true")]
+    public async Task PayBill_ThenMarkPending_PaysAndResetsEveryEntryOnItOnlyThatMonth()
     {
-        AddAccountAndCard(BillDueDay, Account);
-        MainPage.AddEntry(Netflix, AppLabels.Recurrent, 55.9m, paymentSource: Card);
-
-        MainPage.GoToNextMonth().WaitForBill(Card);
-
-        MainPage.BillAmountText(Card).Should().Be(AppFormat.Money(55.9m));
-        MainPage.BillDueDateText(Card).Should().Be(AppFormat.DueDate(BillDueDate.AddMonths(1)));
-    }
-
-    // --- Paying the bill ---
-
-    [Fact]
-    public async Task PayBill_PaysEveryEntryOnItOnlyThatMonthAndPersists()
-    {
-        AddAccountAndCard(BillDueDay, Account);
-        MainPage
-            .AddEntry(Netflix, AppLabels.Recurrent, 55.9m, paymentSource: Card)
-            .AddEntry(Market, AppLabels.Recurrent, 600m, paymentSource: Card)
-            // Collapsed, so the account's entry listed after the bill stays on screen on small devices (CI's 320×640).
-            .ToggleBill(Card)
-            .AddEntry(Rent, AppLabels.Recurrent, 1500m, paymentSource: Account);
-
+        // Collapsed, so the account's entry listed after the bill stays on screen on small devices (CI's 320×640).
+        MainPage.ToggleBill(Card);
         MainPage.RevealBillActions(Card);
         MainPage.RevealedBillActionText.Should().Be(AppLabels.MarkBillPaid);
         MainPage.PayBill(Card);
 
         MainPage.WaitFor(() => MainPage.IsBillPaid(Card));
         MainPage.IsEntryPaid(Rent).Should().BeFalse("only the card's entries are on its bill");
-        MainPage.ToggleBill(Card);
-        MainPage.IsEntryPaid(Netflix).Should().BeTrue();
-        MainPage.IsEntryPaid(Market).Should().BeTrue();
-        MainPage.SwipeSummary("left").WaitForSummaryPage(SummaryPage.Paid);
         MainPage.SummaryPaidText.Should().Be(AppFormat.Money(655.9m));
         MainPage.SummaryToPayText.Should().Be(AppFormat.Money(1500m));
 
@@ -173,147 +138,18 @@ public sealed class CreditCardBillTests : E2ETestBase
         records.Should().OnlyContain(r =>
             r.Status == AppFormat.Paid && r.Year == AppFormat.CurrentMonth.Year && r.Month == AppFormat.CurrentMonth.Month);
 
-        MainPage.GoToNextMonth().WaitForBill(Card);
-        MainPage.IsBillPaid(Card).Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task MarkBillPending_ResetsEveryEntryOnIt()
-    {
-        AddAccountAndCard(BillDueDay, Account);
-        MainPage
-            .AddEntry(Netflix, AppLabels.Recurrent, 55.9m, paymentSource: Card)
-            .AddEntry(Market, AppLabels.Recurrent, 600m, paymentSource: Card)
-            .PayBill(Card);
-
         MainPage.RevealBillActions(Card);
         MainPage.RevealedBillActionText.Should().Be(AppLabels.MarkPending);
         MainPage.MarkBillPending(Card);
 
-        MainPage.IsEntryPaid(Netflix).Should().BeFalse();
-        MainPage.IsEntryPaid(Market).Should().BeFalse();
+        MainPage.WaitFor(() => !MainPage.IsBillPaid(Card));
+        MainPage.SummaryPaidText.Should().Be(AppFormat.Money(0));
         (await GetMonthlyEntryRowsAsync()).Should().OnlyContain(r => r.Status == AppFormat.Pending);
     }
 
     [Fact]
-    public void PayOneEntryOnBill_BillShowsPartiallyPaidUntilEveryEntryIsPaid()
-    {
-        AddAccountAndCard(BillDueDay, Account);
-        MainPage
-            .AddEntry(Netflix, AppLabels.Recurrent, 55.9m, paymentSource: Card)
-            .AddEntry(Market, AppLabels.Recurrent, 600m, paymentSource: Card)
-            .MarkPaid(Netflix);
-
-        MainPage.WaitFor(() => MainPage.IsBillPartiallyPaid(Card));
-        MainPage.BillPaidText(Card).Should().Be(AppFormat.Money(55.9m));
-        MainPage.IsBillPaid(Card).Should().BeFalse();
-
-        MainPage.MarkPaid(Market);
-
-        MainPage.WaitFor(() => MainPage.IsBillPaid(Card));
-        MainPage.BillPaidText(Card).Should().BeNull();
-    }
-
-    // --- Entry page ---
-
-    [Fact]
-    public async Task EntryPage_OutcomeOnCreditCard_FallsDueWithTheBillInsteadOfAPicker()
-    {
-        AddAccountAndCard(BillDueDay, Account);
-
-        var entryPage = MainPage.OpenAddEntry()
-            .EnterDescription(Netflix)
-            .SelectRecurrence(AppLabels.Recurrent)
-            .EnterAmount(55.9m)
-            .SelectDueDay(25)
-            .SelectPaymentSource(Card);
-
-        entryPage.IsDueDayPickerVisible.Should().BeFalse();
-        entryPage.CreditCardBillDueHintText.Should().Be(AppLabels.CreditCardBillDueHintFor(BillDueDay));
-
-        entryPage.SelectPaymentSource(Account);
-        entryPage.IsDueDayPickerVisible.Should().BeTrue();
-        entryPage.DueDayText.Should().Be(AppLabels.DueDay(25), "switching back keeps the day picked before");
-
-        entryPage.SelectPaymentSource(Card).Save();
-        MainPage.WaitForBill(Card);
-
-        (await GetEntryRowsAsync()).Single().DueDay.Should().BeNull("the entry falls due with the bill");
-    }
-
-    [Fact]
-    public void EntryPage_CardWithoutBillDueDay_HintOmitsTheDay()
-    {
-        MainPage.OpenPaymentSources().AddCreditCard(Card, 5000m).GoToEntries();
-
-        var entryPage = MainPage.OpenAddEntry().EnterDescription(Netflix).SelectPaymentSource(Card);
-
-        entryPage.CreditCardBillDueHintText.Should().Be(AppLabels.CreditCardBillDueHint);
-    }
-
-    [Fact]
-    public void EntryPage_PaymentSourceComesBeforeTheDueDate()
-    {
-        MainPage.OpenAddEntry()
-            .EnterDescription(Netflix)
-            .SelectRecurrence(AppLabels.Recurrent)
-            .IsPaymentSourceAboveDueDate.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task EntryPage_OutcomeOnCreditCard_HidesEstimatedAndPartialPayment()
-    {
-        AddAccountAndCard(BillDueDay, Account);
-
-        var entryPage = MainPage.OpenAddEntry()
-            .EnterDescription(Market)
-            .SelectRecurrence(AppLabels.Recurrent)
-            .EnterAmount(600m)
-            .SetEstimated(true)
-            .SetAllowsPartialPayment(true)
-            .SelectPaymentSource(Card);
-
-        entryPage.IsEstimatedSwitchVisible.Should().BeFalse();
-        entryPage.IsPartialPaymentSwitchVisible.Should().BeFalse();
-
-        entryPage.SelectPaymentSource(Account);
-        entryPage.IsEstimatedSwitchVisible.Should().BeTrue();
-        entryPage.IsPartialPaymentSwitchVisible.Should().BeTrue();
-
-        entryPage.SelectPaymentSource(Card).Save();
-        MainPage.WaitForBill(Card);
-
-        var entry = (await GetEntryRowsAsync()).Single();
-        entry.IsEstimated.Should().BeFalse("a credit card purchase has a known amount");
-        entry.AllowsPartialPayment.Should().BeFalse("a credit card purchase is paid with the bill");
-    }
-
-    [Fact]
-    public void EntryPage_IncomeOnCreditCard_KeepsEstimatedAndPartialPayment()
-    {
-        AddAccountAndCard(BillDueDay, Account);
-
-        var entryPage = MainPage.OpenAddEntry()
-            .EnterDescription("Estorno E2E")
-            .SelectIncome()
-            .SelectRecurrence(AppLabels.Recurrent)
-            .SelectPaymentSource(Card);
-
-        entryPage.IsEstimatedSwitchVisible.Should().BeTrue();
-        entryPage.IsPartialPaymentSwitchVisible.Should().BeTrue();
-    }
-
-    // --- Credit limit ---
-
-    [Fact]
     public void AvailableLimit_SubtractsUnpaidOutcomesAndFreesUpWhenTheBillIsPaid()
     {
-        AddAccountAndCard(BillDueDay, Account);
-        MainPage
-            .AddEntry(Netflix, AppLabels.Recurrent, 55.9m, paymentSource: Card)
-            .AddEntry(Market, AppLabels.OneTime, 600m, paymentSource: Card)
-            .AddEntry(Rent, AppLabels.Recurrent, 1500m, paymentSource: Account);
-
         var sources = MainPage.OpenPaymentSources().WaitForAvailableLimit(Card, AppFormat.AvailableLimit(4344.1m));
         sources.BalanceOf(Card).Should().Be(AppFormat.SourceBalance(AppLabels.Limit, 5000m), "the limit itself stays as typed");
         sources.AvailableLimitOf(Account).Should().BeNull("only credit cards have a limit");
@@ -327,34 +163,8 @@ public sealed class CreditCardBillTests : E2ETestBase
     }
 
     [Fact]
-    public void AvailableLimit_PurchaseInInstallments_TakesUpTheInstallmentsStillToCome()
-    {
-        const string phone = "Celular E2E";
-        AddAccountAndCard(BillDueDay, Account);
-        MainPage.AddEntry(phone, AppLabels.Installments, 200m, installments: "10", paymentSource: Card);
-
-        MainPage.OpenPaymentSources().WaitForAvailableLimit(Card, AppFormat.AvailableLimit(3000m)).GoToEntries();
-
-        MainPage.MarkPaid(phone);
-        MainPage.OpenPaymentSources().WaitForAvailableLimit(Card, AppFormat.AvailableLimit(3200m));
-    }
-
-    [Fact]
-    public void AvailableLimit_BeyondTheLimit_ShowsNegative()
-    {
-        MainPage.OpenPaymentSources().AddCreditCard(Card, 500m).GoToEntries();
-        MainPage.AddEntry(Market, AppLabels.OneTime, 650m, paymentSource: Card);
-
-        MainPage.OpenPaymentSources().WaitForAvailableLimit(Card, AppFormat.AvailableLimit(-150m));
-    }
-
-    // --- Card changes ---
-
-    [Fact]
     public void EditCreditCardBill_ChangesDueDateAndAccountOnTheBill()
     {
-        AddAccountAndCard(BillDueDay, Account);
-        MainPage.AddEntry(Netflix, AppLabels.Recurrent, 55.9m, paymentSource: Card);
         var newDueDay = BillDueDay + 5;
 
         MainPage.OpenPaymentSources()
@@ -366,38 +176,4 @@ public sealed class CreditCardBillTests : E2ETestBase
         MainPage.WaitFor(() => MainPage.BillAccountText(Card) == AppLabels.BillAccount("Inter E2E"));
         MainPage.BillDueDateText(Card).Should().Be(AppFormat.DueDate(BillDueDate.AddDays(5)));
     }
-
-    [Fact]
-    public async Task DeleteAccountPayingTheBill_BillNoLongerShowsIt()
-    {
-        AddAccountAndCard(BillDueDay, Account);
-        MainPage.AddEntry(Netflix, AppLabels.Recurrent, 55.9m, paymentSource: Card);
-
-        MainPage.OpenPaymentSources().DeletePaymentSource(Account).GoToEntries().WaitForBill(Card);
-
-        MainPage.WaitFor(() => MainPage.BillAccountText(Card) is null);
-        MainPage.BillDueDateText(Card).Should().Be(AppFormat.DueDate(BillDueDate));
-        (await GetPaymentSourceRowsAsync()).Single().BillPaymentSourceId.Should().BeNull();
-    }
-
-    [Fact]
-    public void ChangeCardToBankAccount_EntriesLeaveTheBill()
-    {
-        AddAccountAndCard(BillDueDay, Account);
-        MainPage.AddEntry(Netflix, AppLabels.Recurrent, 55.9m, paymentSource: Card);
-
-        MainPage.OpenPaymentSources()
-            .EditPaymentSource(Card, Card, AppFormat.BankAccount, 5000m)
-            .GoToEntries()
-            .WaitForBillGone(Card);
-
-        MainPage.WaitForEntry(Netflix);
-        MainPage.VisibleBillNames.Should().BeEmpty();
-    }
-
-    private void AddAccountAndCard(int? billDueDay, string? billPaymentAccount) =>
-        MainPage.OpenPaymentSources()
-            .AddPaymentSource(Account, AppFormat.BankAccount, 2500m)
-            .AddCreditCard(Card, 5000m, billDueDay, billPaymentAccount)
-            .GoToEntries();
 }

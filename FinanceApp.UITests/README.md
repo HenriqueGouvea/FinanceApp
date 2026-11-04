@@ -17,8 +17,8 @@ Each test also asserts on the app's SQLite database, pulled from the device afte
 # 1. Build a standalone, debuggable APK (Fast Deployment APKs can't be installed by Appium)
 dotnet build FinanceApp/FinanceApp.csproj -f net10.0-android -c Debug -p:EmbedAssembliesIntoApk=true -o artifacts/e2e-apk
 
-# 2. Run the suite (the Appium server is started and stopped automatically)
-dotnet test FinanceApp.UITests/FinanceApp.UITests.csproj
+# 2. Run the relevant classes (the Appium server is started and stopped automatically)
+dotnet test FinanceApp.UITests/FinanceApp.UITests.csproj --logger "console;verbosity=normal" --filter "FullyQualifiedName~EditEntryTests"
 ```
 
 The run shares one Appium session. Before each test the app data is wiped (`mobile: clearApp`) and the app relaunched, so every test starts from an empty database.
@@ -34,29 +34,57 @@ You'll need to redeploy from the IDE afterwards.
 
 When a wait times out, the page source and a screenshot are saved under `FinanceApp.UITests/TestResults/diagnostics/`.
 
+### In CI
+
+`.github/workflows/e2e.yml` builds the APK once, then runs [`run-e2e.sh`](run-e2e.sh) on emulators:
+
+- **After each merge to `master`:** the whole suite, split into 3 parallel shards (`--shard 1 3`, …). Classes are dealt to shards by test count, so new classes are picked up without editing the workflow.
+- **On pull requests:** only the smoke set (`--filter Smoke=true`), the critical journeys tagged `[Trait("Smoke", "true")]`.
+- Failed tests are rerun once. A test that passes on the rerun is reported as a "Flaky E2E test" warning instead of failing the run; one that fails again fails it.
+
+## What belongs here
+
+The suite follows the test pyramid. E2E tests cover the critical user journeys and the wiring: the UI writes to the
+database and the screen reacts. Logic (labels, formatting, totals, status and date rules, what a list shows) is tested
+in the ViewModel and service tests, where it is fast and precise. In practice:
+
+- 1–2 tests per feature, for its main flows, plus one per option that the UI maps to a different code path (e.g. each delete scope).
+- Small checks that share a setup and look at different aspects of the same result go in one test, grouped with FluentAssertions' `AssertionScope` so one failed assert doesn't hide the others. Don't merge broadly: a long journey fails at its first flaky step and is harder to diagnose.
+- A test costs ~13 s of reset before it does anything, and every entry created through the UI ~10 s more, so seed the starting data instead (below) and keep the UI for the behaviour under test.
+
 ## Writing tests
 
-- Derive from `E2ETestBase` and add `[Collection(E2ECollection.Name)]` and `[Trait("Category", "E2E")]`. Put shared arrange steps (e.g. creating the entry under test) in the constructor.
+- Derive from `E2ETestBase` and add `[Collection(E2ECollection.Name)]` and `[Trait("Category", "E2E")]`. Add `[Trait("Smoke", "true")]` to a test only if it is one of the few journeys worth running on every PR.
+- Seed the data the test starts from by passing it to the base constructor: `base(server, data => data.AddEntry("Aluguel E2E", 1500m))`. `SeedData` writes entries, payment sources and partial payments straight into the database before the app starts, which skips the setup wizard too. A seeded test starts faster than an empty one.
 - Locate elements by `AutomationId` (it surfaces as the Android `resource-id`). Add one in XAML for every element a test touches.
 - Interact through page objects (`Pages/`); keep raw Appium calls out of test methods. pt-BR texts the tests select by live in `AppLabels`.
 - Compute expected texts with `AppFormat` (`Money`, `MonthTitle`, `EntryCount`) instead of hardcoding them.
 - The month `CarouselView` keeps neighbour months in the tree, so `AppSession` helpers only consider *displayed* elements.
 - Popup buttons can sit below the fold on small screens; tap them with `ScrollToAndTap`.
-- Assert persisted state with `GetEntryRowsAsync` / `GetMonthlyEntryRowsAsync` / `GetCategoryRowsAsync`. The row types in `Infrastructure/TableRows.cs` mirror the tables on purpose and don't reference the app's models.
+- Assert persisted state with `GetEntryRowsAsync` / `GetMonthlyEntryRowsAsync` / `GetCategoryRowsAsync`. The row types in `Infrastructure/TableRows.cs` mirror the tables on purpose and don't reference the app's models; `SeedData` writes plain SQL for the same reason.
 
 ## Coverage
 
 | Class | Flows |
 |---|---|
-| `AddEntryTests` | Description focused on open; one-time outcome, income, recurrent (start month onwards), installments (exactly N months, labels, total), category chip, cancel; header back button (visible after scrolling to the end) and system back discard the entry and return to the same month; saving from another month returns to it |
-| `EditEntryTests` | Pre-filled entry page with locked structural fields; description/amount change across months; header back button and system back discard changes |
-| `DeleteEntryTests` | One-time; recurrent *this month only*, *this and future*, *all months*; cancelled action sheet |
-| `EntryActionsMenuTests` | Long-press reveals menu (with the status action); tapping outside or on the entry hides it without opening the editor |
-| `EntryStatusTests` | Mark an outcome paid (only that month), revert to pending, income "Recebido" labels, pay a single installment in another month |
-| `MonthNavigationTests` | Fresh-install state, swipe to next/previous month, entry created in a non-current month, "Mês atual" pill (visibility, direction, jump back), month picker (year grid, jump to next/previous year, range limits, "Mês atual" shortcut, cancel, entries loaded after a far jump) |
-| `MonthSummaryTests` | Totals page first; swipe the summary to the paid and received pages (and back) without changing month; dots jump to a page; selected page kept across months; paid/to pay and received/to receive totals (all pending at first, mark paid only that month, revert to pending, delete a paid entry) |
-| `PartialPaymentTests` | "Pagar parcial"/"Receber parcial" action (popup labels and progress, payments add up, reaching the amount marks paid and hides the action, save disabled without an amount, cancel); paid amount field in the entry page (edit only, prefilled, partial "já gastos"/"já recebidos" line, whole amount, overpaying raises the month's amount, clearing reverts to pending, "Pagar" settles a partial entry, installment in another month) |
-| `EstimatedAmountTests` | "±" badge for estimated entries in every month, switch off by default, turn estimated on/off when editing, estimated entry paid above its estimate |
-| `SectionToggleTests` | Collapse/expand outcomes; collapsed state shared across months |
-| `AlternatingRowsTests` | Every other outcome row tinted red and income row tinted green (sampled from the rendered row), alternation restarts per section and follows the new order after a delete |
-| `CategoryTests` | Seeded outcome/income defaults grouped by type, entry page offers only categories of the selected type, add outcome/income category and use it on an entry, delete a category used by an entry |
+| `AddEntryTests` | One-time outcome (description focused on open, amount shown once a recurrence is picked, currency mask), recurrent income (from its start month on), installments (exactly N months, labels, total); "Cancelar", the header back button (visible after scrolling) and system back discard the entry; saving from another month starts the entry there |
+| `EditEntryTests` | Pre-filled page with locked structural fields, description/amount change in every month; back button and system back discard changes |
+| `DeleteEntryTests` | One-time; cancelled action sheet then *this month only*; *this and future*; *all months* |
+| `EntryActionsMenuTests` | Long press reveals the menu; tapping outside or on the entry hides it without opening the editor |
+| `EntryStatusTests` | "Pagar"/"Receber" mark the row and the summary's paid totals only that month; "Pendente" reverts them |
+| `MonthNavigationTests` | Swipe and arrows change month and dismiss the hint for good; "Mês atual" pill; month picker (jump to another year with the ▾ badge inside the pill, cancel, "Mês atual", entries loaded after a far jump) |
+| `MonthSummaryTests` | Totals page first; swipe between pages without changing month; dots; selected page kept across months |
+| `PartialPaymentTests` | "Pagar parcial" (cancel, popup texts and progress, payments add up with their records, "Pagar" settles); "Valor já pago neste mês" (only that month, prefilled, clearing reverts to pending) |
+| `PartialPaymentFlagTests` | Turning the flag on offers the action and the paid field; turning it off hides the action but keeps payments removable |
+| `PaymentRecordsTests` | The month's payments listed in the entry page; removing one is undone by "Cancelar" and applied by "Salvar" |
+| `OverBudgetTests` | Paying beyond the planned amount warns in the popup and strikes the planned amount, only that month |
+| `EstimatedAmountTests` | Estimated (and partial payment) switches on a new entry, "±" badge in every month, turned off when editing |
+| `DueDateTests` | Picking a due day on a new entry; changing it to today ("Vence hoje") and clearing it |
+| `SectionToggleTests` | Collapsing a section hides only its rows, in every month |
+| `AlternatingRowsTests` | Every other outcome row tinted red and income row tinted green (sampled from the rendered rows) |
+| `CategoryTests` | Seeded defaults grouped by type; new category used on an entry; deleting a category used by an entry |
+| `PaymentSourceTests` | Adding a voucher and a card (groups, balance labels); renaming a source used by an entry; changing an entry's source; deleting a source used by an entry |
+| `CreditCardBillTests` | New card with bill day and paying account; buying with a card on the entry page (falls due with the bill, no estimated/partial switches); bill row (total, due date, account, collapse); "Pagar fatura"/"Pendente"; available limit freed by paying the bill; editing the bill's day and account |
+| `AppLockTests` | Turning the PIN on (mismatched confirmation first); lock on relaunch (wrong then right PIN); "Esqueci o PIN" and Back keep it locked; turning it off; changing it |
+| `SetupTests` | Welcome step and Back keeping what was typed; skipping (not shown again) then rerunning and closing; filling every step (summary, then sources and entries created); rerunning adds entries |
+| `SettingsTests` | Sections and the name, shown in the menu greeting and kept after a restart |

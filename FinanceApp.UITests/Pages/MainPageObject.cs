@@ -62,8 +62,6 @@ public class MainPageObject
     private static readonly By BillCount = AppSession.AutomationId("CreditCardBillCountLabel");
     private static readonly By BillStatus = AppSession.AutomationId("CreditCardBillStatusLabel");
     private static readonly By BillPaidIcon = AppSession.AutomationId("CreditCardBillPaidIcon");
-    private static readonly By BillPartialIcon = AppSession.AutomationId("CreditCardBillPartialIcon");
-    private static readonly By BillPaid = AppSession.AutomationId("CreditCardBillPaidLabel");
     private static readonly By BillEntries = AppSession.AutomationId("CreditCardBillEntries");
     private static readonly By PayBillAction = AppSession.AutomationId("PayCreditCardBillAction");
     private static readonly By MarkBillPendingAction = AppSession.AutomationId("MarkCreditCardBillPendingAction");
@@ -333,35 +331,8 @@ public class MainPageObject
         return new PartialPaymentPopupObject(_session).WaitUntilOpen();
     }
 
-    /// <summary>
-    /// Adds a payment through the actions menu and waits for the row to show the new paid amount.
-    /// </summary>
-    public MainPageObject AddPartialPayment(string description, decimal amount, string? paymentDescription = null)
-    {
-        var popup = OpenPartialPayment(description).EnterAmount(amount);
-        if (paymentDescription is not null)
-            popup.EnterPaymentDescription(paymentDescription);
-        popup.Save();
-        return WaitForEntry(description);
-    }
-
     public bool IsEntryEstimated(string description) =>
         FindRow(description).FindElements(EntryEstimatedIcon).Any(e => e.Displayed);
-
-    /// <summary>
-    /// Opens the entry, enters the amount already paid this month and saves.
-    /// </summary>
-    public MainPageObject SetPaidAmount(string description, decimal paidAmount)
-    {
-        OpenEntry(description).EnterPaidAmount(paidAmount).Save();
-        return WaitForEntry(description);
-    }
-
-    public PngImage CaptureEntryPaidIcon(string description) => CaptureInRow(description, EntryPaidIcon);
-
-    public PngImage CaptureEntryStatusLabel(string description) => CaptureInRow(description, EntryStatus);
-
-    public PngImage CaptureEntryDueDateLabel(string description) => CaptureInRow(description, EntryDueDate);
 
     /// <summary>
     /// The row's background color, sampled at its top-left corner, inside the padding where no content is drawn.
@@ -420,8 +391,6 @@ public class MainPageObject
 
     public bool IsGoToCurrentMonthVisible => _session.IsVisible(GoToCurrentMonthButton);
 
-    public string GoToCurrentMonthText => _session.WaitForVisible(GoToCurrentMonthButton).Text;
-
     public MainPageObject TapGoToCurrentMonth()
     {
         _session.Tap(GoToCurrentMonthButton);
@@ -479,10 +448,6 @@ public class MainPageObject
         _session.WaitForText(MonthTitle, expected);
         return this;
     }
-
-    public bool IsPreviousMonthArrowEnabled => _session.WaitForVisible(PreviousMonthButton).Enabled;
-
-    public bool IsNextMonthArrowEnabled => _session.WaitForVisible(NextMonthButton).Enabled;
 
     /// <summary>
     /// On-screen bounds of the month title pill, its label and its ▾ badge, for layout assertions.
@@ -618,12 +583,6 @@ public class MainPageObject
         return this;
     }
 
-    public MainPageObject WaitForBillGone(string card)
-    {
-        _session.WaitForGone(BillByCard(card));
-        return this;
-    }
-
     public string BillAmountText(string card) => FindBillRow(card).FindElement(BillAmount).Text;
 
     public string BillCountText(string card) => FindBillRow(card).FindElement(BillCount).Text;
@@ -638,15 +597,8 @@ public class MainPageObject
     /// </summary>
     public string? BillAccountText(string card) => VisibleTextIn(FindBillRow(card), BillAccount);
 
-    /// <summary>
-    /// The amount already paid shown under a partially paid bill's total, or null otherwise.
-    /// </summary>
-    public string? BillPaidText(string card) => VisibleTextIn(FindBillRow(card), BillPaid);
-
     public bool IsBillPaid(string card) =>
         FindBillRow(card).FindElements(BillPaidIcon).Any(e => e.Displayed) && VisibleTextIn(FindBillRow(card), BillStatus) == AppLabels.BillPaid;
-
-    public bool IsBillPartiallyPaid(string card) => FindBillRow(card).FindElements(BillPartialIcon).Any(e => e.Displayed);
 
     /// <summary>
     /// The descriptions of the entries listed under the card's bill (empty while it is collapsed).
@@ -741,17 +693,6 @@ public class MainPageObject
         _session.WaitForVisible(EntryByDescription(description));
         return _session.Driver.FindElements(EntryRow)
             .First(r => r.Displayed && r.FindElements(EntryDescription).Any(d => d.Text == description));
-    }
-
-    /// <summary>
-    /// The element is first scrolled above the floating buttons at the bottom, which would otherwise tint its pixels.
-    /// </summary>
-    private PngImage CaptureInRow(string description, By element)
-    {
-        IWebElement Find() => FindRow(description).FindElements(element).First(e => e.Displayed);
-
-        _session.ScrollAbove(Find, _session.WaitForVisible(AddEntryButton).Location.Y);
-        return AppSession.Capture(Find());
     }
 
     private Rectangle Bounds(By locator)
