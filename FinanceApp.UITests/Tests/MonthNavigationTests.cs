@@ -4,118 +4,52 @@ using FluentAssertions;
 
 namespace FinanceApp.UITests.Tests;
 
+/// <summary>
+/// Changing month by swiping, with the arrows, the "Mês atual" pill and the month picker. The range limits, the
+/// picker's grid and the pill's direction are covered by the MainViewModel and MonthPickerViewModel tests.
+/// </summary>
 [Collection(E2ECollection.Name)]
 [Trait("Category", "E2E")]
 public sealed class MonthNavigationTests : E2ETestBase
 {
-    public MonthNavigationTests(AppiumServerFixture server) : base(server)
+    private const string Rent = "Aluguel E2E";
+
+    public MonthNavigationTests(AppiumServerFixture server) : base(server, data => data.AddEntry(Rent, 1500m))
     {
     }
 
     [Fact]
-    public void Startup_FreshInstall_ShowsCurrentMonthWithEmptyTotals()
+    [Trait("Smoke", "true")]
+    public void Swipe_LeftAndRight_ChangesMonthAndDismissesHintForGood()
     {
         MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth));
-        MainPage.SummaryIncomeText.Should().Be(AppFormat.Money(0));
-        MainPage.SummaryOutcomeText.Should().Be(AppFormat.Money(0));
-        MainPage.SummaryBalanceText.Should().Be(AppFormat.Money(0));
-        MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(0));
-        MainPage.IncomeCountText.Should().Be(AppFormat.EntryCount(0));
-    }
-
-    [Fact]
-    public void SwipeLeft_CurrentMonth_ShowsNextMonth()
-    {
-        MainPage.GoToNextMonth();
-
-        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth.AddMonths(1)));
-    }
-
-    [Fact]
-    public void SwipeRight_CurrentMonth_ShowsPreviousMonth()
-    {
-        MainPage.GoToPreviousMonth();
-
-        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth.AddMonths(-1)));
-    }
-
-    [Fact]
-    public void MonthArrows_TapNextAndPrevious_StepOneMonth()
-    {
-        MainPage.TapNextMonthArrow();
-        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth.AddMonths(1)));
-
-        MainPage.TapPreviousMonthArrow().TapPreviousMonthArrow();
-        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth.AddMonths(-1)));
-    }
-
-    [Fact]
-    public void MonthArrows_AtRangeEdges_DisableArrowPointingOutOfRange()
-    {
-        MainPage.IsPreviousMonthArrowEnabled.Should().BeTrue();
-        MainPage.IsNextMonthArrowEnabled.Should().BeTrue();
-
-        MainPage.GoToMonth(AppFormat.CurrentMonth.AddMonths(24));
-        MainPage.IsNextMonthArrowEnabled.Should().BeFalse();
-        MainPage.IsPreviousMonthArrowEnabled.Should().BeTrue();
-
-        MainPage.GoToMonth(AppFormat.CurrentMonth.AddMonths(-24));
-        MainPage.IsPreviousMonthArrowEnabled.Should().BeFalse();
-        MainPage.IsNextMonthArrowEnabled.Should().BeTrue();
-    }
-
-    [Theory]
-    [InlineData(2)]
-    [InlineData(9)]
-    public void MonthHeader_LongMonthName_KeepsPickerBadgeInsidePill(int month)
-    {
-        var target = new DateTime(AppFormat.CurrentMonth.Year + 1, month, 1);
-
-        MainPage.GoToMonth(target);
-
-        var (pill, title, badge) = MainPage.MonthHeaderBounds;
-        pill.Contains(badge).Should().BeTrue($"the ▾ badge {badge} must sit inside the pill {pill}");
-        badge.Width.Should().BeGreaterThanOrEqualTo(badge.Height - 2, "a clipped badge would be narrower than it is tall");
-        title.Right.Should().BeLessThanOrEqualTo(badge.Left, "the month name must not overlap the badge");
-    }
-
-    [Fact]
-    public void SwipeHint_FreshInstall_ShownUntilFirstMonthChange()
-    {
         MainPage.SwipeHintText.Should().Be(AppLabels.SwipeHint);
 
         MainPage.GoToNextMonth().WaitForSwipeHintGone();
+        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth.AddMonths(1)));
 
-        MainPage.GoToPreviousMonth();
+        MainPage.GoToPreviousMonth().GoToPreviousMonth();
+        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth.AddMonths(-1)));
         MainPage.IsSwipeHintVisible.Should().BeFalse("the hint is dismissed for good once the user changes month");
     }
 
     [Fact]
-    public void SwipeHint_MonthChangedWithArrow_IsDismissed()
+    public void MonthArrows_TapNextAndPrevious_StepOneMonthAndDismissHint()
     {
         MainPage.TapNextMonthArrow().WaitForSwipeHintGone();
+        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth.AddMonths(1)));
 
-        MainPage.TapPreviousMonthArrow();
+        MainPage.TapPreviousMonthArrow().TapPreviousMonthArrow();
+        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth.AddMonths(-1)));
         MainPage.IsSwipeHintVisible.Should().BeFalse();
-    }
-
-    [Fact]
-    public void GoToCurrentMonthButton_HiddenOnCurrentMonthAndShownAfterSwipe()
-    {
-        MainPage.IsGoToCurrentMonthVisible.Should().BeFalse();
-
-        MainPage.GoToNextMonth().WaitForGoToCurrentMonth();
-        MainPage.GoToCurrentMonthText.Should().Be(AppLabels.GoToCurrentMonthBackward);
-
-        MainPage.GoToPreviousMonth().GoToPreviousMonth().WaitForGoToCurrentMonth();
-        MainPage.GoToCurrentMonthText.Should().Be(AppLabels.GoToCurrentMonthForward);
     }
 
     [Fact]
     public void GoToCurrentMonthButton_FarFromToday_JumpsBackToCurrentMonth()
     {
-        MainPage.GoToMonth(AppFormat.CurrentMonth.AddMonths(15));
+        MainPage.IsGoToCurrentMonthVisible.Should().BeFalse();
 
+        MainPage.GoToMonth(AppFormat.CurrentMonth.AddMonths(15));
         MainPage.WaitForGoToCurrentMonth().TapGoToCurrentMonth();
 
         MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth));
@@ -123,53 +57,30 @@ public sealed class MonthNavigationTests : E2ETestBase
     }
 
     [Fact]
-    public void MonthPicker_Open_ShowsCurrentYearWithTwelveMonths()
+    public void MonthPicker_SelectMonthInNextYear_JumpsToThatMonthWithBadgeInsidePill()
     {
-        var picker = MainPage.OpenMonthPicker();
-
-        picker.Year.Should().Be(AppFormat.CurrentMonth.Year);
-        picker.MonthLabels.Should().Equal(Enumerable.Range(1, 12)
-            .Select(m => AppFormat.MonthAbbreviation(new DateTime(AppFormat.CurrentMonth.Year, m, 1))));
-    }
-
-    [Fact]
-    public void MonthPicker_SelectMonthInNextYear_JumpsToThatMonth()
-    {
+        // February has the longest month name in pt-BR ("Fevereiro"), which once pushed the ▾ badge out of the pill.
         var target = new DateTime(AppFormat.CurrentMonth.Year + 1, 2, 1);
 
         MainPage.GoToMonth(target);
 
         MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(target));
-        MainPage.WaitForGoToCurrentMonth();
+        var (pill, title, badge) = MainPage.MonthHeaderBounds;
+        pill.Contains(badge).Should().BeTrue($"the ▾ badge {badge} must sit inside the pill {pill}");
+        badge.Width.Should().BeGreaterThanOrEqualTo(badge.Height - 2, "a clipped badge would be narrower than it is tall");
+        title.Right.Should().BeLessThanOrEqualTo(badge.Left, "the month name must not overlap the badge");
     }
 
     [Fact]
-    public void MonthPicker_SelectMonthInPreviousYear_JumpsToThatMonth()
+    public void MonthPicker_CancelThenCurrentMonthButton_KeepsThenReturnsToCurrentMonth()
     {
-        var target = new DateTime(AppFormat.CurrentMonth.Year - 1, 7, 1);
+        var month = AppFormat.CurrentMonth.AddMonths(-10);
+        MainPage.GoToMonth(month);
 
-        MainPage.GoToMonth(target);
-
-        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(target));
-    }
-
-    [Fact]
-    public void MonthPicker_LastYearOfRange_DisablesNextYearAndMonthsAfterRange()
-    {
-        var lastMonth = AppFormat.CurrentMonth.AddMonths(24);
-        var picker = MainPage.OpenMonthPicker().ShowYear(lastMonth.Year);
-
-        picker.IsNextYearEnabled.Should().BeFalse();
-        picker.IsPreviousYearEnabled.Should().BeTrue();
-        picker.IsMonthEnabled(lastMonth).Should().BeTrue();
-        if (lastMonth.Month < 12)
-            picker.IsMonthEnabled(lastMonth.AddMonths(1)).Should().BeFalse();
-    }
-
-    [Fact]
-    public void MonthPicker_CurrentMonthButton_ReturnsToCurrentMonth()
-    {
-        MainPage.GoToMonth(AppFormat.CurrentMonth.AddMonths(-10));
+        var picker = MainPage.OpenMonthPicker();
+        picker.ShowYear(AppFormat.CurrentMonth.Year + 1);
+        picker.Cancel();
+        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(month));
 
         MainPage.OpenMonthPicker().SelectCurrentMonth();
 
@@ -178,36 +89,14 @@ public sealed class MonthNavigationTests : E2ETestBase
     }
 
     [Fact]
-    public void MonthPicker_Cancel_KeepsSelectedMonth()
-    {
-        MainPage.GoToNextMonth();
-        var picker = MainPage.OpenMonthPicker();
-        picker.ShowYear(AppFormat.CurrentMonth.Year + 1);
-
-        picker.Cancel();
-
-        MainPage.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth.AddMonths(1)));
-    }
-
-    [Fact]
+    [Trait("Smoke", "true")]
     public void MonthPicker_JumpFarAway_LoadsThatMonthsEntries()
     {
-        MainPage.AddEntry("Aluguel E2E", AppLabels.Recurrent, 1500m);
         var target = AppFormat.CurrentMonth.AddMonths(18);
 
-        MainPage.GoToMonth(target).WaitForEntry("Aluguel E2E");
+        MainPage.GoToMonth(target).WaitForEntry(Rent);
 
         MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(1500));
-        MainPage.GoToPreviousMonth().WaitForEntry("Aluguel E2E");
-    }
-
-    [Fact]
-    public void AddEntry_InAnotherMonth_StartsInThatMonth()
-    {
-        MainPage.GoToNextMonth().AddEntry("Viagem E2E", AppLabels.OneTime, 2000m);
-
-        MainPage.GoToPreviousMonth();
-        MainPage.IsEntryVisible("Viagem E2E").Should().BeFalse();
-        MainPage.GoToNextMonth().WaitForEntry("Viagem E2E");
+        MainPage.GoToPreviousMonth().WaitForEntry(Rent);
     }
 }

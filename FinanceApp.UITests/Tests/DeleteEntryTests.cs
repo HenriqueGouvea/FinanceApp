@@ -4,37 +4,53 @@ using FluentAssertions;
 
 namespace FinanceApp.UITests.Tests;
 
+/// <summary>
+/// One test per delete option: each one maps an action sheet choice to a different delete scope.
+/// What each scope does to the stored months is covered by the FinanceService tests.
+/// </summary>
 [Collection(E2ECollection.Name)]
 [Trait("Category", "E2E")]
 public sealed class DeleteEntryTests : E2ETestBase
 {
-    public DeleteEntryTests(AppiumServerFixture server) : base(server)
+    private const string Gift = "Presente E2E";
+    private const string Streaming = "Streaming E2E";
+    private const string Condo = "Condomínio E2E";
+    private const string Insurance = "Seguro E2E";
+
+    public DeleteEntryTests(AppiumServerFixture server) : base(server, data =>
+    {
+        data.AddEntry(Gift, 80m, AppFormat.OneTime);
+        data.AddEntry(Streaming, 40m);
+        data.AddEntry(Condo, 600m, startMonth: AppFormat.CurrentMonth.AddMonths(-1));
+        data.AddEntry(Insurance, 200m);
+    })
     {
     }
 
     [Fact]
     public async Task DeleteEntry_OneTime_RemovesFromListAndDatabase()
     {
-        MainPage.AddEntry("Presente E2E", AppLabels.OneTime, 80m);
+        MainPage.DeleteEntry(Gift, AppLabels.Delete)
+            .WaitForEntryGone(Gift);
 
-        MainPage.DeleteEntry("Presente E2E", AppLabels.Delete)
-            .WaitForEntryGone("Presente E2E");
-
-        MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(0));
-        MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(0));
-        (await GetEntryRowsAsync()).Should().BeEmpty();
+        MainPage.OutcomeCountText.Should().Be(AppFormat.EntryCount(3));
+        MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(840));
+        (await GetEntryRowsAsync()).Should().NotContain(e => e.Description == Gift);
     }
 
     [Fact]
-    public async Task DeleteEntry_RecurrentThisMonthOnly_HidesOnlyCurrentMonth()
+    [Trait("Smoke", "true")]
+    public async Task DeleteEntry_ActionSheetCancelledThenThisMonthOnly_HidesOnlyCurrentMonth()
     {
-        MainPage.AddEntry("Streaming E2E", AppLabels.Recurrent, 40m);
+        MainPage.DeleteEntry(Streaming, AppLabels.Cancel);
+        MainPage.WaitForEntry(Streaming);
+        (await GetMonthlyEntryRowsAsync()).Should().BeEmpty();
 
-        MainPage.DeleteEntry("Streaming E2E", AppLabels.DeleteThisMonth)
-            .WaitForEntryGone("Streaming E2E");
-        MainPage.GoToNextMonth().WaitForEntry("Streaming E2E");
+        MainPage.DeleteEntry(Streaming, AppLabels.DeleteThisMonth)
+            .WaitForEntryGone(Streaming);
+        MainPage.GoToNextMonth().WaitForEntry(Streaming);
 
-        var entry = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
+        var entry = (await GetEntryRowsAsync()).Single(e => e.Description == Streaming);
         entry.EndDate.Should().BeNull();
         var monthly = (await GetMonthlyEntryRowsAsync()).Should().ContainSingle().Subject;
         monthly.FinancialEntryId.Should().Be(entry.Id);
@@ -45,49 +61,24 @@ public sealed class DeleteEntryTests : E2ETestBase
     [Fact]
     public async Task DeleteEntry_RecurrentThisAndFutureMonths_KeepsPreviousMonths()
     {
-        MainPage.GoToPreviousMonth()
-            .AddEntry("Condomínio E2E", AppLabels.Recurrent, 600m)
-            .GoToNextMonth()
-            .WaitForEntry("Condomínio E2E");
-
-        MainPage.DeleteEntry("Condomínio E2E", AppLabels.DeleteThisAndFuture)
-            .WaitForEntryGone("Condomínio E2E");
+        MainPage.DeleteEntry(Condo, AppLabels.DeleteThisAndFuture)
+            .WaitForEntryGone(Condo);
         MainPage.GoToNextMonth();
-        MainPage.IsEntryVisible("Condomínio E2E").Should().BeFalse();
-        MainPage.GoToPreviousMonth().GoToPreviousMonth().WaitForEntry("Condomínio E2E");
+        MainPage.IsEntryVisible(Condo).Should().BeFalse();
+        MainPage.GoToPreviousMonth().GoToPreviousMonth().WaitForEntry(Condo);
 
-        var entry = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
-        entry.StartDate.Date.Should().Be(AppFormat.CurrentMonth.AddMonths(-1));
+        var entry = (await GetEntryRowsAsync()).Single(e => e.Description == Condo);
         entry.EndDate!.Value.Date.Should().Be(AppFormat.CurrentMonth.AddMonths(-1));
     }
 
     [Fact]
     public async Task DeleteEntry_RecurrentAllMonths_RemovesEverywhere()
     {
-        MainPage.AddEntry("Seguro E2E", AppLabels.Recurrent, 200m);
-        MainPage.GoToNextMonth()
-            .DeleteEntry("Seguro E2E", AppLabels.DeleteThisMonth)
-            .WaitForEntryGone("Seguro E2E");
-        MainPage.GoToPreviousMonth();
+        MainPage.DeleteEntry(Insurance, AppLabels.DeleteAllMonths)
+            .WaitForEntryGone(Insurance);
+        MainPage.GoToNextMonth().WaitForEntry(Streaming);
+        MainPage.IsEntryVisible(Insurance).Should().BeFalse();
 
-        MainPage.DeleteEntry("Seguro E2E", AppLabels.DeleteAllMonths)
-            .WaitForEntryGone("Seguro E2E");
-        MainPage.GoToNextMonth().GoToNextMonth();
-        MainPage.IsEntryVisible("Seguro E2E").Should().BeFalse();
-
-        (await GetEntryRowsAsync()).Should().BeEmpty();
-        (await GetMonthlyEntryRowsAsync()).Should().BeEmpty("monthly overrides are removed with their template");
-    }
-
-    [Fact]
-    public async Task DeleteEntry_ActionSheetCancelled_KeepsEntry()
-    {
-        MainPage.AddEntry("Luz E2E", AppLabels.Recurrent, 150m);
-
-        MainPage.DeleteEntry("Luz E2E", AppLabels.Cancel);
-
-        MainPage.WaitForEntry("Luz E2E");
-        (await GetEntryRowsAsync()).Should().ContainSingle();
-        (await GetMonthlyEntryRowsAsync()).Should().BeEmpty();
+        (await GetEntryRowsAsync()).Should().NotContain(e => e.Description == Insurance);
     }
 }

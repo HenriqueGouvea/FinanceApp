@@ -8,7 +8,6 @@ namespace FinanceApp.UITests.Pages;
 public class PaymentSourcesPageObject
 {
     private static readonly By AddButton = AppSession.AutomationId("AddPaymentSourceButton");
-    private static readonly By EmptyLabel = AppSession.AutomationId("PaymentSourcesEmptyLabel");
     private static readonly By SourceRow = AppSession.AutomationId("PaymentSourceRow");
     private static readonly By SourceName = AppSession.AutomationId("PaymentSourceNameLabel");
     private static readonly By SourceBalance = AppSession.AutomationId("PaymentSourceBalanceLabel");
@@ -19,12 +18,8 @@ public class PaymentSourcesPageObject
     private static readonly By BalanceEntry = AppSession.AutomationId("PaymentSourceBalanceEntry");
     private static readonly By BalanceFieldLabel = AppSession.AutomationId("PaymentSourceBalanceFieldLabel");
     private const string SaveButtonId = "SavePaymentSourceButton";
-    private const string CancelButtonId = "CancelPaymentSourceButton";
     private const string BillDueDayPickerId = "BillDueDayPicker";
     private const string BillPaymentAccountPickerId = "BillPaymentAccountPicker";
-    private static readonly By BillFields = AppSession.AutomationId("CreditCardBillFields");
-    private static readonly By NoBillPaymentAccounts = AppSession.AutomationId("NoBillPaymentAccountsLabel");
-    private static readonly By PickerDialogOption = MobileBy.Id("android:id/text1");
     private static readonly By FlyoutButton =
         MobileBy.AndroidUIAutomator("new UiSelector().className(\"android.widget.ImageButton\").instance(0)");
 
@@ -40,8 +35,6 @@ public class PaymentSourcesPageObject
         _session.WaitForVisible(AddButton);
         return this;
     }
-
-    public bool IsEmptyStateVisible => _session.IsVisible(EmptyLabel);
 
     public IReadOnlyList<string> VisibleNames => _session.VisibleTexts(SourceName);
 
@@ -122,46 +115,6 @@ public class PaymentSourcesPageObject
     }
 
     /// <summary>
-    /// Opens the "+" popup, picks the type and tells whether the credit card bill fields show, then cancels.
-    /// </summary>
-    public bool AreBillFieldsVisibleFor(int type)
-    {
-        _session.Tap(AddButton);
-        _session.WaitForVisible(NameEntry);
-        _session.Tap(AppSession.AutomationId(TypeButtonId(type)));
-        _session.WaitForText(BalanceFieldLabel, type == AppFormat.CreditCard ? AppLabels.Limit : AppLabels.Balance);
-        var visible = _session.IsVisible(BillFields);
-        Cancel();
-        return visible;
-    }
-
-    /// <summary>
-    /// The accounts offered to pay the card's bill (bank accounts only), read from its popup, which is then cancelled.
-    /// Empty when the popup shows that there is no bank account yet.
-    /// </summary>
-    public IReadOnlyList<string> BillPaymentAccountOptions(string cardName)
-    {
-        OpenEditPopup(cardName);
-
-        IReadOnlyList<string> options = [];
-        if (_session.TryScrollTo(BillPaymentAccountPickerId) is not null)
-        {
-            _session.ScrollToAndTap(BillPaymentAccountPickerId);
-            _session.WaitForVisible(PickerDialogOption);
-            options = _session.VisibleTexts(PickerDialogOption);
-            _session.PressBack();
-            _session.WaitForGone(PickerDialogOption);
-        }
-        else
-        {
-            _session.WaitForVisible(NoBillPaymentAccounts);
-        }
-
-        Cancel();
-        return options;
-    }
-
-    /// <summary>
     /// Taps the row to open its popup, replaces every field and saves.
     /// </summary>
     public PaymentSourcesPageObject EditPaymentSource(string name, string newName, int type, decimal balance)
@@ -216,12 +169,6 @@ public class PaymentSourcesPageObject
         _session.ScrollToAndTap(SaveButtonId);
         _session.WaitForGone(NameEntry);
         _session.WaitForVisible(NameWithText(name));
-    }
-
-    private void Cancel()
-    {
-        _session.ScrollToAndTap(CancelButtonId);
-        _session.WaitForGone(NameEntry);
     }
 
     private void OpenEditPopup(string name)

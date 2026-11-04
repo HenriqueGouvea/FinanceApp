@@ -1,8 +1,13 @@
 name: E2E (Android)
 
+# After each merge to master the whole suite runs, split across parallel emulators. Pull requests only run the
+# smoke set ([Trait("Smoke", "true")]): a few critical journeys, for early feedback at a fraction of the cost.
 on:
   push:
     branches: [ master ]
+  pull_request:
+    branches: [ master ]
+    paths-ignore: [ '**.md' ]
   workflow_dispatch:
 
 concurrency:
@@ -10,17 +15,52 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  e2e-android:
-    # Linux runners expose KVM, so the x86_64 emulator runs hardware-accelerated (Windows/macOS hosted runners do not).
+  build-apk:
     runs-on: ubuntu-latest
-    # Safety net only: a hung run is cancelled instead of burning hours. The suite grows with every feature
-    # (188 tests at ~25 s each took ~80 min in November 2026), so leave plenty of headroom and raise it when runs get close.
-    timeout-minutes: 150
+    timeout-minutes: 30
 
     steps:
     - uses: actions/checkout@v4
 
-    # The MAUI workload, APK, AVD and system image can exhaust the runner's disk ("No space left on device"),
+    - name: Setup .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Setup Java 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 17
+
+    - name: Install MAUI Android workload
+      run: dotnet workload install maui-android
+
+    - name: Build standalone debug APK
+      run: dotnet build FinanceApp/FinanceApp.csproj -f net10.0-android -c Debug -p:EmbedAssembliesIntoApk=true -o artifacts/e2e-apk
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-apk
+        path: artifacts/e2e-apk/com.companyname.financeapp-Signed.apk
+        retention-days: 3
+
+  e2e-android:
+    needs: build-apk
+    # Linux runners expose KVM, so the x86_64 emulator runs hardware-accelerated (Windows/macOS hosted runners do not).
+    runs-on: ubuntu-latest
+    # Safety net only: a hung run is cancelled instead of burning hours. Each shard took ~10 min in November 2026.
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(github.event_name == 'pull_request' && '[1]' || '[1, 2, 3]') }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # The AVD and system image can exhaust the runner's disk ("No space left on device"),
     # so drop preinstalled toolchains this job never uses.
     - name: Free disk space
       run: sudo rm -rf /opt/ghc /usr/local/.ghcup /usr/share/swift /usr/local/share/boost /opt/hostedtoolcache/CodeQL
@@ -36,12 +76,6 @@ jobs:
       with:
         dotnet-version: 10.0.x
 
-    - name: Setup Java 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: 17
-
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
@@ -49,11 +83,11 @@ jobs:
         cache: npm
         cache-dependency-path: FinanceApp.UITests/package-lock.json
 
-    - name: Install MAUI Android workload
-      run: dotnet workload install maui-android
-
-    - name: Build standalone debug APK
-      run: dotnet build FinanceApp/FinanceApp.csproj -f net10.0-android -c Debug -p:EmbedAssembliesIntoApk=true -o artifacts/e2e-apk
+    - name: Download APK
+      uses: actions/download-artifact@v4
+      with:
+        name: e2e-apk
+        path: artifacts/e2e-apk
 
     - name: Install Appium
       working-directory: FinanceApp.UITests
@@ -83,6 +117,7 @@ jobs:
         disable-animations: false
         script: echo "AVD snapshot generated"
 
+    # run-e2e.sh reruns the failed tests once and flags the ones that pass on the rerun as flaky.
     - name: Run E2E tests
       uses: reactivecircus/android-emulator-runner@v2
       with:
@@ -92,13 +127,13 @@ jobs:
         force-avd-creation: false
         emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
         disable-animations: true
-        script: dotnet test FinanceApp.UITests/FinanceApp.UITests.csproj --no-build --logger "trx;LogFileName=e2e.trx" --logger "console;verbosity=normal" --results-directory TestResults
+        script: bash FinanceApp.UITests/run-e2e.sh ${{ github.event_name == 'pull_request' && '--filter Smoke=true' || format('--shard {0} 3', matrix.shard) }}
 
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: e2e-results
+        name: e2e-results-${{ matrix.shard }}
         # The TRX is only written when the run completes; diagnostics (screenshot + page source per timeout) are saved as they happen.
         path: |
           TestResults

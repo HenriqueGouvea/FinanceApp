@@ -41,8 +41,6 @@ public class PartialPaymentPopupObject
     public string DescriptionText => _session.WaitForVisible(Description).Text;
     public string ProgressText => _session.WaitForVisible(Progress).Text;
     public string NewTotalText => _session.WaitForVisible(NewTotal).Text;
-    public bool IsSaveEnabled => _session.ScrollTo(SaveButtonId).Enabled;
-
     /// <summary>
     /// The "▲ R$ 50,00 acima do previsto" warning under the new total, or null while within the planned amount.
     /// </summary>

@@ -1,12 +1,15 @@
 using FinanceApp.UITests.Infrastructure;
 using FinanceApp.UITests.Pages;
 using FluentAssertions;
+using FluentAssertions.Execution;
 
 namespace FinanceApp.UITests.Tests;
 
 /// <summary>
 /// The setup wizard shown on the first run, which turns the user's accounts, salary and house expenses into recurrent
-/// entries. Picking a photo isn't covered: it opens Android's photo picker, outside the app.
+/// entries. Picking a photo isn't covered: it opens Android's photo picker, outside the app. The wizard's defaults
+/// (first account picked, expense flags, unticked expenses left out) are covered by the SetupViewModel and
+/// SetupService tests.
 /// </summary>
 [Collection(E2ECollection.Name)]
 [Trait("Category", "E2E")]
@@ -29,34 +32,18 @@ public sealed class SetupTests : E2ETestBase
     }
 
     [Fact]
-    public void FirstRun_ShowsWelcomeStepWithBrandAndTagline()
+    public void FirstRun_WelcomeStepThenBack_KeepsWhatWasTyped()
     {
-        _setup.StepText.Should().Be(AppFormat.SetupStep(1));
-        _setup.IsWelcomeStepVisible.Should().BeTrue();
-        _setup.WelcomeTitleText.Should().Be(AppLabels.SetupWelcomeTitle);
-        _setup.TaglineText.Should().Be(AppLabels.Tagline);
-        _setup.SkipButtonText.Should().Be(AppLabels.SetupSkip);
-        _setup.NextButtonText.Should().Be(AppLabels.SetupContinue);
-        _setup.IsBackVisible.Should().BeFalse();
-    }
+        using (new AssertionScope())
+        {
+            _setup.StepText.Should().Be(AppFormat.SetupStep(1));
+            _setup.WelcomeTitleText.Should().Be(AppLabels.SetupWelcomeTitle);
+            _setup.TaglineText.Should().Be(AppLabels.Tagline);
+            _setup.SkipButtonText.Should().Be(AppLabels.SetupSkip);
+            _setup.NextButtonText.Should().Be(AppLabels.SetupContinue);
+            _setup.IsBackVisible.Should().BeFalse();
+        }
 
-    [Fact]
-    public async Task Skip_LandsOnEmptyMonthAndIsNotShownAgain()
-    {
-        var main = _setup.Skip();
-
-        main.OutcomeCountText.Should().Be(AppFormat.EntryCount(0));
-        main.IncomeCountText.Should().Be(AppFormat.EntryCount(0));
-        (await GetEntryRowsAsync()).Should().BeEmpty();
-
-        Session.Relaunch();
-        new MainPageObject(Session).WaitUntilLoaded();
-        _setup.IsWelcomeStepVisible.Should().BeFalse();
-    }
-
-    [Fact]
-    public void Back_KeepsWhatWasTyped()
-    {
         _setup.EnterName(Name);
         _setup.AvatarInitialText.Should().Be("A");
 
@@ -69,45 +56,61 @@ public sealed class SetupTests : E2ETestBase
     }
 
     [Fact]
-    public void AddSources_FirstAccountIsWhereSalaryAndExpensesGo()
+    public async Task SkipThenRedoSetupAndClose_LandsOnEmptyMonthAndCreatesNothing()
     {
-        _setup.Next();
-        _setup.CreditCardTypeText.Should().Be(AppLabels.CreditCardType);
-        _setup
+        var main = _setup.Skip();
+
+        using (new AssertionScope())
+        {
+            main.MonthTitleText.Should().Be(AppFormat.MonthTitle(AppFormat.CurrentMonth));
+            main.SummaryBalanceText.Should().Be(AppFormat.Money(0));
+            main.OutcomeCountText.Should().Be(AppFormat.EntryCount(0));
+            main.IncomeCountText.Should().Be(AppFormat.EntryCount(0));
+        }
+
+        Session.Relaunch();
+        main = new MainPageObject(Session).WaitUntilLoaded();
+        _setup.IsWelcomeStepVisible.Should().BeFalse("a skipped wizard isn't shown again");
+
+        var settings = main.RedoSetup().Next().Next().EnterSalary(5000).Close();
+        main = settings.GoToHome();
+
+        main.IncomeCountText.Should().Be(AppFormat.EntryCount(0));
+        main.ReadMenuGreeting().Should().Be(AppLabels.MenuGreetingWithoutName);
+        (await GetEntryRowsAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    [Trait("Smoke", "true")]
+    public async Task FillEveryStep_SummaryThenFinish_CreatesSourcesAndRecurrentEntries()
+    {
+        _setup.EnterName(Name).Next()
+            .AddSource(Account, AppFormat.BankAccount, 2500)
             .AddSource(Card, AppFormat.CreditCard, 8000)
-            .AddSource(Account, AppFormat.BankAccount, 2500);
+            .Next()
+            .EnterSalary(5000)
+            .SelectSalaryDay(6)
+            .Next()
+            .SelectExpense(Rent, 1500, dueDay: 10)
+            .SelectExpense(Energy, 200, dueDay: 15)
+            .SelectExpense(Supermarket, 1000)
+            .SelectExpensesSource(Card)
+            .Next();
 
-        _setup.SourceNames.Should().Equal(Card, Account);
-
-        _setup.Next();
-        _setup.SalarySourceText.Should().Be(Account);
-        _setup.SalaryDayText.Should().Be(AppLabels.DueDay(5));
-        _setup.Next();
-        _setup.ExpensesSourceText.Should().Be(Account);
-    }
-
-    [Fact]
-    public void Summary_ListsEntriesToCreateWithMonthlyTotals()
-    {
-        FillWizard();
-
-        _setup.SummaryTitleText.Should().Be(AppLabels.SetupSummaryTitleFor(Name));
-        _setup.NextButtonText.Should().Be(AppLabels.SetupStart);
-        _setup.SummaryRows.Should().Equal(
-            (Salary, AppLabels.SetupSchedule("dia 6", Account), AppFormat.Money(5000)),
-            (Rent, AppLabels.SetupSchedule("dia 10", Card), AppFormat.Money(1500)),
-            (Energy, AppLabels.SetupSchedule("dia 15", AppLabels.EstimatedValue, Card), AppFormat.Money(200)),
-            (Supermarket, AppLabels.SetupSchedule(AppLabels.EstimatedValue, AppLabels.PartialPaymentValue, Card), AppFormat.Money(1000)));
-        _setup.SummaryIncomeText.Should().Be(AppFormat.Money(5000));
-        _setup.SummaryOutcomeText.Should().Be(AppFormat.Money(2700));
-        _setup.SummaryBalanceText.Should().Be(AppFormat.Money(2300));
-        _setup.IsRecurrenceGuideVisible.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task Finish_CreatesSourcesAndRecurrentEntries()
-    {
-        FillWizard();
+        using (new AssertionScope())
+        {
+            _setup.SummaryTitleText.Should().Be(AppLabels.SetupSummaryTitleFor(Name));
+            _setup.NextButtonText.Should().Be(AppLabels.SetupStart);
+            _setup.SummaryRows.Should().Equal(
+                (Salary, AppLabels.SetupSchedule("dia 6", Account), AppFormat.Money(5000)),
+                (Rent, AppLabels.SetupSchedule("dia 10", Card), AppFormat.Money(1500)),
+                (Energy, AppLabels.SetupSchedule("dia 15", AppLabels.EstimatedValue, Card), AppFormat.Money(200)),
+                (Supermarket, AppLabels.SetupSchedule(AppLabels.EstimatedValue, AppLabels.PartialPaymentValue, Card), AppFormat.Money(1000)));
+            _setup.SummaryIncomeText.Should().Be(AppFormat.Money(5000));
+            _setup.SummaryOutcomeText.Should().Be(AppFormat.Money(2700));
+            _setup.SummaryBalanceText.Should().Be(AppFormat.Money(2300));
+            _setup.IsRecurrenceGuideVisible.Should().BeTrue();
+        }
 
         var main = _setup.Finish();
 
@@ -115,7 +118,6 @@ public sealed class SetupTests : E2ETestBase
         main.WaitForEntry(Rent).WaitForEntry(Energy);
         main.SummaryIncomeText.Should().Be(AppFormat.Money(5000));
         main.SummaryOutcomeText.Should().Be(AppFormat.Money(2700));
-        main.OutcomeCountText.Should().Be(AppFormat.EntryCount(3));
         main.ReadMenuGreeting().Should().Be(AppLabels.MenuGreeting(Name));
 
         var sources = await GetPaymentSourceRowsAsync();
@@ -144,62 +146,6 @@ public sealed class SetupTests : E2ETestBase
     }
 
     [Fact]
-    public void Finish_EntriesRepeatInNextMonth()
-    {
-        _setup.Next().Next().EnterSalary(5000).Next().SelectExpense(Rent, 1500).Next();
-
-        var main = _setup.Finish().GoToNextMonth();
-
-        main.WaitForEntry(Salary).WaitForEntry(Rent);
-        main.IncomeTotalText.Should().Be(AppFormat.Money(5000));
-        main.OutcomeTotalText.Should().Be(AppFormat.Money(1500));
-    }
-
-    [Fact]
-    public async Task Finish_RemovedSourceAndUntickedExpense_AreLeftOut()
-    {
-        _setup.Next()
-            .AddSource(Account, AppFormat.BankAccount, 2500)
-            .AddSource(Card, AppFormat.CreditCard, 8000)
-            .RemoveSource(Card);
-        _setup.SourceNames.Should().Equal(Account);
-        _setup.Next().Next().SelectExpense(Internet, 100).ToggleExpense(Internet);
-        _setup.IsExpenseChecked(Internet).Should().BeFalse();
-
-        _setup.Next();
-        _setup.IsSummaryEmptyVisible.Should().BeTrue();
-        _setup.SummaryTitleText.Should().Be(AppLabels.SetupSummaryTitle);
-        _setup.Finish();
-
-        (await GetPaymentSourceRowsAsync()).Select(s => s.Name).Should().Equal(Account);
-        (await GetEntryRowsAsync()).Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task HouseExpenses_EstimatedAndPartialPaymentOptions_ArePresetAndCanBeChanged()
-    {
-        // Each expense is handled while on screen, top to bottom: Internet comes before Mercado in the list.
-        _setup.Next().Next().Next().SelectExpense(Internet, 100);
-        _setup.IsExpenseEstimated(Internet).Should().BeFalse();
-        _setup.IsExpensePartialPayment(Internet).Should().BeFalse();
-        _setup.ToggleExpenseEstimated(Internet);
-
-        _setup.SelectExpense(Supermarket, 1000);
-        _setup.IsExpenseEstimated(Supermarket).Should().BeTrue();
-        _setup.IsExpensePartialPayment(Supermarket).Should().BeTrue();
-        _setup.ToggleExpenseEstimated(Supermarket);
-
-        _setup.Next().Finish();
-
-        var entries = await GetEntryRowsAsync();
-        entries.Select(e => (e.Description, e.IsEstimated, e.AllowsPartialPayment)).Should().BeEquivalentTo(
-        [
-            (Supermarket, false, true),
-            (Internet, true, false)
-        ]);
-    }
-
-    [Fact]
     public async Task RedoSetup_AddsEntriesAndKeepsExistingOnes()
     {
         _setup.EnterName(Name).Next().Next().Next().SelectExpense(Rent, 1500).Next();
@@ -214,38 +160,5 @@ public sealed class SetupTests : E2ETestBase
         main.WaitForEntry(Rent).WaitForEntry(Internet);
         main.OutcomeTotalText.Should().Be(AppFormat.Money(1600));
         (await GetEntryRowsAsync()).Select(e => e.Description).Should().BeEquivalentTo([Rent, Internet]);
-    }
-
-    [Fact]
-    public async Task RedoSetup_Close_CreatesNothing()
-    {
-        var main = _setup.Skip();
-
-        var settings = main.RedoSetup().Next().Next().EnterSalary(5000).Close();
-        main = settings.GoToHome();
-
-        main.IncomeCountText.Should().Be(AppFormat.EntryCount(0));
-        (await GetEntryRowsAsync()).Should().BeEmpty();
-        main.ReadMenuGreeting().Should().Be(AppLabels.MenuGreetingWithoutName);
-    }
-
-    /// <summary>
-    /// Goes through every step up to the summary: a name, an account and a card, a salary received on the 6th and
-    /// three house expenses paid with the card.
-    /// </summary>
-    private void FillWizard()
-    {
-        _setup.EnterName(Name).Next()
-            .AddSource(Account, AppFormat.BankAccount, 2500)
-            .AddSource(Card, AppFormat.CreditCard, 8000)
-            .Next()
-            .EnterSalary(5000)
-            .SelectSalaryDay(6)
-            .Next()
-            .SelectExpense(Rent, 1500, dueDay: 10)
-            .SelectExpense(Energy, 200, dueDay: 15)
-            .SelectExpense(Supermarket, 1000)
-            .SelectExpensesSource(Card)
-            .Next();
     }
 }

@@ -26,7 +26,6 @@ public static class AppLabels
     public const string SettingsSecuritySection = "Segurança";
     public const string SettingsGuideSection = "Guia inicial";
     public const string AddNameAndPhoto = "Adicionar nome e foto";
-    public const string CreditCardType = "💳 Cartão de crédito";
 
     public const string SetupWelcomeTitle = "Bem-vindo ao Mensal!";
     public const string Tagline = "Todas as contas, um só rumo.";
@@ -34,7 +33,6 @@ public static class AppLabels
     public const string SetupClose = "Fechar";
     public const string SetupContinue = "Continuar";
     public const string SetupStart = "Começar";
-    public const string SetupSummaryTitle = "Tudo pronto!";
     public static string SetupSummaryTitleFor(string name) => $"Tudo pronto, {name}!";
     public static string MenuGreeting(string name) => $"Olá, {name}!";
     public const string MenuGreetingWithoutName = "Olá!";
@@ -57,8 +55,6 @@ public static class AppLabels
     public const string MealVouchersHeader = "Vales";
     public const string Balance = "Saldo";
     public const string Limit = "Limite";
-    public const string PaidWith = "Pago com";
-    public const string ReceivedIn = "Recebido em";
 
     public const string Paid = "Pago";
     public const string Received = "Recebido";
@@ -67,16 +63,10 @@ public static class AppLabels
     public const string MarkPending = "Pendente";
 
     public const string PaidAmountOutcome = "Valor já pago neste mês";
-    public const string PaidAmountIncome = "Valor já recebido neste mês";
 
     public const string MarkPartialPaid = "Pagar parcial";
-    public const string MarkPartialReceived = "Receber parcial";
-    public const string PartialPaymentOutcome = "Pagamento parcial";
-    public const string PartialPaymentIncome = "Recebimento parcial";
     public const string AlreadySpent = "Já gasto";
-    public const string AlreadyReceived = "Já recebido";
     public const string PaymentsOutcome = "Pagamentos neste mês";
-    public const string PaymentsIncome = "Recebimentos neste mês";
 
     public const string EstimatedSymbol = "±";
 
@@ -88,11 +78,8 @@ public static class AppLabels
     public const string BillPaid = "Paga";
     public static string BillName(string card) => $"💳 Fatura {card}";
     public static string BillAccount(string account) => $"Débito em {account}";
-    public const string CreditCardBillDueHint = "Vence com a fatura do cartão de crédito";
     public static string CreditCardBillDueHintFor(int day) => $"Vence com a fatura do cartão de crédito (dia {day})";
 
-    public const string GoToCurrentMonthBackward = "‹ Mês atual";
-    public const string GoToCurrentMonthForward = "Mês atual ›";
     public const string SwipeHint = "Toque no mês para escolher ou deslize para os lados";
 
     public const string OutcomeCategoriesHeader = "Despesas";

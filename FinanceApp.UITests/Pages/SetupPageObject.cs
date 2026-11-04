@@ -12,7 +12,6 @@ public class SetupPageObject
 {
     private const string SalaryEntryId = "SetupSalaryEntry";
     private const string SalaryDayPickerId = "SetupSalaryDayPicker";
-    private const string SalarySourcePickerId = "SetupSalarySourcePicker";
     private const string ExpensesSourcePickerId = "SetupExpensesSourcePicker";
 
     private static readonly By StepLabel = AppSession.AutomationId("SetupStepLabel");
@@ -26,18 +25,12 @@ public class SetupPageObject
     private static readonly By AvatarInitial = AppSession.AutomationId("SetupAvatarInitialLabel");
     private static readonly By SourceBalanceEntry = AppSession.AutomationId("SetupSourceBalanceEntry");
     private static readonly By SourceBalanceCaption = AppSession.AutomationId("SetupSourceBalanceCaption");
-    private static readonly By SourceRow = AppSession.AutomationId("SetupSourceRow");
     private static readonly By SourceName = AppSession.AutomationId("SetupSourceNameLabel");
-    private static readonly By RemoveSourceButton = AppSession.AutomationId("SetupRemoveSourceButton");
     private static readonly By SummaryTitle = AppSession.AutomationId("SetupSummaryTitleLabel");
     private static readonly By SummaryRow = AppSession.AutomationId("SetupSummaryRow");
     private static readonly By SummaryDescription = AppSession.AutomationId("SetupSummaryDescriptionLabel");
     private static readonly By SummaryDetail = AppSession.AutomationId("SetupSummaryDetailLabel");
     private static readonly By SummaryAmount = AppSession.AutomationId("SetupSummaryAmountLabel");
-    private static readonly By SummaryIncome = AppSession.AutomationId("SetupSummaryIncomeLabel");
-    private static readonly By SummaryOutcome = AppSession.AutomationId("SetupSummaryOutcomeLabel");
-    private static readonly By SummaryBalance = AppSession.AutomationId("SetupSummaryBalanceLabel");
-    private static readonly By SummaryEmpty = AppSession.AutomationId("SetupSummaryEmptyLabel");
 
     private readonly AppSession _session;
 
@@ -186,24 +179,6 @@ public class SetupPageObject
 
     public IReadOnlyList<string> SourceNames => _session.VisibleTexts(SourceName);
 
-    /// <summary>
-    /// The label of the credit card type chip ("💳 Cartão de crédito").
-    /// </summary>
-    public string CreditCardTypeText =>
-        _session.WaitForVisible(By.XPath(
-            $"//*[@resource-id='{E2ESettings.AppPackage}:id/SetupSourceCreditCardTypeButton']//android.widget.TextView")).Text;
-
-    public SetupPageObject RemoveSource(string name)
-    {
-        var count = SourceNames.Count;
-        _session.Driver.FindElements(SourceRow)
-            .First(r => r.Displayed && r.FindElement(SourceName).Text == name)
-            .FindElement(RemoveSourceButton)
-            .Click();
-        _session.WaitFor(() => SourceNames.Count == count - 1, $"\"{name}\" to be removed");
-        return this;
-    }
-
     // --- 3. Income ---
 
     public SetupPageObject EnterSalary(decimal amount)
@@ -212,8 +187,6 @@ public class SetupPageObject
         return this;
     }
 
-    public string SalaryDayText => _session.ScrollTo(SalaryDayPickerId).Text;
-
     public SetupPageObject SelectSalaryDay(int day)
     {
         _session.ScrollToAndTap(SalaryDayPickerId);
@@ -221,10 +194,6 @@ public class SetupPageObject
         _session.WaitForText(AppSession.AutomationId(SalaryDayPickerId), AppLabels.DueDay(day));
         return this;
     }
-
-    public string SalarySourceText => _session.ScrollTo(SalarySourcePickerId).Text;
-
-    public bool IsSalarySourceVisible => _session.TryScrollTo(SalarySourcePickerId) is not null;
 
     // --- 4. House expenses ---
 
@@ -270,30 +239,6 @@ public class SetupPageObject
     public bool IsExpenseChecked(string description) =>
         _session.WaitForVisible(ExpenseRowElement(description, "SetupExpenseCheckBox")).GetAttribute("checked") == "true";
 
-    /// <summary>
-    /// "Valor estimado (±)" of a selected expense.
-    /// </summary>
-    public bool IsExpenseEstimated(string description)
-    {
-        ShowOption(description, "SetupExpenseEstimatedOption");
-        return IsOptionChecked(description, "SetupExpenseEstimatedCheckBox");
-    }
-
-    /// <summary>
-    /// "Pagamento parcial" of a selected expense.
-    /// </summary>
-    public bool IsExpensePartialPayment(string description)
-    {
-        ShowOption(description, "SetupExpensePartialPaymentOption");
-        return IsOptionChecked(description, "SetupExpensePartialPaymentCheckBox");
-    }
-
-    public SetupPageObject ToggleExpenseEstimated(string description) =>
-        ToggleOption(description, "SetupExpenseEstimatedOption", "SetupExpenseEstimatedCheckBox");
-
-    public SetupPageObject ToggleExpensePartialPayment(string description) =>
-        ToggleOption(description, "SetupExpensePartialPaymentOption", "SetupExpensePartialPaymentCheckBox");
-
     // The options sit at the bottom of the row, below the fold once the keyboard closes, so they are scrolled clear
     // of the footer buttons first. Expenses are handled top to bottom, so scrolling down is enough.
     private void ShowOption(string description, string optionId)
@@ -306,17 +251,6 @@ public class SetupPageObject
 
     private bool IsOptionChecked(string description, string checkBoxId) =>
         _session.WaitForVisible(ExpenseRowElement(description, checkBoxId)).GetAttribute("checked") == "true";
-
-    private SetupPageObject ToggleOption(string description, string optionId, string checkBoxId)
-    {
-        ShowOption(description, optionId);
-        var wasChecked = IsOptionChecked(description, checkBoxId);
-        _session.Tap(ExpenseRowElement(description, optionId));
-        _session.WaitFor(() => IsOptionChecked(description, checkBoxId) != wasChecked, $"the option of \"{description}\" to be toggled");
-        return this;
-    }
-
-    public string ExpensesSourceText => _session.ScrollTo(ExpensesSourcePickerId).Text;
 
     public SetupPageObject SelectExpensesSource(string sourceName)
     {
@@ -343,8 +277,6 @@ public class SetupPageObject
     public string SummaryIncomeText => _session.ScrollTo("SetupSummaryIncomeLabel").Text;
     public string SummaryOutcomeText => _session.ScrollTo("SetupSummaryOutcomeLabel").Text;
     public string SummaryBalanceText => _session.ScrollTo("SetupSummaryBalanceLabel").Text;
-
-    public bool IsSummaryEmptyVisible => _session.IsVisible(SummaryEmpty);
 
     public bool IsRecurrenceGuideVisible => _session.TryScrollTo("SetupRecurrenceGuide") is not null;
 
