@@ -21,11 +21,13 @@ public class SetupPageObject
     private static readonly By WelcomeStep = AppSession.AutomationId("SetupWelcomeStep");
     private static readonly By WelcomeTitle = AppSession.AutomationId("SetupWelcomeTitleLabel");
     private static readonly By Tagline = AppSession.AutomationId("SetupTaglineLabel");
-    private static readonly By NameEntry = AppSession.AutomationId("SetupNameEntry");
     private static readonly By AvatarInitial = AppSession.AutomationId("SetupAvatarInitialLabel");
     private static readonly By SourceBalanceEntry = AppSession.AutomationId("SetupSourceBalanceEntry");
     private static readonly By SourceBalanceCaption = AppSession.AutomationId("SetupSourceBalanceCaption");
     private static readonly By SourceName = AppSession.AutomationId("SetupSourceNameLabel");
+    private static readonly By CardName = AppSession.AutomationId("SetupCardNameLabel");
+    private static readonly By CardDetail = AppSession.AutomationId("SetupCardDetailLabel");
+    private static readonly By PurchaseDescription = AppSession.AutomationId("SetupPurchaseDescriptionLabel");
     private static readonly By SummaryTitle = AppSession.AutomationId("SetupSummaryTitleLabel");
     private static readonly By SummaryRow = AppSession.AutomationId("SetupSummaryRow");
     private static readonly By SummaryDescription = AppSession.AutomationId("SetupSummaryDescriptionLabel");
@@ -135,23 +137,24 @@ public class SetupPageObject
 
     // --- 1. Welcome ---
 
-    public string NameText => _session.WaitForVisible(NameEntry).Text;
+    public string NameText => _session.ScrollTo("SetupNameEntry").Text;
 
     public string AvatarInitialText => _session.WaitForVisible(AvatarInitial).Text;
 
     public SetupPageObject EnterName(string name)
     {
-        var entry = _session.WaitForVisible(NameEntry);
+        var entry = _session.ScrollTo("SetupNameEntry");
         entry.Clear();
         entry.SendKeys(name);
         _session.HideKeyboardIfShown();
         return this;
     }
 
-    // --- 2. Accounts and cards ---
+    // --- 2. Accounts and vouchers ---
 
     /// <summary>
-    /// Fills the form with the source's name, type (<see cref="AppFormat.BankAccount"/>, ...) and balance, then taps "Adicionar".
+    /// Fills the form with the source's name, type (<see cref="AppFormat.BankAccount"/> or <see cref="AppFormat.MealVoucher"/>)
+    /// and balance, then taps "Adicionar". Credit cards have a step of their own, see <see cref="AddCard"/>.
     /// </summary>
     public SetupPageObject AddSource(string name, int type, decimal balance)
     {
@@ -159,13 +162,8 @@ public class SetupPageObject
 
         TypeSourceName(name);
 
-        _session.ScrollToAndTap(type switch
-        {
-            AppFormat.CreditCard => "SetupSourceCreditCardTypeButton",
-            AppFormat.MealVoucher => "SetupSourceMealVoucherTypeButton",
-            _ => "SetupSourceBankAccountTypeButton"
-        });
-        _session.WaitForText(SourceBalanceCaption, type == AppFormat.CreditCard ? AppLabels.Limit : AppLabels.Balance);
+        _session.ScrollToAndTap(type == AppFormat.MealVoucher ? "SetupSourceMealVoucherTypeButton" : "SetupSourceBankAccountTypeButton");
+        _session.WaitForText(SourceBalanceCaption, AppLabels.Balance);
 
         TypeAmount(_session.ScrollTo("SetupSourceBalanceEntry"), SourceBalanceEntry, balance);
 
@@ -188,7 +186,62 @@ public class SetupPageObject
 
     public IReadOnlyList<string> SourceNames => _session.VisibleTexts(SourceName);
 
-    // --- 3. Income ---
+    // --- 3. Credit cards ---
+
+    /// <summary>
+    /// Fills the card form with its name, limit and bill due day, then taps "Adicionar cartão de crédito". The bill is
+    /// paid by the account already picked (the first account added).
+    /// </summary>
+    public SetupPageObject AddCard(string name, decimal limit, int billDueDay)
+    {
+        var count = CardNames.Count;
+
+        var nameEntry = _session.ScrollTo("SetupCardNameEntry");
+        nameEntry.Clear();
+        nameEntry.SendKeys(name);
+        _session.HideKeyboardIfShown();
+
+        TypeAmount(_session.ScrollTo("SetupCardLimitEntry"), AppSession.AutomationId("SetupCardLimitEntry"), limit);
+        SelectDay("SetupCardBillDueDayPicker", billDueDay);
+
+        _session.ScrollToAndTap("SetupAddCardButton");
+        _session.WaitFor(() => CardNames.Count == count + 1, $"\"{name}\" to be added");
+        return this;
+    }
+
+    public IReadOnlyList<string> CardNames => ScrolledTexts("SetupCardNameLabel", CardName);
+
+    /// <summary>
+    /// "Vence dia 10 · Débito em Nubank" for each card added.
+    /// </summary>
+    public IReadOnlyList<string> CardDetails => ScrolledTexts("SetupCardDetailLabel", CardDetail);
+
+    /// <summary>
+    /// Adds a purchase in installments to the card picked (the first one added): <paramref name="current"/> of
+    /// <paramref name="total"/> falls this month.
+    /// </summary>
+    public SetupPageObject AddInstallmentPurchase(string description, decimal installmentAmount, int current, int total)
+    {
+        var count = PurchaseDescriptions.Count;
+
+        var descriptionEntry = _session.ScrollTo("SetupPurchaseDescriptionEntry");
+        descriptionEntry.Clear();
+        descriptionEntry.SendKeys(description);
+        _session.HideKeyboardIfShown();
+
+        _session.ScrollToAndTap("SetupPurchaseInstallmentsButton");
+        TypeNumber("SetupPurchaseCurrentInstallmentEntry", current);
+        TypeNumber("SetupPurchaseTotalInstallmentsEntry", total);
+        TypeAmount(_session.ScrollTo("SetupPurchaseAmountEntry"), AppSession.AutomationId("SetupPurchaseAmountEntry"), installmentAmount);
+
+        _session.ScrollToAndTap("SetupAddPurchaseButton");
+        _session.WaitFor(() => PurchaseDescriptions.Count == count + 1, $"\"{description}\" to be added");
+        return this;
+    }
+
+    public IReadOnlyList<string> PurchaseDescriptions => ScrolledTexts("SetupPurchaseDescriptionLabel", PurchaseDescription);
+
+    // --- 4. Income ---
 
     public SetupPageObject EnterSalary(decimal amount)
     {
@@ -196,15 +249,24 @@ public class SetupPageObject
         return this;
     }
 
-    public SetupPageObject SelectSalaryDay(int day)
+    public SetupPageObject SelectSalaryDay(int day) => SelectDay(SalaryDayPickerId, day);
+
+    /// <summary>
+    /// Turns on "Recebo o salário em duas partes" and fills the advance ("vale"), which keeps its default day.
+    /// </summary>
+    public SetupPageObject SplitSalary(decimal advance)
     {
-        _session.ScrollToAndTap(SalaryDayPickerId);
-        _session.ScrollDialogListToAndTap(AppLabels.DueDay(day));
-        _session.WaitForText(AppSession.AutomationId(SalaryDayPickerId), AppLabels.DueDay(day));
+        _session.ScrollToAndTap("SetupSalarySplitSwitch");
+        TypeAmount(_session.ScrollTo("SetupAdvanceEntry"), AppSession.AutomationId("SetupAdvanceEntry"), advance);
         return this;
     }
 
-    // --- 4. House expenses ---
+    /// <summary>
+    /// "Total no mês": the payment plus the advance.
+    /// </summary>
+    public string MonthlySalaryText => _session.ScrollTo("SetupMonthlySalaryLabel").Text;
+
+    // --- 5. House expenses and 6. other expenses ---
 
     /// <summary>
     /// Ticks the expense and fills its monthly amount and, when given, its due day.
@@ -270,7 +332,118 @@ public class SetupPageObject
         return this;
     }
 
-    // --- 5. Summary ---
+    /// <summary>
+    /// Answers "Você tem filhos?" with "Sim", which shows the school expenses.
+    /// </summary>
+    public SetupPageObject SelectHasChildren()
+    {
+        _session.HideKeyboardIfShown();
+        _session.ScrollToAndTap("SetupHasChildrenButton");
+        // The revealed expenses open below the fold.
+        ScrollToText("Mensalidade escolar");
+        return this;
+    }
+
+    /// <summary>
+    /// Answers "Você tem carro?" with "Sim", which shows the car expenses.
+    /// </summary>
+    public SetupPageObject SelectHasCar()
+    {
+        _session.HideKeyboardIfShown();
+        _session.ScrollToAndTap("SetupHasCarButton");
+        ScrollToText("Combustível");
+        return this;
+    }
+
+    /// <summary>
+    /// Answers "Você tem casa própria?" with "Sim", which shows the home form.
+    /// </summary>
+    public SetupPageObject SelectHasOwnHome()
+    {
+        _session.HideKeyboardIfShown();
+        _session.ScrollToAndTap("SetupHasOwnHomeButton");
+        _session.ScrollTo("SetupHomeNameEntry");
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a home with its IPTU (the amount of each installment), which keeps its default first month (February).
+    /// </summary>
+    public SetupPageObject AddHome(string name, decimal iptu, int iptuInstallments)
+    {
+        var count = ScrolledTexts("SetupHomeNameLabel", AppSession.AutomationId("SetupHomeNameLabel")).Count;
+        TypeText("SetupHomeNameEntry", name);
+        TypeAmount(_session.ScrollTo("SetupHomeIptuEntry"), AppSession.AutomationId("SetupHomeIptuEntry"), iptu);
+        SelectOption("SetupHomeIptuInstallmentsPicker", AppLabels.AnnualInstallments(iptuInstallments));
+        _session.ScrollToAndTap("SetupAddHomeButton");
+        _session.WaitFor(() => ScrolledTexts("SetupHomeNameLabel", AppSession.AutomationId("SetupHomeNameLabel")).Count == count + 1,
+            $"\"{name}\" to be added");
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a car with its IPVA (the amount of each installment, from January) and its licensing fee (in July), the
+    /// default months.
+    /// </summary>
+    public SetupPageObject AddCar(string name, decimal ipva, int ipvaInstallments, decimal licensing)
+    {
+        var count = ScrolledTexts("SetupCarNameLabel", AppSession.AutomationId("SetupCarNameLabel")).Count;
+        TypeText("SetupCarNameEntry", name);
+        TypeAmount(_session.ScrollTo("SetupCarIpvaEntry"), AppSession.AutomationId("SetupCarIpvaEntry"), ipva);
+        SelectOption("SetupCarIpvaInstallmentsPicker", AppLabels.AnnualInstallments(ipvaInstallments));
+        TypeAmount(_session.ScrollTo("SetupCarLicensingEntry"), AppSession.AutomationId("SetupCarLicensingEntry"), licensing);
+        _session.ScrollToAndTap("SetupAddCarButton");
+        _session.WaitFor(() => ScrolledTexts("SetupCarNameLabel", AppSession.AutomationId("SetupCarNameLabel")).Count == count + 1,
+            $"\"{name}\" to be added");
+        return this;
+    }
+
+    /// <summary>
+    /// "IPTU todo ano, fevereiro a novembro (10x)" for each home added.
+    /// </summary>
+    public IReadOnlyList<string> HomeDetails => ScrolledTexts("SetupHomeDetailLabel", AppSession.AutomationId("SetupHomeDetailLabel"));
+
+    public IReadOnlyList<string> CarDetails => ScrolledTexts("SetupCarDetailLabel", AppSession.AutomationId("SetupCarDetailLabel"));
+
+    private void TypeText(string automationId, string text)
+    {
+        var entry = _session.ScrollTo(automationId);
+        entry.Clear();
+        entry.SendKeys(text);
+        _session.HideKeyboardIfShown();
+    }
+
+    private void SelectOption(string pickerId, string label)
+    {
+        _session.ScrollToAndTap(pickerId);
+        _session.ScrollDialogListToAndTap(label);
+        _session.WaitForText(AppSession.AutomationId(pickerId), label);
+    }
+
+    // --- Skipping ---
+
+    /// <summary>
+    /// Taps "Pular esta etapa", which discards what was filled in on the step and moves on.
+    /// </summary>
+    public SetupPageObject SkipStep()
+    {
+        var step = CurrentStep;
+        _session.HideKeyboardIfShown();
+        _session.Tap(AppSession.AutomationId("SetupSkipStepButton"));
+        return WaitForStep(step + 1);
+    }
+
+    /// <summary>
+    /// "Tudo é opcional...", shown on every step but the summary.
+    /// </summary>
+    public bool IsOptionalHintVisible => _session.IsVisible(AppSession.AutomationId("SetupOptionalHint"));
+
+    /// <summary>
+    /// "Etapas puladas: Contas e vales, Renda" on the summary, see <see cref="AppLabels.SetupSkippedSteps"/>.
+    /// </summary>
+    public string SkippedStepsText => _session.ScrollTo("SetupSkippedStepsLabel").Text;
+
+    // --- 7. Summary ---
 
     public string SummaryTitleText => _session.WaitForVisible(SummaryTitle).Text;
 
@@ -298,6 +471,30 @@ public class SetupPageObject
         entry.SendKeys(decimal.ToInt64(amount * 100).ToString(CultureInfo.InvariantCulture));
         _session.WaitForText(locator, AppFormat.Money(amount));
         _session.HideKeyboardIfShown();
+    }
+
+    // The card and purchase lists sit above their forms, so they scroll out of sight while a form is filled.
+    private IReadOnlyList<string> ScrolledTexts(string automationId, By locator)
+    {
+        _session.TryScrollTo(automationId);
+        return _session.VisibleTexts(locator);
+    }
+
+    private void TypeNumber(string automationId, int value)
+    {
+        var entry = _session.ScrollTo(automationId);
+        entry.Clear();
+        entry.SendKeys(value.ToString(CultureInfo.InvariantCulture));
+        _session.WaitForText(AppSession.AutomationId(automationId), value.ToString(CultureInfo.InvariantCulture));
+        _session.HideKeyboardIfShown();
+    }
+
+    private SetupPageObject SelectDay(string pickerId, int day)
+    {
+        _session.ScrollToAndTap(pickerId);
+        _session.ScrollDialogListToAndTap(AppLabels.DueDay(day));
+        _session.WaitForText(AppSession.AutomationId(pickerId), AppLabels.DueDay(day));
+        return this;
     }
 
     private bool IsAboveFooter(By locator, int footerTop) =>

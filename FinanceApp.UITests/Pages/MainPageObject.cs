@@ -86,6 +86,15 @@ public class MainPageObject
         return this;
     }
 
+    /// <summary>
+    /// Waits for "Carregando lançamentos..." to go away: the month on screen has its entries.
+    /// </summary>
+    public MainPageObject WaitForMonthLoaded()
+    {
+        _session.WaitForGone(AppSession.AutomationId("MonthLoadingIndicator"));
+        return this;
+    }
+
     public string MonthTitleText => _session.WaitForVisible(MonthTitle).Text;
     public string SummaryIncomeText => SummaryValue(SummaryPage.Totals, SummaryIncome);
     public string SummaryOutcomeText => SummaryValue(SummaryPage.Totals, SummaryOutcome);

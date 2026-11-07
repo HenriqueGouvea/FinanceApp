@@ -65,6 +65,61 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task InitializeAsync_LoadsMonthOnScreenFirstThenClosestNeighbours()
+    {
+        List<DateTime> loaded = [];
+        _service.GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>())
+            .Returns(call =>
+            {
+                loaded.Add(new DateTime(call.ArgAt<int>(0), call.ArgAt<int>(1), 1));
+                return Task.FromResult<IEnumerable<MonthlyEntryProjection>>([]);
+            });
+
+        await _vm.InitializeAsync();
+
+        var today = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        loaded.Should().Equal(today, today.AddMonths(1), today.AddMonths(-1), today.AddMonths(2), today.AddMonths(-2));
+    }
+
+    [Fact]
+    public async Task IsSelectedMonthLoading_WhileTheMonthOnScreenIsFetched_IsTrueUntilItsEntriesArrive()
+    {
+        var fetch = new TaskCompletionSource<IEnumerable<MonthlyEntryProjection>>();
+        _service.GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>()).Returns(fetch.Task);
+        List<string?> notified = [];
+        _vm.PropertyChanged += (_, e) => notified.Add(e.PropertyName);
+
+        var initializing = _vm.InitializeAsync();
+
+        _vm.IsSelectedMonthLoading.Should().BeTrue();
+        fetch.SetResult([]);
+        await initializing;
+        _vm.IsSelectedMonthLoading.Should().BeFalse();
+        notified.Should().Contain(nameof(MainViewModel.IsSelectedMonthLoading));
+    }
+
+    [Fact]
+    public async Task IsSelectedMonthLoading_RefreshingAfterAChange_ShowsUntilReloaded()
+    {
+        await _vm.InitializeAsync();
+        var fetch = new TaskCompletionSource<IEnumerable<MonthlyEntryProjection>>();
+        _service.GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>()).Returns(fetch.Task);
+
+        var refreshing = _vm.RefreshAllAsync();
+
+        _vm.IsSelectedMonthLoading.Should().BeTrue();
+        fetch.SetResult([]);
+        await refreshing;
+        _vm.IsSelectedMonthLoading.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsSelectedMonthLoading_BeforeInitialization_IsFalse()
+    {
+        _vm.IsSelectedMonthLoading.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task InitializeAsync_PtBrCulture_MonthNameIsLocalizedAndCapitalized()
     {
         var original = CultureInfo.CurrentCulture;

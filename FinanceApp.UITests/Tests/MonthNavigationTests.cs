@@ -90,12 +90,13 @@ public sealed class MonthNavigationTests : E2ETestBase
 
     [Fact]
     [Trait("Smoke", "true")]
-    public void MonthPicker_JumpFarAway_LoadsThatMonthsEntries()
+    public void MonthPicker_JumpFarAway_LoadsThatMonthsEntriesAndHidesLoadingIndicator()
     {
         var target = AppFormat.CurrentMonth.AddMonths(18);
 
         MainPage.GoToMonth(target).WaitForEntry(Rent);
 
+        MainPage.WaitForMonthLoaded();
         MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(1500));
         MainPage.GoToPreviousMonth().WaitForEntry(Rent);
     }

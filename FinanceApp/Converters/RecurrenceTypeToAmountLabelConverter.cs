@@ -12,6 +12,7 @@ public class RecurrenceTypeToAmountLabelConverter : IValueConverter
         RecurrenceType.OneTime => "Valor total",
         RecurrenceType.Recurrent => "Valor mensal",
         RecurrenceType.Installments => "Valor de cada parcela",
+        RecurrenceType.Annual => "Valor anual (ou de cada parcela)",
         _ => "Valor"
     };
 

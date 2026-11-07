@@ -13,6 +13,7 @@ public static class AppFormat
     public const int OneTime = 0;
     public const int Recurrent = 1;
     public const int Installments = 2;
+    public const int Annual = 3;
 
     public const int Pending = 0;
     public const int Paid = 1;
@@ -34,9 +35,19 @@ public static class AppFormat
 
     public static string EntryCount(int count) => $"{count} lançamento(s)";
 
-    public const int SetupStepCount = 5;
+    public const int SetupStepCount = 7;
 
     public static string SetupStep(int step) => $"Passo {step} de {SetupStepCount}";
+
+    /// <summary>
+    /// Where the setup wizard starts an annual tax: this year's first month while any of this year's installments is
+    /// still to come, otherwise next year's.
+    /// </summary>
+    public static DateTime AnnualStart(int month, int installments)
+    {
+        var start = new DateTime(CurrentMonth.Year, month, 1);
+        return start.AddMonths(installments - 1) < CurrentMonth ? start.AddYears(1) : start;
+    }
 
     /// <summary>
     /// Balance line of a payment source row (e.g. "Saldo: R$ 1.000,00" or "Limite: R$ 5.000,00").

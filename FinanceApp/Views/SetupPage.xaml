@@ -10,7 +10,103 @@
              Shell.NavBarIsVisible="False"
              BackgroundColor="{StaticResource AppBackground}">
 
-    <Grid RowDefinitions="Auto, Auto, *, Auto">
+    <ContentPage.Resources>
+        <!-- An expense the user can tick, with its amount, due day and the two kinds of varying bills -->
+        <DataTemplate x:Key="SetupExpenseTemplate" x:DataType="vm:SetupExpenseItem">
+            <Border AutomationId="SetupExpenseRow"
+                    BackgroundColor="{StaticResource CardBackground}"
+                    StrokeShape="RoundRectangle 16"
+                    Stroke="Transparent"
+                    StrokeThickness="2"
+                    Padding="12,8">
+                <Border.Triggers>
+                    <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                        <Setter Property="Stroke" Value="{StaticResource PrimaryBrush}" />
+                        <Setter Property="BackgroundColor" Value="{StaticResource BillTint}" />
+                    </DataTrigger>
+                </Border.Triggers>
+                <VerticalStackLayout Spacing="8">
+                    <!-- Tapping the row (re)selects it; the check box only mirrors the state -->
+                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10">
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding ToggleExpenseCommand, Source={RelativeSource AncestorType={x:Type vm:SetupViewModel}}, x:DataType=vm:SetupViewModel}"
+                                                  CommandParameter="{Binding .}" />
+                        </Grid.GestureRecognizers>
+                        <Label Grid.Column="0" Text="{Binding Icon}" FontSize="20" VerticalOptions="Center" />
+                        <Label Grid.Column="1" AutomationId="SetupExpenseNameLabel" Text="{Binding Description}" FontSize="15" VerticalOptions="Center" />
+                        <CheckBox Grid.Column="2"
+                                  AutomationId="SetupExpenseCheckBox"
+                                  IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                  InputTransparent="True"
+                                  Color="{StaticResource Primary}"
+                                  VerticalOptions="Center" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*, *" ColumnSpacing="10" IsVisible="{Binding IsSelected}">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Valor mensal" Style="{StaticResource FieldCaption}" />
+                            <Entry AutomationId="SetupExpenseAmountEntry" Keyboard="Numeric">
+                                <Entry.Behaviors>
+                                    <behaviors:CurrencyMaskBehavior Value="{Binding Amount}" />
+                                </Entry.Behaviors>
+                            </Entry>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="Vencimento" Style="{StaticResource FieldCaption}" />
+                            <Picker AutomationId="SetupExpenseDueDayPicker"
+                                    Title="Vencimento"
+                                    ItemsSource="{Binding DueDays, Source={RelativeSource AncestorType={x:Type vm:SetupViewModel}}, x:DataType=vm:SetupViewModel}"
+                                    ItemDisplayBinding="{Binding ., Converter={x:Static converters:DueDayToLabelConverter.Instance}, x:DataType=x:Int32}"
+                                    SelectedItem="{Binding DueDay}" />
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <!-- The two kinds of varying bills, explained right where the user first meets them -->
+                    <Grid AutomationId="SetupExpenseEstimatedOption"
+                          ColumnDefinitions="Auto, *"
+                          ColumnSpacing="6"
+                          IsVisible="{Binding IsSelected}">
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding ToggleEstimatedCommand}" />
+                        </Grid.GestureRecognizers>
+                        <CheckBox Grid.Column="0"
+                                  AutomationId="SetupExpenseEstimatedCheckBox"
+                                  IsChecked="{Binding IsEstimated, Mode=OneWay}"
+                                  InputTransparent="True"
+                                  Color="{StaticResource Primary}"
+                                  VerticalOptions="Start" />
+                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                            <Label Text="Valor estimado (±)" FontSize="14" />
+                            <Label Text="O valor muda a cada mês, como luz e água. Você ajusta quando a conta chegar."
+                                   FontSize="11"
+                                   TextColor="{StaticResource Muted}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Grid AutomationId="SetupExpensePartialPaymentOption"
+                          ColumnDefinitions="Auto, *"
+                          ColumnSpacing="6"
+                          IsVisible="{Binding IsSelected}">
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding TogglePartialPaymentCommand}" />
+                        </Grid.GestureRecognizers>
+                        <CheckBox Grid.Column="0"
+                                  AutomationId="SetupExpensePartialPaymentCheckBox"
+                                  IsChecked="{Binding AllowsPartialPayment, Mode=OneWay}"
+                                  InputTransparent="True"
+                                  Color="{StaticResource Primary}"
+                                  VerticalOptions="Start" />
+                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                            <Label Text="Pagamento parcial" FontSize="14" />
+                            <Label Text="Pago aos poucos durante o mês, como o mercado. Registre cada compra com &quot;Pagar parcial&quot;."
+                                   FontSize="11"
+                                   TextColor="{StaticResource Muted}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+        </DataTemplate>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto, Auto, Auto, *, Auto">
 
         <!-- Header: the step and a way out, on every step -->
         <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Padding="20,8,8,8">
@@ -41,8 +137,15 @@
                      Progress="{Binding Progress}"
                      ProgressColor="{StaticResource Primary}"
                      Margin="20,0" />
+        <Label Grid.Row="2"
+               AutomationId="SetupOptionalHint"
+               Text="Tudo é opcional: pule o que quiser e faça depois em Configurações › Refazer configuração inicial."
+               FontSize="11"
+               TextColor="{StaticResource Muted}"
+               Margin="20,6,20,0"
+               IsVisible="{Binding IsLastStep, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
 
-        <ScrollView x:Name="StepScroll" Grid.Row="2">
+        <ScrollView x:Name="StepScroll" Grid.Row="3">
             <Grid Padding="20,20,20,24">
 
                 <!-- 1. Welcome: name and photo -->
@@ -56,7 +159,7 @@
                     </HorizontalStackLayout>
                     <Label FontSize="14"
                            TextColor="{StaticResource Ink}"
-                           Text="Vamos montar o seu primeiro mês em poucos passos: suas contas, sua renda e os gastos fixos da casa. Tudo pode ser alterado depois, e você pode pular o que quiser." />
+                           Text="Vamos montar o seu primeiro mês em poucos passos: suas contas e cartões, sua renda e os gastos fixos. Tudo pode ser alterado depois, e você pode pular o que quiser." />
 
                     <Grid WidthRequest="112" HeightRequest="112" HorizontalOptions="Center" Margin="0,8,0,0">
                         <Grid.GestureRecognizers>
@@ -104,12 +207,12 @@
                     </VerticalStackLayout>
                 </VerticalStackLayout>
 
-                <!-- 2. Accounts, cards and vouchers -->
+                <!-- 2. Accounts and vouchers -->
                 <VerticalStackLayout AutomationId="SetupPaymentSourcesStep" Spacing="16" IsVisible="{Binding IsPaymentSourcesStep}">
                     <Label Text="Onde fica o seu dinheiro?" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
                     <Label FontSize="14"
                            TextColor="{StaticResource Ink}"
-                           Text="Cadastre suas contas, cartões de crédito e vales. Assim cada receita diz onde cai e cada despesa diz como é paga." />
+                           Text="Cadastre suas contas bancárias e vales. Assim cada receita diz onde cai e cada despesa diz como é paga. Os cartões de crédito vêm no próximo passo." />
 
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding NewSources}" Spacing="4" IsVisible="{Binding HasNewSources}">
                         <BindableLayout.ItemTemplate>
@@ -148,10 +251,10 @@
 
                     <Border Style="{StaticResource Card}" Padding="14">
                         <VerticalStackLayout Spacing="12">
-                            <Entry AutomationId="SetupSourceNameEntry" Placeholder="Nome (ex.: Nubank)" Text="{Binding NewSourceName}" MaxLength="30" />
+                            <Entry AutomationId="SetupSourceNameEntry" Placeholder="Nome (ex.: Itaú)" Text="{Binding NewSourceName}" MaxLength="30" />
 
                             <Border Style="{StaticResource SegmentedControl}">
-                                <Grid ColumnDefinitions="*, *, *" ColumnSpacing="3">
+                                <Grid ColumnDefinitions="*, *" ColumnSpacing="3">
                                     <Border Grid.Column="0"
                                             AutomationId="SetupSourceBankAccountTypeButton"
                                             Style="{StaticResource SegmentOption}">
@@ -163,7 +266,7 @@
                                         <Border.GestureRecognizers>
                                             <TapGestureRecognizer Command="{Binding SelectSourceTypeCommand}" CommandParameter="{x:Static models:PaymentSourceType.BankAccount}" />
                                         </Border.GestureRecognizers>
-                                        <Label Text="🏦 Conta" Style="{StaticResource SegmentLabel}">
+                                        <Label Text="🏦 Conta bancária" Style="{StaticResource SegmentLabel}">
                                             <Label.Triggers>
                                                 <DataTrigger TargetType="Label" Binding="{Binding NewSourceType}" Value="{x:Static models:PaymentSourceType.BankAccount}">
                                                     <Setter Property="TextColor" Value="White" />
@@ -173,26 +276,6 @@
                                         </Label>
                                     </Border>
                                     <Border Grid.Column="1"
-                                            AutomationId="SetupSourceCreditCardTypeButton"
-                                            Style="{StaticResource SegmentOption}">
-                                        <Border.Triggers>
-                                            <DataTrigger TargetType="Border" Binding="{Binding NewSourceType}" Value="{x:Static models:PaymentSourceType.CreditCard}">
-                                                <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
-                                            </DataTrigger>
-                                        </Border.Triggers>
-                                        <Border.GestureRecognizers>
-                                            <TapGestureRecognizer Command="{Binding SelectSourceTypeCommand}" CommandParameter="{x:Static models:PaymentSourceType.CreditCard}" />
-                                        </Border.GestureRecognizers>
-                                        <Label Text="💳 Cartão de crédito" Style="{StaticResource SegmentLabel}">
-                                            <Label.Triggers>
-                                                <DataTrigger TargetType="Label" Binding="{Binding NewSourceType}" Value="{x:Static models:PaymentSourceType.CreditCard}">
-                                                    <Setter Property="TextColor" Value="White" />
-                                                    <Setter Property="FontAttributes" Value="Bold" />
-                                                </DataTrigger>
-                                            </Label.Triggers>
-                                        </Label>
-                                    </Border>
-                                    <Border Grid.Column="2"
                                             AutomationId="SetupSourceMealVoucherTypeButton"
                                             Style="{StaticResource SegmentOption}">
                                         <Border.Triggers>
@@ -228,35 +311,316 @@
 
                             <Button AutomationId="SetupAddSourceButton"
                                     Text="Adicionar"
-                                   
                                     Command="{Binding AddSourceCommand}" />
                         </VerticalStackLayout>
                     </Border>
                 </VerticalStackLayout>
 
-                <!-- 3. Income -->
+                <!-- 3. Credit cards and the purchases already on them -->
+                <VerticalStackLayout AutomationId="SetupCreditCardsStep" Spacing="16" IsVisible="{Binding IsCreditCardsStep}">
+                    <Label Text="Você usa cartão de crédito?" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
+                    <Label FontSize="14"
+                           TextColor="{StaticResource Ink}"
+                           Text="Cadastre seus cartões de crédito e as compras que já estão neles. Todo mês, as compras de um cartão de crédito são reunidas na fatura dele, que vence em um só dia." />
+
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding NewCards}" Spacing="4" IsVisible="{Binding HasNewCards}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SetupCreditCardItem">
+                                <Grid AutomationId="SetupCardRow" ColumnDefinitions="Auto, *, Auto, 36" ColumnSpacing="10" Padding="0,6">
+                                    <Label Grid.Column="0" Text="💳" FontSize="18" VerticalOptions="Center" />
+                                    <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                        <Label AutomationId="SetupCardNameLabel" Text="{Binding Card.Name}" FontSize="15" LineBreakMode="TailTruncation" />
+                                        <Label AutomationId="SetupCardDetailLabel" Text="{Binding Detail}" FontSize="11" TextColor="{StaticResource Muted}" />
+                                    </VerticalStackLayout>
+                                    <Label Grid.Column="2"
+                                           AutomationId="SetupCardLimitLabel"
+                                           Text="{Binding Card.Balance, Converter={x:Static converters:MoneyConverter.Instance}}"
+                                           FontSize="14"
+                                           FontAttributes="Bold"
+                                           VerticalOptions="Center" />
+                                    <Button Grid.Column="3"
+                                            AutomationId="SetupRemoveCardButton"
+                                            Text="✕"
+                                            FontSize="14"
+                                            Padding="0"
+                                            HeightRequest="36"
+                                            BackgroundColor="Transparent"
+                                            TextColor="{StaticResource Outcome}"
+                                            Command="{Binding RemoveCardCommand, Source={RelativeSource AncestorType={x:Type vm:SetupViewModel}}, x:DataType=vm:SetupViewModel}"
+                                            CommandParameter="{Binding .}" />
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+
+                    <Border Style="{StaticResource Card}" Padding="14">
+                        <VerticalStackLayout Spacing="12">
+                            <Entry AutomationId="SetupCardNameEntry" Placeholder="Nome (ex.: Nubank)" Text="{Binding NewCardName}" MaxLength="30" />
+
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="Limite" Style="{StaticResource FieldCaption}" />
+                                <Entry AutomationId="SetupCardLimitEntry" Keyboard="Numeric">
+                                    <Entry.Behaviors>
+                                        <behaviors:CurrencyMaskBehavior Value="{Binding NewCardLimit}" />
+                                    </Entry.Behaviors>
+                                </Entry>
+                            </VerticalStackLayout>
+
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="Vencimento da fatura" Style="{StaticResource FieldCaption}" />
+                                <Picker AutomationId="SetupCardBillDueDayPicker"
+                                        Title="Vencimento da fatura"
+                                        ItemsSource="{Binding DueDays}"
+                                        ItemDisplayBinding="{Binding ., Converter={x:Static converters:DueDayToLabelConverter.Instance}, x:DataType=x:Int32}"
+                                        SelectedItem="{Binding NewCardBillDueDay}" />
+                            </VerticalStackLayout>
+
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="Fatura paga com" Style="{StaticResource FieldCaption}" />
+                                <Picker AutomationId="SetupCardBillAccountPicker"
+                                        Title="Fatura paga com"
+                                        ItemsSource="{Binding BillAccounts}"
+                                        ItemDisplayBinding="{Binding Name, x:DataType=models:PaymentSource}"
+                                        SelectedItem="{Binding NewCardBillAccount}"
+                                        IsVisible="{Binding HasBillAccounts}" />
+                                <Label AutomationId="SetupNoBillAccountsLabel"
+                                       Text="Volte ao passo anterior e cadastre uma conta bancária para escolher qual paga a fatura."
+                                       FontSize="12"
+                                       TextColor="{StaticResource Muted}"
+                                       IsVisible="{Binding HasBillAccounts, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
+                            </VerticalStackLayout>
+
+                            <Button AutomationId="SetupAddCardButton"
+                                    Text="Adicionar cartão de crédito"
+                                    Command="{Binding AddCardCommand}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Purchases: only once there is a card to put them on -->
+                    <VerticalStackLayout AutomationId="SetupPurchasesSection" Spacing="12" IsVisible="{Binding HasCreditCards}">
+                        <Label Text="Compras no cartão de crédito" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
+                        <Label FontSize="13"
+                               TextColor="{StaticResource Ink}"
+                               Text="Inclua as parcelas que ainda faltam, as assinaturas (como streaming) e as compras deste mês. Elas entram na fatura do cartão de crédito." />
+
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Purchases}" Spacing="4" IsVisible="{Binding HasPurchases}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SetupPurchaseItem">
+                                    <Grid AutomationId="SetupPurchaseRow" ColumnDefinitions="*, Auto, 36" ColumnSpacing="10" Padding="0,6">
+                                        <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
+                                            <Label AutomationId="SetupPurchaseDescriptionLabel" Text="{Binding Description}" FontSize="15" LineBreakMode="TailTruncation" />
+                                            <Label AutomationId="SetupPurchaseDetailLabel" Text="{Binding Detail}" FontSize="11" TextColor="{StaticResource Muted}" />
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="1"
+                                               AutomationId="SetupPurchaseAmountLabel"
+                                               Text="{Binding Amount, Converter={x:Static converters:MoneyConverter.Instance}}"
+                                               FontSize="14"
+                                               FontAttributes="Bold"
+                                               TextColor="{StaticResource Outcome}"
+                                               VerticalOptions="Center" />
+                                        <Button Grid.Column="2"
+                                                AutomationId="SetupRemovePurchaseButton"
+                                                Text="✕"
+                                                FontSize="14"
+                                                Padding="0"
+                                                HeightRequest="36"
+                                                BackgroundColor="Transparent"
+                                                TextColor="{StaticResource Outcome}"
+                                                Command="{Binding RemovePurchaseCommand, Source={RelativeSource AncestorType={x:Type vm:SetupViewModel}}, x:DataType=vm:SetupViewModel}"
+                                                CommandParameter="{Binding .}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+
+                        <Border Style="{StaticResource Card}" Padding="14">
+                            <VerticalStackLayout Spacing="12">
+                                <Entry AutomationId="SetupPurchaseDescriptionEntry" Placeholder="Descrição (ex.: Celular novo)" Text="{Binding NewPurchaseDescription}" MaxLength="40" />
+
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="Cartão de crédito" Style="{StaticResource FieldCaption}" />
+                                    <Picker AutomationId="SetupPurchaseCardPicker"
+                                            Title="Cartão de crédito"
+                                            ItemsSource="{Binding CreditCards}"
+                                            ItemDisplayBinding="{Binding Name, x:DataType=models:PaymentSource}"
+                                            SelectedItem="{Binding NewPurchaseCard}" />
+                                </VerticalStackLayout>
+
+                                <Border Style="{StaticResource SegmentedControl}">
+                                    <Grid ColumnDefinitions="*, *, *" ColumnSpacing="3">
+                                        <Border Grid.Column="0"
+                                                AutomationId="SetupPurchaseOneTimeButton"
+                                                Style="{StaticResource SegmentOption}">
+                                            <Border.Triggers>
+                                                <DataTrigger TargetType="Border" Binding="{Binding NewPurchaseRecurrence}" Value="{x:Static models:RecurrenceType.OneTime}">
+                                                    <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                                                </DataTrigger>
+                                            </Border.Triggers>
+                                            <Border.GestureRecognizers>
+                                                <TapGestureRecognizer Command="{Binding SelectPurchaseRecurrenceCommand}" CommandParameter="{x:Static models:RecurrenceType.OneTime}" />
+                                            </Border.GestureRecognizers>
+                                            <Label Text="À vista" Style="{StaticResource SegmentLabel}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding NewPurchaseRecurrence}" Value="{x:Static models:RecurrenceType.OneTime}">
+                                                        <Setter Property="TextColor" Value="White" />
+                                                        <Setter Property="FontAttributes" Value="Bold" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                        </Border>
+                                        <Border Grid.Column="1"
+                                                AutomationId="SetupPurchaseInstallmentsButton"
+                                                Style="{StaticResource SegmentOption}">
+                                            <Border.Triggers>
+                                                <DataTrigger TargetType="Border" Binding="{Binding NewPurchaseRecurrence}" Value="{x:Static models:RecurrenceType.Installments}">
+                                                    <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                                                </DataTrigger>
+                                            </Border.Triggers>
+                                            <Border.GestureRecognizers>
+                                                <TapGestureRecognizer Command="{Binding SelectPurchaseRecurrenceCommand}" CommandParameter="{x:Static models:RecurrenceType.Installments}" />
+                                            </Border.GestureRecognizers>
+                                            <Label Text="Parcelada" Style="{StaticResource SegmentLabel}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding NewPurchaseRecurrence}" Value="{x:Static models:RecurrenceType.Installments}">
+                                                        <Setter Property="TextColor" Value="White" />
+                                                        <Setter Property="FontAttributes" Value="Bold" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                        </Border>
+                                        <Border Grid.Column="2"
+                                                AutomationId="SetupPurchaseRecurrentButton"
+                                                Style="{StaticResource SegmentOption}">
+                                            <Border.Triggers>
+                                                <DataTrigger TargetType="Border" Binding="{Binding NewPurchaseRecurrence}" Value="{x:Static models:RecurrenceType.Recurrent}">
+                                                    <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                                                </DataTrigger>
+                                            </Border.Triggers>
+                                            <Border.GestureRecognizers>
+                                                <TapGestureRecognizer Command="{Binding SelectPurchaseRecurrenceCommand}" CommandParameter="{x:Static models:RecurrenceType.Recurrent}" />
+                                            </Border.GestureRecognizers>
+                                            <Label Text="Todo mês" Style="{StaticResource SegmentLabel}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding NewPurchaseRecurrence}" Value="{x:Static models:RecurrenceType.Recurrent}">
+                                                        <Setter Property="TextColor" Value="White" />
+                                                        <Setter Property="FontAttributes" Value="Bold" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <!-- An installment purchase already in progress: "3 de 10" falls this month -->
+                                <Grid ColumnDefinitions="*, *" ColumnSpacing="10" IsVisible="{Binding IsNewPurchaseInstallments}">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                        <Label Text="Parcela deste mês" Style="{StaticResource FieldCaption}" />
+                                        <Entry AutomationId="SetupPurchaseCurrentInstallmentEntry"
+                                               Placeholder="ex.: 3"
+                                               Text="{Binding NewPurchaseCurrentInstallment}"
+                                               Keyboard="Numeric" />
+                                    </VerticalStackLayout>
+                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                        <Label Text="Nº de parcelas" Style="{StaticResource FieldCaption}" />
+                                        <Entry AutomationId="SetupPurchaseTotalInstallmentsEntry"
+                                               Placeholder="ex.: 10"
+                                               Text="{Binding NewPurchaseTotalInstallments}"
+                                               Keyboard="Numeric" />
+                                    </VerticalStackLayout>
+                                </Grid>
+
+                                <VerticalStackLayout Spacing="2">
+                                    <Label AutomationId="SetupPurchaseAmountCaption"
+                                           Text="{Binding NewPurchaseRecurrence, Converter={x:Static converters:RecurrenceTypeToAmountLabelConverter.Instance}}"
+                                           Style="{StaticResource FieldCaption}" />
+                                    <Entry AutomationId="SetupPurchaseAmountEntry" Keyboard="Numeric">
+                                        <Entry.Behaviors>
+                                            <behaviors:CurrencyMaskBehavior Value="{Binding NewPurchaseAmount}" />
+                                        </Entry.Behaviors>
+                                    </Entry>
+                                </VerticalStackLayout>
+
+                                <Button AutomationId="SetupAddPurchaseButton"
+                                        Text="Adicionar compra"
+                                        Command="{Binding AddPurchaseCommand}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+
+                <!-- 4. Income -->
                 <VerticalStackLayout AutomationId="SetupIncomeStep" Spacing="16" IsVisible="{Binding IsIncomeStep}">
                     <Label Text="Quanto você recebe por mês?" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
                     <Label FontSize="14"
                            TextColor="{StaticResource Ink}"
                            Text="O salário vira uma receita recorrente (&quot;Todo mês&quot;): ela aparece em todos os meses, sem precisar lançar de novo." />
 
-                    <VerticalStackLayout Spacing="2">
-                        <Label Text="Salário" Style="{StaticResource FieldCaption}" />
-                        <Entry AutomationId="SetupSalaryEntry" Keyboard="Numeric">
-                            <Entry.Behaviors>
-                                <behaviors:CurrencyMaskBehavior Value="{Binding Salary}" />
-                            </Entry.Behaviors>
-                        </Entry>
-                    </VerticalStackLayout>
+                    <!-- Common in Brazil: an advance ("vale") around the 20th and the rest on the 5th business day -->
+                    <Border Style="{StaticResource Card}" Padding="14,10">
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10">
+                            <VerticalStackLayout Grid.Column="0" VerticalOptions="Center" Spacing="2">
+                                <Label Text="Recebo o salário em duas partes" FontSize="15" />
+                                <Label Text="Um adiantamento (vale) por volta do dia 20 e o restante (pagamento) até o 5º dia útil."
+                                       FontSize="11"
+                                       TextColor="{StaticResource Muted}" />
+                            </VerticalStackLayout>
+                            <Switch Grid.Column="1"
+                                    AutomationId="SetupSalarySplitSwitch"
+                                    IsToggled="{Binding IsSalarySplit}"
+                                    VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
 
-                    <VerticalStackLayout Spacing="2">
-                        <Label Text="Dia do pagamento" Style="{StaticResource FieldCaption}" />
-                        <Picker AutomationId="SetupSalaryDayPicker"
-                                Title="Dia do pagamento"
-                                ItemsSource="{Binding DueDays}"
-                                ItemDisplayBinding="{Binding ., Converter={x:Static converters:DueDayToLabelConverter.Instance}, x:DataType=x:Int32}"
-                                SelectedItem="{Binding SalaryDay}" />
+                    <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label AutomationId="SetupSalaryCaption" Text="{Binding SalaryCaption}" Style="{StaticResource FieldCaption}" />
+                            <Entry AutomationId="SetupSalaryEntry" Keyboard="Numeric">
+                                <Entry.Behaviors>
+                                    <behaviors:CurrencyMaskBehavior Value="{Binding Salary}" />
+                                </Entry.Behaviors>
+                            </Entry>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="Dia do pagamento" Style="{StaticResource FieldCaption}" />
+                            <Picker AutomationId="SetupSalaryDayPicker"
+                                    Title="Dia do pagamento"
+                                    ItemsSource="{Binding DueDays}"
+                                    ItemDisplayBinding="{Binding ., Converter={x:Static converters:DueDayToLabelConverter.Instance}, x:DataType=x:Int32}"
+                                    SelectedItem="{Binding SalaryDay}" />
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <VerticalStackLayout AutomationId="SetupAdvanceFields" Spacing="12" IsVisible="{Binding IsSalarySplit}">
+                        <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label Text="Adiantamento (vale)" Style="{StaticResource FieldCaption}" />
+                                <Entry AutomationId="SetupAdvanceEntry" Keyboard="Numeric">
+                                    <Entry.Behaviors>
+                                        <behaviors:CurrencyMaskBehavior Value="{Binding Advance}" />
+                                    </Entry.Behaviors>
+                                </Entry>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                <Label Text="Dia do adiantamento" Style="{StaticResource FieldCaption}" />
+                                <Picker AutomationId="SetupAdvanceDayPicker"
+                                        Title="Dia do adiantamento"
+                                        ItemsSource="{Binding DueDays}"
+                                        ItemDisplayBinding="{Binding ., Converter={x:Static converters:DueDayToLabelConverter.Instance}, x:DataType=x:Int32}"
+                                        SelectedItem="{Binding AdvanceDay}" />
+                            </VerticalStackLayout>
+                        </Grid>
+                        <Label FontSize="12"
+                               TextColor="{StaticResource Muted}"
+                               Text="O dia do pagamento é fixo: se ele cai no 5º dia útil, escolha o dia em que costuma cair." />
+                        <Grid ColumnDefinitions="*, Auto">
+                            <Label Text="Total no mês" FontSize="14" FontAttributes="Bold" />
+                            <Label Grid.Column="1"
+                                   AutomationId="SetupMonthlySalaryLabel"
+                                   Text="{Binding MonthlySalary, Converter={x:Static converters:MoneyConverter.Instance}}"
+                                   FontSize="14"
+                                   FontAttributes="Bold"
+                                   TextColor="{StaticResource Income}" />
+                        </Grid>
                     </VerticalStackLayout>
 
                     <VerticalStackLayout Spacing="2" IsVisible="{Binding HasAvailableSources}">
@@ -269,108 +633,157 @@
                     </VerticalStackLayout>
                 </VerticalStackLayout>
 
-                <!-- 4. House expenses -->
+                <!-- 5. House expenses -->
                 <VerticalStackLayout AutomationId="SetupHouseExpensesStep" Spacing="12" IsVisible="{Binding IsHouseExpensesStep}">
                     <Label Text="Quais são os gastos fixos da casa?" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
                     <Label FontSize="14"
                            TextColor="{StaticResource Ink}"
                            Text="Marque os que você tem e informe o valor de um mês. Cada um vira uma despesa recorrente. Depois, diga se o valor muda todo mês ou se é pago aos poucos." />
 
-                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Expenses}" Spacing="8">
-                        <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="vm:SetupExpenseItem">
-                                <Border AutomationId="SetupExpenseRow"
-                                        BackgroundColor="{StaticResource CardBackground}"
-                                        StrokeShape="RoundRectangle 16"
-                                        Stroke="Transparent"
-                                        StrokeThickness="2"
-                                        Padding="12,8">
-                                    <Border.Triggers>
-                                        <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
-                                            <Setter Property="Stroke" Value="{StaticResource PrimaryBrush}" />
-                                            <Setter Property="BackgroundColor" Value="{StaticResource BillTint}" />
-                                        </DataTrigger>
-                                    </Border.Triggers>
-                                    <VerticalStackLayout Spacing="8">
-                                        <!-- Tapping the row (re)selects it; the check box only mirrors the state -->
-                                        <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10">
-                                            <Grid.GestureRecognizers>
-                                                <TapGestureRecognizer Command="{Binding ToggleExpenseCommand, Source={RelativeSource AncestorType={x:Type vm:SetupViewModel}}, x:DataType=vm:SetupViewModel}"
-                                                                      CommandParameter="{Binding .}" />
-                                            </Grid.GestureRecognizers>
-                                            <Label Grid.Column="0" Text="{Binding Icon}" FontSize="20" VerticalOptions="Center" />
-                                            <Label Grid.Column="1" AutomationId="SetupExpenseNameLabel" Text="{Binding Description}" FontSize="15" VerticalOptions="Center" />
-                                            <CheckBox Grid.Column="2"
-                                                      AutomationId="SetupExpenseCheckBox"
-                                                      IsChecked="{Binding IsSelected, Mode=OneWay}"
-                                                      InputTransparent="True"
-                                                      Color="{StaticResource Primary}"
-                                                      VerticalOptions="Center" />
-                                        </Grid>
-                                        <Grid ColumnDefinitions="*, *" ColumnSpacing="10" IsVisible="{Binding IsSelected}">
-                                            <VerticalStackLayout Grid.Column="0" Spacing="2">
-                                                <Label Text="Valor mensal" Style="{StaticResource FieldCaption}" />
-                                                <Entry AutomationId="SetupExpenseAmountEntry" Keyboard="Numeric">
-                                                    <Entry.Behaviors>
-                                                        <behaviors:CurrencyMaskBehavior Value="{Binding Amount}" />
-                                                    </Entry.Behaviors>
-                                                </Entry>
-                                            </VerticalStackLayout>
-                                            <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                                <Label Text="Vencimento" Style="{StaticResource FieldCaption}" />
-                                                <Picker AutomationId="SetupExpenseDueDayPicker"
-                                                        Title="Vencimento"
-                                                        ItemsSource="{Binding DueDays, Source={RelativeSource AncestorType={x:Type vm:SetupViewModel}}, x:DataType=vm:SetupViewModel}"
-                                                        ItemDisplayBinding="{Binding ., Converter={x:Static converters:DueDayToLabelConverter.Instance}, x:DataType=x:Int32}"
-                                                        SelectedItem="{Binding DueDay}" />
-                                            </VerticalStackLayout>
-                                        </Grid>
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Expenses}"
+                                         BindableLayout.ItemTemplate="{StaticResource SetupExpenseTemplate}"
+                                         Spacing="8" />
 
-                                        <!-- The two kinds of varying bills, explained right where the user first meets them -->
-                                        <Grid AutomationId="SetupExpenseEstimatedOption"
-                                              ColumnDefinitions="Auto, *"
-                                              ColumnSpacing="6"
-                                              IsVisible="{Binding IsSelected}">
-                                            <Grid.GestureRecognizers>
-                                                <TapGestureRecognizer Command="{Binding ToggleEstimatedCommand}" />
-                                            </Grid.GestureRecognizers>
-                                            <CheckBox Grid.Column="0"
-                                                      AutomationId="SetupExpenseEstimatedCheckBox"
-                                                      IsChecked="{Binding IsEstimated, Mode=OneWay}"
-                                                      InputTransparent="True"
-                                                      Color="{StaticResource Primary}"
-                                                      VerticalOptions="Start" />
-                                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
-                                                <Label Text="Valor estimado (±)" FontSize="14" />
-                                                <Label Text="O valor muda a cada mês, como luz e água. Você ajusta quando a conta chegar."
-                                                       FontSize="11"
-                                                       TextColor="{StaticResource Muted}" />
-                                            </VerticalStackLayout>
-                                        </Grid>
-                                        <Grid AutomationId="SetupExpensePartialPaymentOption"
-                                              ColumnDefinitions="Auto, *"
-                                              ColumnSpacing="6"
-                                              IsVisible="{Binding IsSelected}">
-                                            <Grid.GestureRecognizers>
-                                                <TapGestureRecognizer Command="{Binding TogglePartialPaymentCommand}" />
-                                            </Grid.GestureRecognizers>
-                                            <CheckBox Grid.Column="0"
-                                                      AutomationId="SetupExpensePartialPaymentCheckBox"
-                                                      IsChecked="{Binding AllowsPartialPayment, Mode=OneWay}"
-                                                      InputTransparent="True"
-                                                      Color="{StaticResource Primary}"
-                                                      VerticalOptions="Start" />
-                                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
-                                                <Label Text="Pagamento parcial" FontSize="14" />
-                                                <Label Text="Pago aos poucos durante o mês, como o mercado. Registre cada compra com &quot;Pagar parcial&quot;."
-                                                       FontSize="11"
-                                                       TextColor="{StaticResource Muted}" />
-                                            </VerticalStackLayout>
-                                        </Grid>
+                    <!-- Homes the user owns: financing and the yearly IPTU. Renting (above) and owning can go together -->
+                    <Label Text="Casa própria" Style="{StaticResource GroupHeader}" />
+                    <Label Text="Você tem casa própria?" FontSize="15" />
+                    <Label FontSize="12"
+                           TextColor="{StaticResource Muted}"
+                           Text="Dá para ter casa própria e também pagar aluguel, como quem mora em outra cidade. Cadastre cada imóvel com o financiamento e o IPTU." />
+                    <Border Style="{StaticResource SegmentedControl}">
+                        <Grid ColumnDefinitions="*, *" ColumnSpacing="3">
+                            <Border Grid.Column="0"
+                                    AutomationId="SetupNoOwnHomeButton"
+                                    Style="{StaticResource SegmentOption}">
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding HasOwnHome}" Value="False">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SelectHasOwnHomeCommand}">
+                                        <TapGestureRecognizer.CommandParameter>
+                                            <x:Boolean>False</x:Boolean>
+                                        </TapGestureRecognizer.CommandParameter>
+                                    </TapGestureRecognizer>
+                                </Border.GestureRecognizers>
+                                <Label Text="Não" Style="{StaticResource SegmentLabel}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding HasOwnHome}" Value="False">
+                                            <Setter Property="TextColor" Value="White" />
+                                            <Setter Property="FontAttributes" Value="Bold" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Border>
+                            <Border Grid.Column="1"
+                                    AutomationId="SetupHasOwnHomeButton"
+                                    Style="{StaticResource SegmentOption}">
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding HasOwnHome}" Value="True">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SelectHasOwnHomeCommand}">
+                                        <TapGestureRecognizer.CommandParameter>
+                                            <x:Boolean>True</x:Boolean>
+                                        </TapGestureRecognizer.CommandParameter>
+                                    </TapGestureRecognizer>
+                                </Border.GestureRecognizers>
+                                <Label Text="Sim" Style="{StaticResource SegmentLabel}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding HasOwnHome}" Value="True">
+                                            <Setter Property="TextColor" Value="White" />
+                                            <Setter Property="FontAttributes" Value="Bold" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <VerticalStackLayout AutomationId="SetupHomesSection" Spacing="12" IsVisible="{Binding HasOwnHome}">
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Homes}" Spacing="4">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SetupHomeItem">
+                                    <Grid AutomationId="SetupHomeRow" ColumnDefinitions="Auto, *, 36" ColumnSpacing="10" Padding="0,6">
+                                        <Label Grid.Column="0" Text="🏡" FontSize="18" VerticalOptions="Center" />
+                                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                            <Label AutomationId="SetupHomeNameLabel" Text="{Binding Name}" FontSize="15" LineBreakMode="TailTruncation" />
+                                            <Label AutomationId="SetupHomeDetailLabel" Text="{Binding Detail}" FontSize="11" TextColor="{StaticResource Muted}" />
+                                        </VerticalStackLayout>
+                                        <Button Grid.Column="2"
+                                                AutomationId="SetupRemoveHomeButton"
+                                                Text="✕"
+                                                FontSize="14"
+                                                Padding="0"
+                                                HeightRequest="36"
+                                                BackgroundColor="Transparent"
+                                                TextColor="{StaticResource Outcome}"
+                                                Command="{Binding RemoveHomeCommand, Source={RelativeSource AncestorType={x:Type vm:SetupViewModel}}, x:DataType=vm:SetupViewModel}"
+                                                CommandParameter="{Binding .}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Border Style="{StaticResource Card}" Padding="14">
+                            <VerticalStackLayout Spacing="12">
+                                <Entry AutomationId="SetupHomeNameEntry" Placeholder="Nome (ex.: Apartamento do centro)" Text="{Binding NewHomeName}" MaxLength="30" />
+                                <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                        <Label Text="Financiamento (mensal)" Style="{StaticResource FieldCaption}" />
+                                        <Entry AutomationId="SetupHomeFinancingEntry" Keyboard="Numeric">
+                                            <Entry.Behaviors>
+                                                <behaviors:CurrencyMaskBehavior Value="{Binding NewHomeFinancing}" />
+                                            </Entry.Behaviors>
+                                        </Entry>
                                     </VerticalStackLayout>
-                                </Border>
-                            </DataTemplate>
-                        </BindableLayout.ItemTemplate>
+                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                        <Label Text="Vencimento" Style="{StaticResource FieldCaption}" />
+                                        <Picker AutomationId="SetupHomeFinancingDueDayPicker"
+                                                Title="Vencimento"
+                                                ItemsSource="{Binding DueDays}"
+                                                ItemDisplayBinding="{Binding ., Converter={x:Static converters:DueDayToLabelConverter.Instance}, x:DataType=x:Int32}"
+                                                SelectedItem="{Binding NewHomeFinancingDueDay}" />
+                                    </VerticalStackLayout>
+                                </Grid>
+                                <Label Text="IPTU (imposto anual)" FontSize="14" FontAttributes="Bold" />
+                                <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                        <Label Text="Valor de cada parcela" Style="{StaticResource FieldCaption}" />
+                                        <Entry AutomationId="SetupHomeIptuEntry" Keyboard="Numeric">
+                                            <Entry.Behaviors>
+                                                <behaviors:CurrencyMaskBehavior Value="{Binding NewHomeIptu}" />
+                                            </Entry.Behaviors>
+                                        </Entry>
+                                    </VerticalStackLayout>
+                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                        <Label Text="Parcelas" Style="{StaticResource FieldCaption}" />
+                                        <Picker AutomationId="SetupHomeIptuInstallmentsPicker"
+                                                Title="Parcelas"
+                                                ItemsSource="{Binding AnnualInstallmentCounts}"
+                                                ItemDisplayBinding="{Binding ., Converter={x:Static converters:AnnualInstallmentsToLabelConverter.Instance}, x:DataType=x:Int32}"
+                                                SelectedItem="{Binding NewHomeIptuInstallments}" />
+                                    </VerticalStackLayout>
+                                </Grid>
+                                <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                        <Label Text="Primeiro mês" Style="{StaticResource FieldCaption}" />
+                                        <Picker AutomationId="SetupHomeIptuMonthPicker"
+                                                Title="Primeiro mês"
+                                                ItemsSource="{Binding Months}"
+                                                ItemDisplayBinding="{Binding ., Converter={x:Static converters:MonthNumberToNameConverter.Instance}, x:DataType=x:Int32}"
+                                                SelectedItem="{Binding NewHomeIptuStartMonth}" />
+                                    </VerticalStackLayout>
+                                </Grid>
+                                <Label FontSize="12"
+                                       TextColor="{StaticResource Muted}"
+                                       Text="Confira no carnê do IPTU (ou no site da prefeitura) o valor e os meses. Ele entra todo ano nesses meses, para não te pegar de surpresa." />
+                                <Button AutomationId="SetupAddHomeButton"
+                                        Text="Adicionar imóvel"
+                                        Command="{Binding AddHomeCommand}" />
+                            </VerticalStackLayout>
+                        </Border>
                     </VerticalStackLayout>
 
                     <VerticalStackLayout Spacing="2" IsVisible="{Binding HasAvailableSources}">
@@ -380,10 +793,255 @@
                                 ItemsSource="{Binding AvailableSources}"
                                 ItemDisplayBinding="{Binding Name, x:DataType=models:PaymentSource}"
                                 SelectedItem="{Binding ExpensesSource}" />
+                        <Label AutomationId="SetupExpensesCardHint"
+                               Text="Pagas com cartão de crédito, elas entram na fatura: vencem com ela e não usam valor estimado nem pagamento parcial."
+                               FontSize="12"
+                               TextColor="{StaticResource Muted}"
+                               IsVisible="{Binding IsExpensesSourceCreditCard}" />
                     </VerticalStackLayout>
                 </VerticalStackLayout>
 
-                <!-- 5. Summary, and how entries work -->
+                <!-- 6. Other expenses: health, children's school, the car and eating out -->
+                <VerticalStackLayout AutomationId="SetupOtherExpensesStep" Spacing="12" IsVisible="{Binding IsOtherExpensesStep}">
+                    <Label Text="E os outros gastos do mês?" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
+                    <Label FontSize="14"
+                           TextColor="{StaticResource Ink}"
+                           Text="Saúde, a escola dos filhos, o carro e o que você gasta comendo fora também viram despesas recorrentes." />
+
+                    <Label Text="Saúde" Style="{StaticResource GroupHeader}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding HealthExpenses}"
+                                         BindableLayout.ItemTemplate="{StaticResource SetupExpenseTemplate}"
+                                         Spacing="8" />
+
+                    <Label Text="Filhos" Style="{StaticResource GroupHeader}" />
+                    <Label Text="Você tem filhos?" FontSize="15" />
+                    <Border Style="{StaticResource SegmentedControl}">
+                        <Grid ColumnDefinitions="*, *" ColumnSpacing="3">
+                            <Border Grid.Column="0"
+                                    AutomationId="SetupNoChildrenButton"
+                                    Style="{StaticResource SegmentOption}">
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding HasChildren}" Value="False">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SelectHasChildrenCommand}">
+                                        <TapGestureRecognizer.CommandParameter>
+                                            <x:Boolean>False</x:Boolean>
+                                        </TapGestureRecognizer.CommandParameter>
+                                    </TapGestureRecognizer>
+                                </Border.GestureRecognizers>
+                                <Label Text="Não" Style="{StaticResource SegmentLabel}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding HasChildren}" Value="False">
+                                            <Setter Property="TextColor" Value="White" />
+                                            <Setter Property="FontAttributes" Value="Bold" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Border>
+                            <Border Grid.Column="1"
+                                    AutomationId="SetupHasChildrenButton"
+                                    Style="{StaticResource SegmentOption}">
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding HasChildren}" Value="True">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SelectHasChildrenCommand}">
+                                        <TapGestureRecognizer.CommandParameter>
+                                            <x:Boolean>True</x:Boolean>
+                                        </TapGestureRecognizer.CommandParameter>
+                                    </TapGestureRecognizer>
+                                </Border.GestureRecognizers>
+                                <Label Text="Sim" Style="{StaticResource SegmentLabel}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding HasChildren}" Value="True">
+                                            <Setter Property="TextColor" Value="White" />
+                                            <Setter Property="FontAttributes" Value="Bold" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <VerticalStackLayout AutomationId="SetupSchoolExpenses"
+                                         BindableLayout.ItemsSource="{Binding SchoolExpenses}"
+                                         BindableLayout.ItemTemplate="{StaticResource SetupExpenseTemplate}"
+                                         Spacing="8"
+                                         IsVisible="{Binding HasChildren}" />
+
+                    <Label Text="Transporte" Style="{StaticResource GroupHeader}" />
+                    <Label Text="Você tem carro?" FontSize="15" />
+                    <Border Style="{StaticResource SegmentedControl}">
+                        <Grid ColumnDefinitions="*, *" ColumnSpacing="3">
+                            <Border Grid.Column="0"
+                                    AutomationId="SetupNoCarButton"
+                                    Style="{StaticResource SegmentOption}">
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding HasCar}" Value="False">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SelectHasCarCommand}">
+                                        <TapGestureRecognizer.CommandParameter>
+                                            <x:Boolean>False</x:Boolean>
+                                        </TapGestureRecognizer.CommandParameter>
+                                    </TapGestureRecognizer>
+                                </Border.GestureRecognizers>
+                                <Label Text="Não" Style="{StaticResource SegmentLabel}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding HasCar}" Value="False">
+                                            <Setter Property="TextColor" Value="White" />
+                                            <Setter Property="FontAttributes" Value="Bold" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Border>
+                            <Border Grid.Column="1"
+                                    AutomationId="SetupHasCarButton"
+                                    Style="{StaticResource SegmentOption}">
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding HasCar}" Value="True">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SelectHasCarCommand}">
+                                        <TapGestureRecognizer.CommandParameter>
+                                            <x:Boolean>True</x:Boolean>
+                                        </TapGestureRecognizer.CommandParameter>
+                                    </TapGestureRecognizer>
+                                </Border.GestureRecognizers>
+                                <Label Text="Sim" Style="{StaticResource SegmentLabel}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding HasCar}" Value="True">
+                                            <Setter Property="TextColor" Value="White" />
+                                            <Setter Property="FontAttributes" Value="Bold" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <VerticalStackLayout AutomationId="SetupCarExpenses"
+                                         BindableLayout.ItemsSource="{Binding CarExpenses}"
+                                         BindableLayout.ItemTemplate="{StaticResource SetupExpenseTemplate}"
+                                         Spacing="8"
+                                         IsVisible="{Binding HasCar}" />
+                    <VerticalStackLayout AutomationId="SetupCarsSection" Spacing="12" IsVisible="{Binding HasCar}">
+                        <Label Text="IPVA e licenciamento" FontSize="14" FontAttributes="Bold" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Cars}" Spacing="4">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SetupCarItem">
+                                    <Grid AutomationId="SetupCarRow" ColumnDefinitions="Auto, *, 36" ColumnSpacing="10" Padding="0,6">
+                                        <Label Grid.Column="0" Text="🚗" FontSize="18" VerticalOptions="Center" />
+                                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                            <Label AutomationId="SetupCarNameLabel" Text="{Binding Name}" FontSize="15" LineBreakMode="TailTruncation" />
+                                            <Label AutomationId="SetupCarDetailLabel" Text="{Binding Detail}" FontSize="11" TextColor="{StaticResource Muted}" />
+                                        </VerticalStackLayout>
+                                        <Button Grid.Column="2"
+                                                AutomationId="SetupRemoveCarButton"
+                                                Text="✕"
+                                                FontSize="14"
+                                                Padding="0"
+                                                HeightRequest="36"
+                                                BackgroundColor="Transparent"
+                                                TextColor="{StaticResource Outcome}"
+                                                Command="{Binding RemoveCarCommand, Source={RelativeSource AncestorType={x:Type vm:SetupViewModel}}, x:DataType=vm:SetupViewModel}"
+                                                CommandParameter="{Binding .}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Border Style="{StaticResource Card}" Padding="14">
+                            <VerticalStackLayout Spacing="12">
+                                <Entry AutomationId="SetupCarNameEntry" Placeholder="Nome (ex.: Onix)" Text="{Binding NewCarName}" MaxLength="30" />
+                                <Label Text="IPVA" FontSize="14" FontAttributes="Bold" />
+                                <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                        <Label Text="Valor de cada parcela" Style="{StaticResource FieldCaption}" />
+                                        <Entry AutomationId="SetupCarIpvaEntry" Keyboard="Numeric">
+                                            <Entry.Behaviors>
+                                                <behaviors:CurrencyMaskBehavior Value="{Binding NewCarIpva}" />
+                                            </Entry.Behaviors>
+                                        </Entry>
+                                    </VerticalStackLayout>
+                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                        <Label Text="Parcelas" Style="{StaticResource FieldCaption}" />
+                                        <Picker AutomationId="SetupCarIpvaInstallmentsPicker"
+                                                Title="Parcelas"
+                                                ItemsSource="{Binding AnnualInstallmentCounts}"
+                                                ItemDisplayBinding="{Binding ., Converter={x:Static converters:AnnualInstallmentsToLabelConverter.Instance}, x:DataType=x:Int32}"
+                                                SelectedItem="{Binding NewCarIpvaInstallments}" />
+                                    </VerticalStackLayout>
+                                </Grid>
+                                <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                        <Label Text="Primeiro mês" Style="{StaticResource FieldCaption}" />
+                                        <Picker AutomationId="SetupCarIpvaMonthPicker"
+                                                Title="Primeiro mês"
+                                                ItemsSource="{Binding Months}"
+                                                ItemDisplayBinding="{Binding ., Converter={x:Static converters:MonthNumberToNameConverter.Instance}, x:DataType=x:Int32}"
+                                                SelectedItem="{Binding NewCarIpvaStartMonth}" />
+                                    </VerticalStackLayout>
+                                </Grid>
+                                <Label Text="Licenciamento" FontSize="14" FontAttributes="Bold" />
+                                <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                        <Label Text="Valor" Style="{StaticResource FieldCaption}" />
+                                        <Entry AutomationId="SetupCarLicensingEntry" Keyboard="Numeric">
+                                            <Entry.Behaviors>
+                                                <behaviors:CurrencyMaskBehavior Value="{Binding NewCarLicensing}" />
+                                            </Entry.Behaviors>
+                                        </Entry>
+                                    </VerticalStackLayout>
+                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                        <Label Text="Mês" Style="{StaticResource FieldCaption}" />
+                                        <Picker AutomationId="SetupCarLicensingMonthPicker"
+                                                Title="Mês"
+                                                ItemsSource="{Binding Months}"
+                                                ItemDisplayBinding="{Binding ., Converter={x:Static converters:MonthNumberToNameConverter.Instance}, x:DataType=x:Int32}"
+                                                SelectedItem="{Binding NewCarLicensingMonth}" />
+                                    </VerticalStackLayout>
+                                </Grid>
+                                <Label FontSize="12"
+                                       TextColor="{StaticResource Muted}"
+                                       Text="Os meses do IPVA e do licenciamento dependem do final da placa e mudam de estado para estado: confira no site da Sefaz ou do Detran. Eles entram todo ano nesses meses, para não te pegar de surpresa." />
+                                <Button AutomationId="SetupAddCarButton"
+                                        Text="Adicionar carro"
+                                        Command="{Binding AddCarCommand}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <Label Text="Lazer" Style="{StaticResource GroupHeader}" />
+                    <Label FontSize="12"
+                           TextColor="{StaticResource Muted}"
+                           Text="Comer fora e pedir comida ficam separados do mercado: são um prazer, não uma necessidade, e é aqui que costuma dar para economizar." />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding LeisureExpenses}"
+                                         BindableLayout.ItemTemplate="{StaticResource SetupExpenseTemplate}"
+                                         Spacing="8" />
+
+                    <VerticalStackLayout Spacing="2" IsVisible="{Binding HasAvailableSources}">
+                        <Label Text="Pago com" Style="{StaticResource FieldCaption}" />
+                        <Picker AutomationId="SetupOtherExpensesSourcePicker"
+                                Title="Pago com"
+                                ItemsSource="{Binding AvailableSources}"
+                                ItemDisplayBinding="{Binding Name, x:DataType=models:PaymentSource}"
+                                SelectedItem="{Binding OtherExpensesSource}" />
+                        <Label AutomationId="SetupOtherExpensesCardHint"
+                               Text="Pagas com cartão de crédito, elas entram na fatura: vencem com ela e não usam valor estimado nem pagamento parcial."
+                               FontSize="12"
+                               TextColor="{StaticResource Muted}"
+                               IsVisible="{Binding IsOtherExpensesSourceCreditCard}" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+
+                <!-- 7. Summary, and how entries work -->
                 <VerticalStackLayout AutomationId="SetupSummaryStep" Spacing="16" IsVisible="{Binding IsSummaryStep}">
                     <Label AutomationId="SetupSummaryTitleLabel" Text="{Binding SummaryTitle}" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
 
@@ -412,11 +1070,11 @@
 
                         <BoxView HeightRequest="1" Color="{StaticResource Line}" />
                         <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto, Auto" RowSpacing="4">
-                            <Label Grid.Row="0" Text="Receitas por mês" FontSize="14" />
+                            <Label Grid.Row="0" Text="Receitas neste mês" FontSize="14" />
                             <Label Grid.Row="0" Grid.Column="1" AutomationId="SetupSummaryIncomeLabel"
                                    Text="{Binding TotalIncome, Converter={x:Static converters:MoneyConverter.Instance}}"
                                    FontSize="14" TextColor="{StaticResource Income}" />
-                            <Label Grid.Row="1" Text="Despesas por mês" FontSize="14" />
+                            <Label Grid.Row="1" Text="Despesas neste mês" FontSize="14" />
                             <Label Grid.Row="1" Grid.Column="1" AutomationId="SetupSummaryOutcomeLabel"
                                    Text="{Binding TotalOutcome, Converter={x:Static converters:MoneyConverter.Instance}}"
                                    FontSize="14" TextColor="{StaticResource Outcome}" />
@@ -426,6 +1084,25 @@
                                    FontSize="14" FontAttributes="Bold" />
                         </Grid>
                     </VerticalStackLayout>
+
+                    <Border AutomationId="SetupSkippedSteps"
+                            Style="{StaticResource Card}"
+                            Padding="14"
+                            IsVisible="{Binding HasSkippedSteps}">
+                        <VerticalStackLayout Spacing="4">
+                            <Label AutomationId="SetupSkippedStepsLabel" FontSize="14" TextColor="{StaticResource Ink}">
+                                <Label.FormattedText>
+                                    <FormattedString>
+                                        <Span Text="Etapas puladas: " FontAttributes="Bold" />
+                                        <Span Text="{Binding SkippedStepsText}" />
+                                    </FormattedString>
+                                </Label.FormattedText>
+                            </Label>
+                            <Label Text="Para preenchê-las agora, toque em Voltar. Ou faça depois em Configurações › Refazer configuração inicial."
+                                   FontSize="12"
+                                   TextColor="{StaticResource Muted}" />
+                        </VerticalStackLayout>
+                    </Border>
 
                     <Label AutomationId="SetupSummaryEmptyLabel"
                            Text="Nenhum lançamento será criado agora. Você pode adicioná-los quando quiser pelo botão +."
@@ -467,6 +1144,22 @@
                             <Label FontSize="13" TextColor="{StaticResource Ink}">
                                 <Label.FormattedText>
                                     <FormattedString>
+                                        <Span Text="Todo ano (anual): " FontAttributes="Bold" />
+                                        <Span Text="cai nos mesmos meses todo ano, como IPVA, licenciamento e IPTU, à vista ou em parcelas." />
+                                    </FormattedString>
+                                </Label.FormattedText>
+                            </Label>
+                            <Label FontSize="13" TextColor="{StaticResource Ink}">
+                                <Label.FormattedText>
+                                    <FormattedString>
+                                        <Span Text="Fatura do cartão de crédito: " FontAttributes="Bold" />
+                                        <Span Text="as compras de cada cartão de crédito ficam juntas na fatura dele e são pagas de uma vez com &quot;Pagar fatura&quot;." />
+                                    </FormattedString>
+                                </Label.FormattedText>
+                            </Label>
+                            <Label FontSize="13" TextColor="{StaticResource Ink}">
+                                <Label.FormattedText>
+                                    <FormattedString>
                                         <Span Text="Valor estimado (±): " FontAttributes="Bold" />
                                         <Span Text="para contas que mudam a cada mês. Ajuste o valor quando a conta chegar." />
                                     </FormattedString>
@@ -489,18 +1182,28 @@
             </Grid>
         </ScrollView>
 
-        <!-- Footer -->
-        <Grid Grid.Row="3" ColumnDefinitions="*, *" ColumnSpacing="10" Padding="20,8,20,16">
-            <Button Grid.Column="0"
+        <!-- Footer: skipping a step discards what was filled in on it -->
+        <Grid Grid.Row="4" ColumnDefinitions="*, *" RowDefinitions="Auto, Auto" ColumnSpacing="10" Padding="20,0,20,16">
+            <Button Grid.Row="0"
+                    Grid.ColumnSpan="2"
+                    AutomationId="SetupSkipStepButton"
+                    Text="Pular esta etapa"
+                    Style="{StaticResource TextButton}"
+                    FontSize="14"
+                    HorizontalOptions="Center"
+                    IsVisible="{Binding IsLastStep, Converter={x:Static converters:InverseBoolConverter.Instance}}"
+                    Command="{Binding SkipStepCommand}" />
+            <Button Grid.Row="1"
+                    Grid.Column="0"
                     AutomationId="SetupBackButton"
                     Text="Voltar"
                     Style="{StaticResource SecondaryButton}"
                     IsVisible="{Binding IsFirstStep, Converter={x:Static converters:InverseBoolConverter.Instance}}"
                     Command="{Binding BackCommand}" />
-            <Button Grid.Column="1"
+            <Button Grid.Row="1"
+                    Grid.Column="1"
                     AutomationId="SetupNextButton"
                     Text="{Binding NextButtonText}"
-                   
                     Command="{Binding NextCommand}" />
         </Grid>
     </Grid>

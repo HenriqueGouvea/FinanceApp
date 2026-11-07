@@ -8,6 +8,8 @@ public static class AppLabels
     public const string OneTime = "Única";
     public const string Recurrent = "Todo mês (recorrente)";
     public const string Installments = "Parcelada";
+    public const string Annual = "Todo ano (anual)";
+    public static string AnnualInstallments(int count) => count > 1 ? $"{count} parcelas" : "Cota única";
 
     public const string NewEntryTitle = "Novo Lançamento";
     public const string EditEntryTitle = "Editar Lançamento";
@@ -30,7 +32,7 @@ public static class AppLabels
 
     public const string SetupWelcomeTitle = "Bem-vindo ao Mensal!";
     public const string Tagline = "Todas as contas, um só rumo.";
-    public const string SetupSkip = "Pular";
+    public const string SetupSkip = "Pular tudo";
     public const string SetupClose = "Fechar";
     public const string SetupContinue = "Continuar";
     public const string SetupStart = "Começar";
@@ -38,6 +40,9 @@ public static class AppLabels
     public static string MenuGreeting(string name) => $"Olá, {name}!";
     public const string MenuGreetingWithoutName = "Olá!";
     public static string SetupSchedule(params string[] parts) => string.Join(" · ", ["Todo mês", .. parts]);
+    public static string SetupInstallmentSchedule(int current, int total, string card) => $"Parcela {current} de {total} · {card}";
+    public const string SetupAdvanceDescription = "Adiantamento salarial";
+    public static string SetupSkippedSteps(string steps) => $"Etapas puladas: {steps}";
     public const string EstimatedValue = "valor estimado";
     public const string PartialPaymentValue = "pagamento parcial";
 
@@ -86,6 +91,6 @@ public static class AppLabels
     public const string OutcomeCategoriesHeader = "Despesas";
     public const string IncomeCategoriesHeader = "Receitas";
 
-    public static readonly string[] DefaultOutcomeCategories = ["Moradia", "Educação", "Mercado", "Lazer"];
+    public static readonly string[] DefaultOutcomeCategories = ["Moradia", "Educação", "Mercado", "Saúde", "Transporte", "Lazer"];
     public static readonly string[] DefaultIncomeCategories = ["Salário", "Investimentos"];
 }

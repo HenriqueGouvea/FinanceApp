@@ -12,6 +12,8 @@ public class DatabaseContext : IDatabaseContext
         new() { Name = "Moradia", Icon = "🏠", Color = "#1E88E5" },
         new() { Name = "Educação", Icon = "🎓", Color = "#8E24AA" },
         new() { Name = "Mercado", Icon = "🛒", Color = "#F4511E" },
+        new() { Name = "Saúde", Icon = "🩺", Color = "#E53935" },
+        new() { Name = "Transporte", Icon = "🚗", Color = "#6D4C41" },
         new() { Name = "Lazer", Icon = "🎉", Color = "#43A047" }
     ];
 

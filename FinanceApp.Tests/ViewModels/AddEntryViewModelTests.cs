@@ -423,6 +423,64 @@ public class AddEntryViewModelTests
     }
 
     [Fact]
+    public void RecurrenceTypes_OffersAnnual()
+    {
+        _vm.RecurrenceTypes.Should().Equal(
+            RecurrenceType.OneTime, RecurrenceType.Recurrent, RecurrenceType.Installments, RecurrenceType.Annual);
+    }
+
+    [Fact]
+    public void InstallmentsTotal_AnnualInInstallments_ReturnsYearlyTotal()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Annual;
+        _vm.Amount = 800m;
+        _vm.TotalInstallments = 3;
+
+        _vm.IsAnnual.Should().BeTrue();
+        _vm.InstallmentsTotal.Should().Be(2400m);
+    }
+
+    [Fact]
+    public void InstallmentsTotal_AnnualSinglePayment_ReturnsNull()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Annual;
+        _vm.Amount = 800m;
+        _vm.TotalInstallments = 1;
+
+        _vm.InstallmentsTotal.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(1, null)]
+    [InlineData(3, 3)]
+    [InlineData(15, 12)]
+    public async Task SaveCommand_Annual_SavesInstallmentsWithinTheYear(int? typed, int? saved)
+    {
+        _vm.Description = "IPVA";
+        _vm.Amount = 800m;
+        _vm.SelectedRecurrence = RecurrenceType.Annual;
+        _vm.TotalInstallments = typed;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e =>
+            e.Recurrence == RecurrenceType.Annual && e.TotalInstallments == saved));
+    }
+
+    [Fact]
+    public async Task SaveCommand_RecurrentAfterTypingInstallments_SavesNoInstallments()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Annual;
+        _vm.TotalInstallments = 3;
+        _vm.SelectedRecurrence = RecurrenceType.Recurrent;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.TotalInstallments == null));
+    }
+
+    [Fact]
     public async Task SaveCommand_WithoutRecurrence_DoesNotCallService()
     {
         await _vm.SaveCommand.ExecuteAsync(null);

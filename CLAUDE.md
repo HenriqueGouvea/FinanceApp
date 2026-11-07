@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Tech Stack
 - **Framework:** .NET 10 (MAUI)
-- **Runtime:** Android 13.0 (API 33) - Galaxy Nexus Emulator
+- **Runtime:** Android 15 (API 35) - Galaxy A16 emulator (AVD `galaxy_a16_-_api_35`, 1080×2340) for manual tests and local E2E runs
 - **Architecture:** MVVM (CommunityToolkit.Mvvm)
 - **Database:** SQLite-net-pcl (Fluent mapping via CreateFlags)
 
@@ -60,6 +60,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Assert both the UI reaction and the persisted state (`GetEntryRowsAsync`, `GetMonthlyEntryRowsAsync`, `GetCategoryRowsAsync`) when a flow writes to the DB. Row types in `TableRows.cs` mirror the tables and must be updated when the schema changes.
 - The run shares one Appium session; before every test the app data is wiped and the app relaunched (empty DB, default categories seeded), so tests must not depend on each other. Creating a session per test was the main cost of the suite, so keep it shared.
 - On a timeout, a screenshot + page source are saved to `FinanceApp.UITests/TestResults/diagnostics/`. Check them first when debugging.
+- The emulator must use 3-button navigation (see `FinanceApp.UITests/README.md`): with gesture navigation (the Android 15 default) a scroll swipe near the bottom edge sends the app home mid-test.
 - CI's emulator has a much smaller screen (320×640, mdpi) than the local one, so rows that fit locally can sit below the fold there. Tests must keep the rows they check on screen (e.g. collapse a credit card bill first). To reproduce a CI-only failure, run `adb shell wm size 320x640` and `adb shell wm density 160` (`reset` restores them) and rerun the test.
 
 ## Git & Pull Request Workflow
@@ -143,6 +144,7 @@ SQLite (FinanceDataV3.db3)
   - `OneTime`: Single occurrence.
   - `Installments`: Fixed number of payments spread over N months.
   - `Recurrent`: Monthly recurring entries without a fixed end date.
+  - `Annual`: Falls in the same month(s) every year (IPVA, IPTU, licenciamento): `TotalInstallments` are the installments within each year, in consecutive months from `StartDate`'s month (one when null).
 - **Payment source terminology (pt-BR UI):** a `PaymentSource` of type `CreditCard` is always shown as "Cartão de crédito", never just "Cartão": bank accounts come with a (debit) card too, so "Cartão" alone doesn't tell them apart. Bank accounts are "Conta" / "Conta bancária", meal vouchers "Vale".
 - **Credit card bill:** a credit card has a bill due day (`PaymentSource.BillDueDay`) and the bank account that pays it (`BillPaymentSourceId`). Each month, the outcomes paid with the card are grouped under its bill (`CreditCardBill`, built in `MonthViewModel`), fall due on the bill's day instead of their own `DueDay`, and are paid together with "Pagar fatura" (`IFinanceService.SetCreditCardBillStatusAsync`). The bill never adds to the month's totals: its entries are already counted. Outcomes paid with a card are never estimated nor partially paid, so the entry page hides both switches for them. Account and voucher balances are only what the user types; a card's limit is typed too, but its available limit is computed: the limit minus what is unpaid on the card's outcomes up to the current month plus the installments still to come (`IFinanceService.GetUsedCreditLimitsAsync`).
 - **Future Roadmap:** Transitioning to a distributed architecture (Web App + MAUI) consuming a centralized Web API. Logic must be decoupled from local storage to facilitate this migration.
@@ -181,6 +183,7 @@ A `FinancialEntry` template is "active" in a given month when:
 - `OneTime`: `StartDate` falls within that month.
 - `Installments`: month is between `StartDate` and `StartDate + TotalInstallments months`.
 - `Recurrent`: month is on or after `StartDate` (no end date).
+- `Annual`: month is on or after `StartDate` and `(months since StartDate) % 12 < TotalInstallments` (1 when null).
 - For every type, when `EndDate` is set, the month must also be on or before `EndDate` (set by the "this and future months" delete scope).
 
 The merge result is a unified list consumed by `MonthViewModel`. Only physical `FinancialMonthlyEntry` records represent user-confirmed state; virtual projections are computed on-the-fly and not written to the DB unless the user acts on them.

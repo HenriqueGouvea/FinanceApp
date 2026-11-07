@@ -357,6 +357,56 @@ public class FinanceServiceTests
         projection.InstallmentTotalAmount.Should().Be(1000m);
     }
 
+    [Theory]
+    [InlineData(2026, 3, false)]
+    [InlineData(2026, 4, true)]
+    [InlineData(2026, 5, false)]
+    [InlineData(2027, 3, false)]
+    [InlineData(2027, 4, true)]
+    [InlineData(2030, 4, true)]
+    public async Task GetMergedEntries_AnnualEntry_FallsInItsMonthEveryYear(int year, int month, bool expected)
+    {
+        await SaveTemplateAsync(RecurrenceType.Annual);
+
+        var projections = await _service.GetMergedEntriesForMonthAsync(year, month);
+
+        projections.Any().Should().Be(expected);
+        if (expected)
+        {
+            projections.Single().InstallmentLabel.Should().BeNull("a single yearly payment has no installments");
+            projections.Single().InstallmentTotalAmount.Should().BeNull();
+        }
+    }
+
+    [Theory]
+    [InlineData(2026, 3, null)]
+    [InlineData(2026, 4, "1/3")]
+    [InlineData(2026, 6, "3/3")]
+    [InlineData(2026, 7, null)]
+    [InlineData(2027, 3, null)]
+    [InlineData(2027, 5, "2/3")]
+    public async Task GetMergedEntries_AnnualEntryInInstallments_FallsInConsecutiveMonthsEveryYear(int year, int month, string? label)
+    {
+        await SaveTemplateAsync(RecurrenceType.Annual, totalInstallments: 3);
+
+        var projections = await _service.GetMergedEntriesForMonthAsync(year, month);
+
+        projections.Select(p => p.InstallmentLabel).Should().Equal(label is null ? [] : [label]);
+        if (label is not null)
+            projections.Single().InstallmentTotalAmount.Should().Be(300m, "the total of each year");
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_AnnualEntryWithEndDate_StopsAfterIt()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Annual);
+        await _service.DeleteEntryAsync(entry.Id, 2027, 4, EntryDeleteScope.ThisAndFuture);
+
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Should().ContainSingle();
+        (await _service.GetMergedEntriesForMonthAsync(2027, 4)).Should().BeEmpty();
+        (await _service.GetMergedEntriesForMonthAsync(2028, 4)).Should().BeEmpty();
+    }
+
     [Fact]
     public async Task GetMergedEntries_InstallmentsEntryWithOverride_TotalUsesTemplateAmount()
     {
