@@ -753,17 +753,6 @@
             </CarouselView.ItemTemplate>
         </CarouselView>
 
-        <Button Text="Nuke DB"
-                Command="{Binding ClearDatabaseCommand}"
-                FontSize="10"
-                HeightRequest="30"
-                WidthRequest="70"
-                Padding="0"
-                BackgroundColor="#33FF0000"
-                TextColor="Red"
-                HorizontalOptions="Start"
-                VerticalOptions="End"
-                Margin="20,0,0,33" />
         <Button AutomationId="GoToCurrentMonthButton"
                 Text="{Binding GoToCurrentMonthLabel}"
                 Command="{Binding GoToCurrentMonthCommand}"

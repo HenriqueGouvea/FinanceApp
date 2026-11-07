@@ -8,6 +8,7 @@ namespace FinanceApp.ViewModels;
 public partial class MonthViewModel : ObservableObject
 {
     private readonly HashSet<int> _collapsedBillCardIds = [];
+    private bool _isReplacingEntries;
 
     public ObservableCollection<MonthlyEntryProjection> Entries { get; } = [];
 
@@ -90,21 +91,48 @@ public partial class MonthViewModel : ObservableObject
 
     public MonthViewModel()
     {
-        Entries.CollectionChanged += (s, e) =>
+        Entries.CollectionChanged += (_, _) =>
         {
-            OnPropertyChanged(nameof(TotalIncomes));
-            OnPropertyChanged(nameof(TotalOutcomes));
-            OnPropertyChanged(nameof(Balance));
-            OnPropertyChanged(nameof(ReceivedIncomes));
-            OnPropertyChanged(nameof(PendingIncomes));
-            OnPropertyChanged(nameof(PaidOutcomes));
-            OnPropertyChanged(nameof(PendingOutcomes));
-            OnPropertyChanged(nameof(OutcomeEntries));
-            OnPropertyChanged(nameof(IncomeEntries));
-            OnPropertyChanged(nameof(CreditCardBills));
-            OnPropertyChanged(nameof(OutcomeCount));
-            OnPropertyChanged(nameof(IncomeCount));
+            if (!_isReplacingEntries)
+                NotifyEntriesChanged();
         };
+    }
+
+    /// <summary>
+    /// Swaps the month's entries for a freshly loaded list, notifying the lists and totals once instead of once
+    /// per entry: each notification rebuilds the rows on screen.
+    /// </summary>
+    public void ReplaceEntries(IEnumerable<MonthlyEntryProjection> entries)
+    {
+        _isReplacingEntries = true;
+        try
+        {
+            Entries.Clear();
+            foreach (var entry in entries)
+                Entries.Add(entry);
+        }
+        finally
+        {
+            _isReplacingEntries = false;
+        }
+
+        NotifyEntriesChanged();
+    }
+
+    private void NotifyEntriesChanged()
+    {
+        OnPropertyChanged(nameof(TotalIncomes));
+        OnPropertyChanged(nameof(TotalOutcomes));
+        OnPropertyChanged(nameof(Balance));
+        OnPropertyChanged(nameof(ReceivedIncomes));
+        OnPropertyChanged(nameof(PendingIncomes));
+        OnPropertyChanged(nameof(PaidOutcomes));
+        OnPropertyChanged(nameof(PendingOutcomes));
+        OnPropertyChanged(nameof(OutcomeEntries));
+        OnPropertyChanged(nameof(IncomeEntries));
+        OnPropertyChanged(nameof(CreditCardBills));
+        OnPropertyChanged(nameof(OutcomeCount));
+        OnPropertyChanged(nameof(IncomeCount));
     }
 
     [RelayCommand]

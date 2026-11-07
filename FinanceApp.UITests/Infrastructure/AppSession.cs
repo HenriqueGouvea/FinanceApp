@@ -274,6 +274,34 @@ public sealed class AppSession : IDisposable
     }
 
     /// <summary>
+    /// Texts of every element matching the locator in a list longer than the screen (e.g. on CI's 320×640
+    /// emulator): collects the displayed ones, scrolling down half a screen at a time until the page can't
+    /// scroll further. Leaves the page scrolled to the bottom.
+    /// </summary>
+    public IReadOnlyList<string> TextsWhileScrollingDown(By locator, int maxScrolls = 10)
+    {
+        var size = Driver.Manage().Window.Size;
+        var texts = VisibleTexts(locator).Distinct().ToList();
+        for (var i = 0; i < maxScrolls; i++)
+        {
+            var canScrollMore = Driver.ExecuteScript("mobile: scrollGesture", new Dictionary<string, object>
+            {
+                ["left"] = size.Width / 10,
+                ["top"] = size.Height / 4,
+                ["width"] = size.Width * 8 / 10,
+                ["height"] = size.Height / 2,
+                ["direction"] = "down",
+                ["percent"] = 0.5
+            });
+            texts.AddRange(VisibleTexts(locator).Distinct().Except(texts).ToList());
+            if (canScrollMore is false)
+                break;
+        }
+
+        return texts;
+    }
+
+    /// <summary>
     /// Swipes horizontally across the lower middle of the screen, below the month summary (which takes
     /// sideways swipes for its own pages). "left" moves the finger to the left.
     /// </summary>
