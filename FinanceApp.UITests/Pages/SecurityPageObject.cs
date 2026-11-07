@@ -33,6 +33,20 @@ public class SecurityPageObject
 
     public bool IsBiometricOptionVisible => _session.IsVisible(BiometricRow);
 
+    // The row sits below the fold on small screens.
+    public bool IsHideInRecentsOn => _session.ScrollTo("HideInRecentsSwitch").GetAttribute("checked") == "true";
+
+    /// <summary>
+    /// Taps "Ocultar conteúdo nos apps recentes" and waits for its switch to flip.
+    /// </summary>
+    public SecurityPageObject ToggleHideInRecents()
+    {
+        var wasOn = IsHideInRecentsOn;
+        _session.ScrollToAndTap("HideInRecentsRow");
+        _session.WaitFor(() => IsHideInRecentsOn != wasOn, "the hide in recents switch to flip");
+        return this;
+    }
+
     /// <summary>
     /// Waits for the "Bloquear com PIN" switch to settle, as the page reloads after the keypad closes.
     /// </summary>

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using CommunityToolkit.Mvvm.Messaging;
 using FinanceApp.Messages;
 using FinanceApp.Models;
@@ -33,7 +34,7 @@ public class PaymentSourcesViewModelTests
             .Returns(Task.FromResult<IReadOnlyDictionary<int, decimal>>(new Dictionary<int, decimal>()));
         _timeProvider.LocalTimeZone.Returns(TimeZoneInfo.Local);
         _timeProvider.GetUtcNow().Returns(new DateTimeOffset(Today.ToUniversalTime()));
-        _vm = new PaymentSourcesViewModel(_service, _financeService, _timeProvider, _messenger);
+        _vm = new PaymentSourcesViewModel(_service, _financeService, _timeProvider, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
     }
 
     // --- LoadAsync ---

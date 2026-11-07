@@ -14,7 +14,19 @@ public partial class PinPage : ContentPage
     {
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
+        _viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PinViewModel.IsLockedOut) && _viewModel.IsLockedOut)
+                StartLockoutCountdown();
+        };
     }
+
+    private void StartLockoutCountdown() =>
+        Dispatcher.StartTimer(TimeSpan.FromSeconds(1), () =>
+        {
+            _viewModel.RefreshLockout();
+            return _viewModel.IsLockedOut;
+        });
 
     /// <summary>
     /// <paramref name="onCompleted"/> runs once the purpose is fulfilled and must close the page.

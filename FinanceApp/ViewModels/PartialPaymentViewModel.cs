@@ -11,6 +11,7 @@ namespace FinanceApp.ViewModels;
 public partial class PartialPaymentViewModel : ObservableObject
 {
     private readonly IFinanceService _financeService;
+    private readonly IWriteGuard _writeGuard;
     private Func<Task>? _onSaved;
     private int _entryId;
     private DateTime _month;
@@ -48,9 +49,10 @@ public partial class PartialPaymentViewModel : ObservableObject
     public decimal NewOverBudgetAmount => Math.Max(0, NewPaidAmount - TotalAmount);
     public bool IsNewTotalOverBudget => NewOverBudgetAmount > 0;
 
-    public PartialPaymentViewModel(IFinanceService financeService)
+    public PartialPaymentViewModel(IFinanceService financeService, IWriteGuard writeGuard)
     {
         _financeService = financeService;
+        _writeGuard = writeGuard;
     }
 
     partial void OnEntryTypeChanged(FinancialEntryType value)
@@ -88,8 +90,9 @@ public partial class PartialPaymentViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task Save()
     {
-        await _financeService.AddPaymentAsync(_entryId, _month.Year, _month.Month, Amount, PaymentDate, PaymentDescription.Trim());
-        if (_onSaved is not null)
+        var saved = await _writeGuard.TryAsync(() =>
+            _financeService.AddPaymentAsync(_entryId, _month.Year, _month.Month, Amount, PaymentDate, PaymentDescription.Trim()));
+        if (saved && _onSaved is not null)
             await _onSaved();
     }
 

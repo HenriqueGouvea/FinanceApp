@@ -1,6 +1,7 @@
 using FinanceApp.UITests.Infrastructure;
 using FinanceApp.UITests.Pages;
 using FluentAssertions;
+using FluentAssertions.Execution;
 
 namespace FinanceApp.UITests.Tests;
 
@@ -37,8 +38,35 @@ public sealed class AppLockTests : E2ETestBase
         keypad.Type(Pin).WaitForTitle(AppLabels.ConfirmPin).TypeAndWaitForClose(Pin);
 
         security.WaitForPinLock(true);
-        security.IsChangePinVisible.Should().BeTrue();
-        security.IsBiometricOptionVisible.Should().BeTrue();
+        using (new AssertionScope())
+        {
+            security.IsChangePinVisible.Should().BeTrue();
+            security.IsBiometricOptionVisible.Should().BeTrue();
+            security.IsHideInRecentsOn.Should().BeTrue("the app hides from the recent apps by default once locked");
+        }
+
+        security.ToggleHideInRecents().IsHideInRecentsOn.Should().BeFalse();
+    }
+
+    [Fact]
+    public void LockScreen_FiveWrongPins_LocksTheKeypad()
+    {
+        MainPage.OpenSecurity().EnablePin(Pin);
+        Session.Relaunch();
+        var lockScreen = new PinPageObject(Session).WaitUntilLoaded();
+
+        for (var i = 0; i < 4; i++)
+            lockScreen.TypeWrongPin("0000");
+        lockScreen.ErrorText.Should().Be(AppLabels.WrongPin);
+
+        lockScreen.TypeWrongPin("0000");
+
+        using (new AssertionScope())
+        {
+            lockScreen.ErrorText.Should().StartWith(AppLabels.TooManyAttempts);
+            lockScreen.IsKeypadEnabled.Should().BeFalse();
+            new MainPageObject(Session).IsLoaded.Should().BeFalse();
+        }
     }
 
     [Fact]

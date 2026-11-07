@@ -14,6 +14,7 @@ public partial class ProfileEditViewModel : ObservableObject
     private readonly IUserProfileService _profileService;
     private readonly IMediaPicker _mediaPicker;
     private readonly IMessenger _messenger;
+    private readonly IWriteGuard _writeGuard;
     private Func<Task>? _onSaved;
 
     [ObservableProperty]
@@ -27,11 +28,12 @@ public partial class ProfileEditViewModel : ObservableObject
     public bool HasPhoto => PhotoPath is not null;
     public string Initial => string.IsNullOrWhiteSpace(Name) ? "👤" : Name.Trim()[..1].ToUpperInvariant();
 
-    public ProfileEditViewModel(IUserProfileService profileService, IMediaPicker mediaPicker, IMessenger messenger)
+    public ProfileEditViewModel(IUserProfileService profileService, IMediaPicker mediaPicker, IMessenger messenger, IWriteGuard writeGuard)
     {
         _profileService = profileService;
         _mediaPicker = mediaPicker;
         _messenger = messenger;
+        _writeGuard = writeGuard;
     }
 
     public void Prepare()
@@ -58,7 +60,9 @@ public partial class ProfileEditViewModel : ObservableObject
     [RelayCommand]
     async Task Save()
     {
-        await _profileService.SaveAsync(Name, PhotoPath);
+        if (!await _writeGuard.TryAsync(() => _profileService.SaveAsync(Name, PhotoPath)))
+            return;
+
         _messenger.Send(new ProfileChangedMessage());
 
         if (_onSaved is not null)

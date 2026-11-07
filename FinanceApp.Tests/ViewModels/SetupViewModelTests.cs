@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using CommunityToolkit.Mvvm.Messaging;
 using FinanceApp.Messages;
 using FinanceApp.Models;
@@ -29,7 +30,7 @@ public class SetupViewModelTests
         _profileService.Name.Returns(string.Empty);
         _profileService.PhotoPath.Returns((string?)null);
         _mediaPicker = Substitute.For<IMediaPicker>();
-        _vm = new SetupViewModel(_setupService, _paymentSourceService, _profileService, _mediaPicker, _messenger);
+        _vm = new SetupViewModel(_setupService, _paymentSourceService, _profileService, _mediaPicker, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
     }
 
     // --- PrepareAsync ---

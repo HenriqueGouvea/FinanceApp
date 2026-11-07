@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using FinanceApp.Models;
 using FinanceApp.Services;
 using FinanceApp.ViewModels;
@@ -30,7 +31,7 @@ public class AddEntryViewModelTests
         _service.GetPaymentsAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>()).Returns([]);
         _paymentSourceService = Substitute.For<IPaymentSourceService>();
         _paymentSourceService.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<PaymentSource>>([Checking, Card]));
-        _vm = new AddEntryViewModel(_service, _categoryService, _paymentSourceService);
+        _vm = new AddEntryViewModel(_service, _categoryService, _paymentSourceService, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
         _vm.PrepareAsync(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local)).GetAwaiter().GetResult();
     }
 

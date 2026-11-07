@@ -52,6 +52,10 @@ public static class AppLabels
     public const string EnterCurrentPin = "Digite o PIN atual";
     public const string EnterNewPin = "Digite o novo PIN";
     public const string WrongPin = "PIN incorreto. Tente novamente.";
+    /// <summary>
+    /// Followed by the remaining wait, e.g. "30 s", which counts down.
+    /// </summary>
+    public const string TooManyAttempts = "Muitas tentativas. Tente de novo em";
     public const string PinMismatch = "Os PINs não conferem. Crie o PIN novamente.";
     public const string PinNotRecoverable = "o PIN não pode ser recuperado";
     public const string Understood = "Entendi";

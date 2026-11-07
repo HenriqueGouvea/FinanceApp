@@ -8,26 +8,20 @@ public class SetupService : ISetupService
     private const string CompletedKey = "SetupCompleted";
 
     private readonly IDatabaseContext _context;
-    private readonly IFinanceService _financeService;
     private readonly ICategoryService _categoryService;
-    private readonly IPaymentSourceService _paymentSourceService;
     private readonly IUserProfileService _profileService;
     private readonly IPreferencesService _preferences;
     private readonly TimeProvider _timeProvider;
 
     public SetupService(
         IDatabaseContext context,
-        IFinanceService financeService,
         ICategoryService categoryService,
-        IPaymentSourceService paymentSourceService,
         IUserProfileService profileService,
         IPreferencesService preferences,
         TimeProvider timeProvider)
     {
         _context = context;
-        _financeService = financeService;
         _categoryService = categoryService;
-        _paymentSourceService = paymentSourceService;
         _profileService = profileService;
         _preferences = preferences;
         _timeProvider = timeProvider;
@@ -49,51 +43,62 @@ public class SetupService : ISetupService
 
     public async Task CompleteAsync(NewUserSetup setup)
     {
-        await _profileService.SaveAsync(setup.Name, setup.PhotoPath);
-
-        foreach (var source in setup.PaymentSources)
-            await _paymentSourceService.SaveAsync(source);
-
-        foreach (var item in setup.CreditCards)
-        {
-            item.Card.Type = PaymentSourceType.CreditCard;
-            item.Card.BillPaymentSourceId = item.BillAccount?.Id;
-            await _paymentSourceService.SaveAsync(item.Card);
-        }
-
         var categories = await _categoryService.GetAllAsync();
         var now = _timeProvider.GetLocalNow();
         var startDate = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Local);
 
-        foreach (var item in setup.Entries.Where(e => e.Amount > 0))
+        // All or nothing: a wizard that fails halfway leaves no accounts or entries behind, so it can simply be run again.
+        var db = await _context.GetConnectionAsync();
+        await db.RunInTransactionAsync(conn =>
         {
-            var category = categories.FirstOrDefault(c => c.EntryType == item.EntryType && c.Name == item.CategoryName);
-            var (entryStart, totalInstallments) = item.Recurrence switch
+            foreach (var source in setup.PaymentSources)
             {
-                RecurrenceType.Installments => InstallmentsSchedule(item, startDate),
-                RecurrenceType.Annual => AnnualSchedule(item, startDate),
-                _ => (startDate, (int?)null)
-            };
-            // A credit card purchase is paid with the bill, so it is never estimated nor paid little by little.
-            var isOnCardBill = item.EntryType == FinancialEntryType.Outcome && item.PaymentSource?.Type == PaymentSourceType.CreditCard;
+                PaymentSourceService.Normalize(source);
+                conn.Insert(source);
+            }
 
-            await _financeService.SaveEntryAsync(new FinancialEntry
+            foreach (var item in setup.CreditCards)
             {
-                Description = item.Description.Trim(),
-                Amount = item.Amount,
-                EntryType = item.EntryType,
-                Recurrence = item.Recurrence,
-                TotalInstallments = totalInstallments,
-                StartDate = entryStart,
-                DueDay = item.DueDay,
-                IsEstimated = item.IsEstimated && !isOnCardBill,
-                AllowsPartialPayment = item.AllowsPartialPayment && !isOnCardBill,
-                CategoryId = category?.Id,
-                PaymentSourceId = item.PaymentSource?.Id
-            });
-        }
+                item.Card.Type = PaymentSourceType.CreditCard;
+                item.Card.BillPaymentSourceId = item.BillAccount?.Id;
+                PaymentSourceService.Normalize(item.Card);
+                conn.Insert(item.Card);
+            }
 
+            foreach (var item in setup.Entries.Where(e => e.Amount > 0))
+                conn.Insert(BuildEntry(item, categories, startDate));
+        });
+
+        await _profileService.SaveAsync(setup.Name, setup.PhotoPath);
         Skip();
+    }
+
+    private static FinancialEntry BuildEntry(SetupEntry item, IReadOnlyList<FinancialCategory> categories, DateTime startDate)
+    {
+        var category = categories.FirstOrDefault(c => c.EntryType == item.EntryType && c.Name == item.CategoryName);
+        var (entryStart, totalInstallments) = item.Recurrence switch
+        {
+            RecurrenceType.Installments => InstallmentsSchedule(item, startDate),
+            RecurrenceType.Annual => AnnualSchedule(item, startDate),
+            _ => (startDate, (int?)null)
+        };
+        // A credit card purchase is paid with the bill, so it is never estimated nor paid little by little.
+        var isOnCardBill = item.EntryType == FinancialEntryType.Outcome && item.PaymentSource?.Type == PaymentSourceType.CreditCard;
+
+        return new FinancialEntry
+        {
+            Description = item.Description.Trim(),
+            Amount = item.Amount,
+            EntryType = item.EntryType,
+            Recurrence = item.Recurrence,
+            TotalInstallments = totalInstallments,
+            StartDate = entryStart,
+            DueDay = item.DueDay,
+            IsEstimated = item.IsEstimated && !isOnCardBill,
+            AllowsPartialPayment = item.AllowsPartialPayment && !isOnCardBill,
+            CategoryId = category?.Id,
+            PaymentSourceId = item.PaymentSource?.Id
+        };
     }
 
     public void Skip() => _preferences.Set(CompletedKey, true);

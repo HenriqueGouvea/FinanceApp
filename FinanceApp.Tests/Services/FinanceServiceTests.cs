@@ -2,6 +2,7 @@ using FinanceApp.Models;
 using FinanceApp.Services;
 using FinanceApp.Tests.Infrastructure;
 using FluentAssertions;
+using SQLite;
 using Xunit;
 
 namespace FinanceApp.Tests.Services;
@@ -1273,6 +1274,49 @@ public class FinanceServiceTests
             .Should().ContainSingle().Which.FinancialEntryId.Should().Be(kept.Id);
     }
 
+    [Fact]
+    public async Task DeleteEntryAsync_FailsHalfway_ThrowsAndKeepsEveryRow()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveMonthlyEntryAsync(new FinancialMonthlyEntry { FinancialEntryId = entry.Id, Year = 2026, Month = 5 });
+        await _service.AddPaymentAsync(entry.Id, 2026, 5, 30m, new DateTime(2026, 5, 3), string.Empty);
+        // The monthly rows go first, so the template's delete fails after they're gone.
+        await FailOnAsync("BEFORE DELETE ON FinancialEntry");
+
+        var act = () => _service.DeleteEntryAsync(entry.Id, 2026, 8, EntryDeleteScope.All);
+
+        await act.Should().ThrowAsync<SQLiteException>();
+        var db = await _context.GetConnectionAsync();
+        (await _service.GetEntryByIdAsync(entry.Id)).Should().NotBeNull();
+        (await db.Table<FinancialMonthlyEntry>().CountAsync()).Should().Be(1);
+        (await db.Table<FinancialPayment>().CountAsync()).Should().Be(1);
+    }
+
+    // --- Failed writes ---
+
+    [Fact]
+    public async Task SaveEntryAsync_WriteFails_Throws()
+    {
+        await FailOnAsync("BEFORE INSERT ON FinancialEntry");
+
+        var act = () => _service.SaveEntryAsync(new FinancialEntry { Description = "Aluguel", Amount = 1000, StartDate = DateTime.Today });
+
+        await act.Should().ThrowAsync<SQLiteException>();
+    }
+
+    [Fact]
+    public async Task AddPaymentAsync_PaymentInsertFails_ThrowsAndLeavesMonthUnpaid()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await FailOnAsync("BEFORE INSERT ON FinancialPayment");
+
+        var act = () => _service.AddPaymentAsync(entry.Id, 2026, 4, 30m, new DateTime(2026, 4, 3), string.Empty);
+
+        await act.Should().ThrowAsync<SQLiteException>();
+        var db = await _context.GetConnectionAsync();
+        (await db.Table<FinancialMonthlyEntry>().CountAsync()).Should().Be(0);
+    }
+
     // --- Credit card bill ---
 
     [Fact]
@@ -1363,6 +1407,20 @@ public class FinanceServiceTests
         var entries = await _service.GetMergedEntriesForMonthAsync(2026, 4);
         entries.Should().OnlyContain(e => e.IsPaid);
         entries.Select(e => e.FinancialEntryId).Should().BeEquivalentTo([netflix.Id, market.Id]);
+    }
+
+    [Fact]
+    public async Task SetCreditCardBillStatusAsync_FailsHalfway_ThrowsAndPaysNothing()
+    {
+        var card = await SaveCardAsync();
+        await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+        var market = await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+        await FailOnAsync($"BEFORE INSERT ON FinancialMonthlyEntry WHEN NEW.FinancialEntryId = {market.Id}");
+
+        var act = () => _service.SetCreditCardBillStatusAsync(card.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+
+        await act.Should().ThrowAsync<SQLiteException>();
+        (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Should().OnlyContain(e => !e.IsPaid);
     }
 
     [Fact]
@@ -1581,6 +1639,13 @@ public class FinanceServiceTests
         var used = await _service.GetUsedCreditLimitsAsync(2026, 4);
 
         used.Should().BeEquivalentTo(new Dictionary<int, decimal> { [card.Id] = 0m, [otherCard.Id] = 100m });
+    }
+
+    // Makes the given write fail, as a full disk or a killed app would.
+    private async Task FailOnAsync(string triggerEvent)
+    {
+        var db = await _context.GetConnectionAsync();
+        await db.ExecuteAsync($"CREATE TRIGGER FailWrite {triggerEvent} BEGIN SELECT RAISE(ABORT, 'write failed'); END");
     }
 
     private async Task<PaymentSource> SaveCardAsync(int? billDueDay = null, int? billPaymentSourceId = null)

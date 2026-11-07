@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using FinanceApp.Models;
 using FinanceApp.Services;
 using FinanceApp.ViewModels;
@@ -18,7 +19,7 @@ public class PartialPaymentViewModelTests
     public PartialPaymentViewModelTests()
     {
         _service = Substitute.For<IFinanceService>();
-        _vm = new PartialPaymentViewModel(_service);
+        _vm = new PartialPaymentViewModel(_service, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
     }
 
     // --- Prepare ---

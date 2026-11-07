@@ -12,16 +12,18 @@ public partial class CategoriesViewModel : ObservableObject
 {
     private readonly ICategoryService _categoryService;
     private readonly IMessenger _messenger;
+    private readonly IWriteGuard _writeGuard;
     private List<FinancialCategory> _categories = [];
 
     public ObservableCollection<CategoryGroup> Groups { get; } = [];
 
     public bool IsEmpty => Groups.Count == 0;
 
-    public CategoriesViewModel(ICategoryService categoryService, IMessenger messenger)
+    public CategoriesViewModel(ICategoryService categoryService, IMessenger messenger, IWriteGuard writeGuard)
     {
         _categoryService = categoryService;
         _messenger = messenger;
+        _writeGuard = writeGuard;
         Groups.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
     }
 
@@ -37,7 +39,9 @@ public partial class CategoriesViewModel : ObservableObject
 
     public async Task DeleteAsync(FinancialCategory category)
     {
-        await _categoryService.DeleteAsync(category.Id);
+        if (!await _writeGuard.TryAsync(() => _categoryService.DeleteAsync(category.Id)))
+            return;
+
         _categories.Remove(category);
         BuildGroups();
         _messenger.Send(new CategoriesChangedMessage());

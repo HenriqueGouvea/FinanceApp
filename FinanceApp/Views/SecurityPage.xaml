@@ -71,6 +71,22 @@
                                     InputTransparent="True"
                                     VerticalOptions="Center" />
                         </Grid>
+
+                        <BoxView HeightRequest="1" Margin="16,0" />
+                        <Grid AutomationId="HideInRecentsRow" ColumnDefinitions="*, Auto" Style="{StaticResource CardRow}">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding ToggleHideInRecentsCommand}" />
+                            </Grid.GestureRecognizers>
+                            <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
+                                <Label Text="Ocultar conteúdo nos apps recentes" Style="{StaticResource RowTitle}" />
+                                <Label Text="Seus valores não aparecem na lista de apps abertos" Style="{StaticResource Hint}" />
+                            </VerticalStackLayout>
+                            <Switch Grid.Column="1"
+                                    AutomationId="HideInRecentsSwitch"
+                                    IsToggled="{Binding IsHideInRecentsEnabled, Mode=OneWay}"
+                                    InputTransparent="True"
+                                    VerticalOptions="Center" />
+                        </Grid>
                     </VerticalStackLayout>
                 </VerticalStackLayout>
             </Border>

@@ -9,6 +9,7 @@ namespace FinanceApp.ViewModels;
 public partial class PaymentSourceEditViewModel : ObservableObject
 {
     private readonly IPaymentSourceService _paymentSourceService;
+    private readonly IWriteGuard _writeGuard;
     private Func<Task>? _onSaved;
     private int _editingSourceId;
 
@@ -47,9 +48,10 @@ public partial class PaymentSourceEditViewModel : ObservableObject
     /// </summary>
     public ObservableCollection<PaymentSource> BillPaymentAccounts { get; } = [];
 
-    public PaymentSourceEditViewModel(IPaymentSourceService paymentSourceService)
+    public PaymentSourceEditViewModel(IPaymentSourceService paymentSourceService, IWriteGuard writeGuard)
     {
         _paymentSourceService = paymentSourceService;
+        _writeGuard = writeGuard;
         BillPaymentAccounts.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasBillPaymentAccounts));
     }
 
@@ -93,7 +95,7 @@ public partial class PaymentSourceEditViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task Save()
     {
-        await _paymentSourceService.SaveAsync(new PaymentSource
+        var saved = await _writeGuard.TryAsync(() => _paymentSourceService.SaveAsync(new PaymentSource
         {
             Id = _editingSourceId,
             Name = Name.Trim(),
@@ -101,9 +103,9 @@ public partial class PaymentSourceEditViewModel : ObservableObject
             Balance = Balance,
             BillDueDay = IsCreditCard && BillDueDay != AddEntryViewModel.NoDueDay ? BillDueDay : null,
             BillPaymentSourceId = IsCreditCard ? BillPaymentAccount?.Id : null
-        });
+        }));
 
-        if (_onSaved is not null)
+        if (saved && _onSaved is not null)
             await _onSaved();
     }
 

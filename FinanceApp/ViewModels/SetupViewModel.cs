@@ -36,6 +36,7 @@ public partial class SetupViewModel : ObservableObject
     private readonly IUserProfileService _profileService;
     private readonly IMediaPicker _mediaPicker;
     private readonly IMessenger _messenger;
+    private readonly IWriteGuard _writeGuard;
     private readonly HashSet<SetupStep> _skippedSteps = [];
     private Func<bool, Task>? _onClosed;
 
@@ -258,13 +259,15 @@ public partial class SetupViewModel : ObservableObject
         IPaymentSourceService paymentSourceService,
         IUserProfileService profileService,
         IMediaPicker mediaPicker,
-        IMessenger messenger)
+        IMessenger messenger,
+        IWriteGuard writeGuard)
     {
         _setupService = setupService;
         _paymentSourceService = paymentSourceService;
         _profileService = profileService;
         _mediaPicker = mediaPicker;
         _messenger = messenger;
+        _writeGuard = writeGuard;
         NewSources.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasNewSources));
         NewCards.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasNewCards));
         AvailableSources.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasAvailableSources));
@@ -632,7 +635,9 @@ public partial class SetupViewModel : ObservableObject
 
     private async Task FinishAsync()
     {
-        await _setupService.CompleteAsync(BuildSetup());
+        if (!await _writeGuard.TryAsync(() => _setupService.CompleteAsync(BuildSetup())))
+            return;
+
         _messenger.Send(new SetupCompletedMessage());
 
         if (_onClosed is not null)

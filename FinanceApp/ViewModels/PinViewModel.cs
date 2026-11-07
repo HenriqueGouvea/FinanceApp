@@ -20,6 +20,14 @@ public partial class PinViewModel : ObservableObject
     [ObservableProperty] string errorMessage = string.Empty;
     [ObservableProperty] bool canUseBiometrics;
 
+    /// <summary>
+    /// True while too many wrong PINs keep the keypad locked. The page calls <see cref="RefreshLockout"/> every second
+    /// meanwhile, to count down and unlock it.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddDigitCommand))]
+    bool isLockedOut;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Dots))]
     string pin = string.Empty;
@@ -45,6 +53,26 @@ public partial class PinViewModel : ObservableObject
         CanUseBiometrics = purpose == PinPurpose.Unlock && _appLockService.IsBiometricEnabled && _biometricService.IsAvailable();
         ErrorMessage = string.Empty;
         GoTo(purpose == PinPurpose.Create ? Step.EnterNew : Step.EnterCurrent);
+        if (_step == Step.EnterCurrent)
+            RefreshLockout();
+    }
+
+    public void RefreshLockout()
+    {
+        var remaining = _appLockService.GetRemainingLockout();
+        var wasLockedOut = IsLockedOut;
+        IsLockedOut = remaining > TimeSpan.Zero;
+
+        if (IsLockedOut)
+            ErrorMessage = $"Muitas tentativas. Tente de novo em {FormatWait(remaining)}";
+        else if (wasLockedOut)
+            ErrorMessage = string.Empty;
+    }
+
+    private static string FormatWait(TimeSpan remaining)
+    {
+        var seconds = (int)Math.Ceiling(remaining.TotalSeconds);
+        return seconds < 60 ? $"{seconds} s" : $"{(int)Math.Ceiling(seconds / 60.0)} min";
     }
 
     public void SetCompletedCallback(Func<Task> onCompleted)
@@ -52,10 +80,12 @@ public partial class PinViewModel : ObservableObject
         _onCompleted = onCompleted;
     }
 
-    [RelayCommand]
+    private bool CanAddDigit() => !IsLockedOut;
+
+    [RelayCommand(CanExecute = nameof(CanAddDigit))]
     async Task AddDigit(string digit)
     {
-        if (Pin.Length >= AppLockService.PinLength)
+        if (IsLockedOut || Pin.Length >= AppLockService.PinLength)
             return;
 
         ErrorMessage = string.Empty;
@@ -88,6 +118,7 @@ public partial class PinViewModel : ObservableObject
                 if (!await _appLockService.VerifyPinAsync(entered))
                 {
                     Fail("PIN incorreto. Tente novamente.", Step.EnterCurrent);
+                    RefreshLockout();
                     return;
                 }
 

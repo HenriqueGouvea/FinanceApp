@@ -44,13 +44,17 @@ public static class MauiProgram
         builder.Services.AddSingleton<IAppLockService, AppLockService>();
         builder.Services.AddSingleton<IUserProfileService, UserProfileService>();
         builder.Services.AddSingleton<ISetupService, SetupService>();
+        builder.Services.AddSingleton<IAlertService, AlertService>();
+        builder.Services.AddSingleton<IWriteGuard, WriteGuard>();
         builder.Services.AddSingleton(FileSystem.Current);
         builder.Services.AddSingleton(MediaPicker.Default);
         builder.Services.AddSingleton(TimeProvider.System);
 #if ANDROID
         builder.Services.AddSingleton<IBiometricService, BiometricService>();
+        builder.Services.AddSingleton<IRecentsPrivacyService, RecentsPrivacyService>();
 #else
         builder.Services.AddSingleton<IBiometricService, UnavailableBiometricService>();
+        builder.Services.AddSingleton<IRecentsPrivacyService, UnavailableRecentsPrivacyService>();
 #endif
         builder.Services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
 
