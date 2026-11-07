@@ -31,6 +31,7 @@ public partial class MainViewModel : ObservableObject,
     [NotifyPropertyChangedFor(nameof(SelectedMonth))]
     [NotifyPropertyChangedFor(nameof(IsAwayFromCurrentMonth))]
     [NotifyPropertyChangedFor(nameof(GoToCurrentMonthLabel))]
+    [NotifyPropertyChangedFor(nameof(IsSelectedMonthLoading))]
     [NotifyCanExecuteChangedFor(nameof(GoToPreviousMonthCommand))]
     [NotifyCanExecuteChangedFor(nameof(GoToNextMonthCommand))]
     int currentPosition;
@@ -45,6 +46,12 @@ public partial class MainViewModel : ObservableObject,
     bool isHeaderCompact;
 
     public MonthViewModel? SelectedMonth => Months.ElementAtOrDefault(CurrentPosition);
+
+    /// <summary>
+    /// The month on screen is still fetching its entries, so the page shows that something is happening instead of an
+    /// empty (or outdated) month.
+    /// </summary>
+    public bool IsSelectedMonthLoading => SelectedMonth is { IsLoaded: false };
 
     public DateTime CurrentMonthDate => FirstOfToday;
     public DateTime FirstMonthDate => FirstOfToday.AddMonths(-MaxMonthsFromToday);
@@ -194,10 +201,9 @@ public partial class MainViewModel : ObservableObject,
 
     private async Task LoadNearbyMonthsAsync(int position)
     {
-        var from = Math.Max(0, position - 2);
-        var to = Math.Min(Months.Count - 1, position + 2);
-
-        for (int i = from; i <= to; i++)
+        // The month on screen first, then its neighbours, closest first, so the user waits as little as possible.
+        int[] offsets = [0, 1, -1, 2, -2];
+        foreach (var i in offsets.Select(o => position + o).Where(i => i >= 0 && i < Months.Count))
         {
             var month = Months[i];
             if (month.IsLoaded)
@@ -235,6 +241,14 @@ public partial class MainViewModel : ObservableObject,
     }
 
     private void OnMonthViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MonthViewModel.IsLoaded) && sender == SelectedMonth)
+            OnPropertyChanged(nameof(IsSelectedMonthLoading));
+
+        SyncMonthPreferences(sender, e);
+    }
+
+    private void SyncMonthPreferences(object? sender, PropertyChangedEventArgs e)
     {
         if (_isSyncing || sender is not MonthViewModel changedVm) return;
 

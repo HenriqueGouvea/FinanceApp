@@ -6,7 +6,7 @@ Each test also asserts on the app's SQLite database, pulled from the device afte
 ## Prerequisites (one time)
 
 - Android emulator running (default serial `emulator-5554`, e.g. `galaxy_a16_-_api_35`, Android 15).
-- 3-button navigation on the emulator: `adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton` (once per AVD; it persists). Android 15 images default to gesture navigation, where a scroll swipe that starts near the bottom edge is taken as "go home" and the app leaves the screen mid-test, mostly at CI's 320×640 size. A real Galaxy A16 ships with the 3-button bar too.
+- 3-button navigation on the emulator: `adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton` (once per AVD; it survives a normal shutdown, but recheck it with `adb shell cmd overlay list | grep navbar` after the emulator was killed or cold booted). Android 15 images default to gesture navigation, where a scroll swipe that starts near the bottom edge is taken as "go home" and the app leaves the screen mid-test, mostly at CI's 320×640 size. A real Galaxy A16 ships with the 3-button bar too.
 - Node.js ≥ 18, then install the pinned local Appium + driver:
   ```bash
   cd FinanceApp.UITests && npm install

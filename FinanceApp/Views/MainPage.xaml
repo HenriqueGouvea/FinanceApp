@@ -784,5 +784,26 @@
         <Button AutomationId="AddEntryButton"
                 Style="{StaticResource FabButton}"
                 Clicked="OnAddClicked" />
+
+        <!-- While the month on screen fetches its entries, above the list and the "+". Swipes and taps go through -->
+        <Border AutomationId="MonthLoadingIndicator"
+                Style="{StaticResource Card}"
+                Padding="20,14"
+                HorizontalOptions="Center"
+                VerticalOptions="Center"
+                InputTransparent="True"
+                IsVisible="{Binding IsSelectedMonthLoading}">
+            <HorizontalStackLayout Spacing="12">
+                <ActivityIndicator IsRunning="{Binding IsSelectedMonthLoading}"
+                                   Color="{StaticResource Primary}"
+                                   WidthRequest="28"
+                                   HeightRequest="28"
+                                   VerticalOptions="Center" />
+                <Label Text="Carregando lançamentos..."
+                       FontSize="14"
+                       TextColor="{StaticResource Ink}"
+                       VerticalOptions="Center" />
+            </HorizontalStackLayout>
+        </Border>
     </Grid>
 </ContentPage>
