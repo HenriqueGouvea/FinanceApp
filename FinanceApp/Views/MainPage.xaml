@@ -331,20 +331,23 @@
                                    FontFamily="OpenSansSemibold"
                                    TextColor="{StaticResource Primary}"
                                    LineBreakMode="TailTruncation" />
-                            <HorizontalStackLayout IsClippedToBounds="True">
-                                <!-- Turns red while it is due today and not yet paid -->
-                                <Label AutomationId="CreditCardBillDueDateLabel"
-                                       Text="{Binding DueDate, Converter={x:Static converters:DueDateToLabelConverter.Instance}}"
-                                       Style="{StaticResource EntryMeta}"
-                                       IsVisible="{Binding HasDueDate}">
-                                    <Label.Triggers>
-                                        <DataTrigger TargetType="Label" Binding="{Binding IsDueToday}" Value="True">
-                                            <Setter Property="TextColor" Value="{StaticResource Outcome}" />
-                                            <Setter Property="FontAttributes" Value="Bold" />
-                                        </DataTrigger>
-                                    </Label.Triggers>
-                                </Label>
-                                <Label Text=" · " Style="{StaticResource EntryMeta}" IsVisible="{Binding HasDueDate}" />
+                            <!-- Wraps on narrow screens instead of clipping the parts that don't fit;
+                                 each part keeps its " · " so a wrapped line never starts with one -->
+                            <FlexLayout Wrap="Wrap" AlignItems="Start">
+                                <HorizontalStackLayout IsVisible="{Binding HasDueDate}">
+                                    <!-- Turns red while it is due today and not yet paid -->
+                                    <Label AutomationId="CreditCardBillDueDateLabel"
+                                           Text="{Binding DueDate, Converter={x:Static converters:DueDateToLabelConverter.Instance}}"
+                                           Style="{StaticResource EntryMeta}">
+                                        <Label.Triggers>
+                                            <DataTrigger TargetType="Label" Binding="{Binding IsDueToday}" Value="True">
+                                                <Setter Property="TextColor" Value="{StaticResource Outcome}" />
+                                                <Setter Property="FontAttributes" Value="Bold" />
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                    <Label Text=" · " Style="{StaticResource EntryMeta}" />
+                                </HorizontalStackLayout>
                                 <HorizontalStackLayout IsVisible="{Binding HasPaymentAccount}">
                                     <Label AutomationId="CreditCardBillAccountLabel"
                                            Text="{Binding PaymentAccount.Name, StringFormat='Débito em {0}'}"
@@ -354,7 +357,7 @@
                                 <Label AutomationId="CreditCardBillCountLabel"
                                        Text="{Binding EntryCount, StringFormat='{0} lançamento(s)'}"
                                        Style="{StaticResource EntryMeta}" />
-                            </HorizontalStackLayout>
+                            </FlexLayout>
                         </VerticalStackLayout>
 
                         <VerticalStackLayout Grid.Column="2" Spacing="1" VerticalOptions="Center">
