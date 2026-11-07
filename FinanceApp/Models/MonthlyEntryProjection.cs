@@ -73,5 +73,18 @@ public record MonthlyEntryProjection(
     /// </summary>
     public bool ShowsPaidSoFar => IsPartiallyPaid && !IsOverBudget;
     public bool ShowsPaymentProgress => IsPartiallyPaid || IsOverBudget;
+    /// <summary>
+    /// The amount the row shows: while partially paid within the plan, what was paid so far ("R$ 450,00", with
+    /// "de R$ 1.200,00" under it); otherwise the month's amount.
+    /// </summary>
+    public decimal ShownAmount => ShowsPaidSoFar ? PaidAmount : EffectiveAmount;
+    /// <summary>
+    /// The row shows the due date until the entry is paid: then "Pago"/"Recebido" takes its place.
+    /// </summary>
+    public bool ShowsDueDateInRow => ShowsDueDate && !IsPaid;
+    /// <summary>
+    /// Entries on a credit card bill don't repeat the card: they are listed under its bill.
+    /// </summary>
+    public bool ShowsPaymentSourceInRow => HasPaymentSource && !IsOnCreditCardBill;
     public decimal PlannedOrEffectiveAmount => PlannedAmount ?? EffectiveAmount;
 }

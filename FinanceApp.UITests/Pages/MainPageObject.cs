@@ -29,6 +29,10 @@ public class MainPageObject
     private static readonly By EntryCategory = AppSession.AutomationId("EntryCategoryLabel");
     private static readonly By EntryPaymentSource = AppSession.AutomationId("EntryPaymentSourceLabel");
     private static readonly By EntryInstallment = AppSession.AutomationId("EntryInstallmentLabel");
+    private static readonly By EntryInstallmentTotal = AppSession.AutomationId("EntryInstallmentTotalLabel");
+    private static readonly By CompactMonthButton = AppSession.AutomationId("CompactMonthButton");
+    private static readonly By CompactMonthTitle = AppSession.AutomationId("CompactMonthTitleLabel");
+    private static readonly By HeaderAvatarInitial = AppSession.AutomationId("HeaderAvatarInitialLabel");
     private static readonly By EntryDueDate = AppSession.AutomationId("EntryDueDateLabel");
     private static readonly By DeleteAction = AppSession.AutomationId("DeleteEntryAction");
     private static readonly By MarkPaidAction = AppSession.AutomationId("MarkPaidEntryAction");
@@ -141,7 +145,15 @@ public class MainPageObject
     public IReadOnlyList<string> VisibleEntryAmounts => _session.VisibleTexts(EntryAmount);
     public IReadOnlyList<string> VisibleEntryCategories => _session.VisibleTexts(EntryCategory);
     public IReadOnlyList<string> VisibleEntryPaymentSources => _session.VisibleTexts(EntryPaymentSource);
+    /// <summary>
+    /// The installment badges beside the descriptions, e.g. "1/3".
+    /// </summary>
     public IReadOnlyList<string> VisibleInstallmentLabels => _session.VisibleTexts(EntryInstallment);
+
+    /// <summary>
+    /// The installment totals in the rows' details, e.g. "total R$ 300,00".
+    /// </summary>
+    public IReadOnlyList<string> VisibleInstallmentTotals => _session.VisibleTexts(EntryInstallmentTotal);
 
     public bool IsEntryVisible(string description) => _session.IsVisible(EntryByDescription(description));
 
@@ -284,10 +296,19 @@ public class MainPageObject
         FindRow(description).FindElements(EntryPartialIcon).Any(e => e.Displayed);
 
     /// <summary>
-    /// The amount paid so far shown under the row's price (e.g. "R$ 250,00"), or null when not partially paid
-    /// or already beyond the planned amount.
+    /// The amount paid so far (e.g. "R$ 250,00"), which the row shows as its amount while partially paid within the
+    /// planned amount; null when not partially paid or already beyond the planned amount.
     /// </summary>
-    public string? EntryPartialText(string description) =>
+    public string? EntryPaidSoFarText(string description)
+    {
+        var row = FindRow(description);
+        return row.FindElements(EntryPartial).Any(e => e.Displayed) ? row.FindElements(EntryAmount).First(e => e.Displayed).Text : null;
+    }
+
+    /// <summary>
+    /// The "de R$ 800,00" line under the amount paid so far of a partially paid entry, or null otherwise.
+    /// </summary>
+    public string? EntryOfPlannedText(string description) =>
         FindRow(description).FindElements(EntryPartial).FirstOrDefault(e => e.Displayed)?.Text;
 
     public string EntryAmountText(string description) =>
@@ -481,6 +502,35 @@ public class MainPageObject
         _session.Tap(OutcomesHeader);
         return this;
     }
+
+    /// <summary>
+    /// The card under the sections telling how to expand a collapsed one, or null while both are expanded.
+    /// </summary>
+    public string? CollapsedSectionsHintText =>
+        _session.TryScrollTo("CollapsedSectionsHintLabel") is { Displayed: true } hint ? hint.Text : null;
+
+    /// <summary>
+    /// Scrolls the month down until its header leaves the screen, then reads the month pill the top bar shows instead.
+    /// </summary>
+    public string ScrollToCompactMonthTitle()
+    {
+        _session.ScrollDownUntil(() => _session.IsVisible(CompactMonthTitle), "the month to show in the top bar");
+        return _session.WaitForVisible(CompactMonthTitle).Text;
+    }
+
+    /// <summary>
+    /// Taps the month pill in the top bar (shown once the month header has scrolled away), which opens the month picker.
+    /// </summary>
+    public MonthPickerPopupObject OpenMonthPickerFromTopBar()
+    {
+        _session.Tap(CompactMonthButton);
+        return new MonthPickerPopupObject(_session).WaitUntilOpen();
+    }
+
+    /// <summary>
+    /// The user's initial in the top bar's avatar.
+    /// </summary>
+    public string HeaderAvatarInitialText => _session.WaitForVisible(HeaderAvatarInitial).Text;
 
     public MainPageObject ToggleIncomes()
     {

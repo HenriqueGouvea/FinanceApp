@@ -5,16 +5,17 @@
              xmlns:converters="clr-namespace:FinanceApp.Converters"
              x:Class="FinanceApp.Views.PinPage"
              x:DataType="vm:PinViewModel"
-             BackgroundColor="White"
+             BackgroundColor="{StaticResource Primary}"
              Shell.NavBarIsVisible="False">
     <ContentPage.Resources>
+        <!-- The lock screen sits on the plum of the splash screen, with translucent keys -->
         <Style x:Key="PinKey" TargetType="Button">
             <Setter Property="WidthRequest" Value="64" />
             <Setter Property="HeightRequest" Value="64" />
             <Setter Property="CornerRadius" Value="32" />
             <Setter Property="FontSize" Value="24" />
-            <Setter Property="BackgroundColor" Value="#F3E5F5" />
-            <Setter Property="TextColor" Value="{StaticResource Primary}" />
+            <Setter Property="BackgroundColor" Value="{StaticResource HeaderPill}" />
+            <Setter Property="TextColor" Value="White" />
             <Setter Property="HorizontalOptions" Value="Center" />
             <Setter Property="Command" Value="{Binding AddDigitCommand, x:DataType=vm:PinViewModel}" />
         </Style>
@@ -25,7 +26,7 @@
                 AutomationId="PinCancelButton"
                 Text="Cancelar"
                 BackgroundColor="Transparent"
-                TextColor="{StaticResource Primary}"
+                TextColor="White"
                 HorizontalOptions="Start"
                 IsVisible="{Binding CanCancel}"
                 Clicked="OnCancelClicked" />
@@ -36,17 +37,18 @@
                    Text="{Binding Title}"
                    FontSize="20"
                    FontAttributes="Bold"
+                   TextColor="White"
                    HorizontalOptions="Center" />
             <Label AutomationId="PinDotsLabel"
                    Text="{Binding Dots}"
                    FontSize="24"
-                   TextColor="{StaticResource Primary}"
+                   TextColor="{StaticResource Accent}"
                    CharacterSpacing="4"
                    HorizontalOptions="Center" />
             <Label AutomationId="PinErrorLabel"
                    Text="{Binding ErrorMessage}"
                    FontSize="14"
-                   TextColor="#C2414B"
+                   TextColor="#FFB4BA"
                    HorizontalTextAlignment="Center"
                    MinimumHeightRequest="20" />
         </VerticalStackLayout>
@@ -87,7 +89,7 @@
                 AutomationId="ForgotPinButton"
                 Text="Esqueci o PIN"
                 BackgroundColor="Transparent"
-                TextColor="Gray"
+                TextColor="{StaticResource BillAccent}"
                 FontSize="13"
                 Margin="0,8,0,0"
                 HorizontalOptions="Center"

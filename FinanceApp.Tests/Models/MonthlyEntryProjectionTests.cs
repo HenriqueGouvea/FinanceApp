@@ -98,6 +98,71 @@ public class MonthlyEntryProjectionTests
         projection.HasDueDate.Should().BeFalse();
     }
 
+    [Fact]
+    public void ShownAmount_PartiallyPaidWithinPlanned_IsWhatWasPaidSoFar()
+    {
+        var projection = Make(FinancialMonthlyEntryStatus.PartiallyPaid, effectiveAmount: 1200m, paidAmount: 450m);
+
+        projection.ShownAmount.Should().Be(450m);
+    }
+
+    [Theory]
+    [InlineData(FinancialMonthlyEntryStatus.Pending, 0)]
+    [InlineData(FinancialMonthlyEntryStatus.Paid, 800)]
+    public void ShownAmount_NotPartiallyPaid_IsTheMonthsAmount(FinancialMonthlyEntryStatus status, int paidAmount)
+    {
+        var projection = Make(status, effectiveAmount: 800m, paidAmount: paidAmount);
+
+        projection.ShownAmount.Should().Be(800m);
+    }
+
+    [Fact]
+    public void ShownAmount_PaidBeyondPlanned_IsWhatWasPaid()
+    {
+        var projection = Make(FinancialMonthlyEntryStatus.PartiallyPaid, effectiveAmount: 900m, paidAmount: 900m, plannedAmount: 800m);
+
+        projection.ShownAmount.Should().Be(900m);
+    }
+
+    [Theory]
+    [InlineData(FinancialMonthlyEntryStatus.Pending, true)]
+    [InlineData(FinancialMonthlyEntryStatus.PartiallyPaid, true)]
+    [InlineData(FinancialMonthlyEntryStatus.Paid, false)]
+    public void ShowsDueDateInRow_UntilPaid(FinancialMonthlyEntryStatus status, bool expected)
+    {
+        var projection = Make(status, effectiveAmount: 100m, paidAmount: 0m, dueDate: DateTime.Today.AddDays(3));
+
+        projection.ShowsDueDateInRow.Should().Be(expected);
+    }
+
+    [Fact]
+    public void ShowsDueDateInRow_WithoutDueDate_False()
+    {
+        Make(FinancialMonthlyEntryStatus.Pending, effectiveAmount: 100m, paidAmount: 0m).ShowsDueDateInRow.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(PaymentSourceType.BankAccount, FinancialEntryType.Outcome, true)]
+    [InlineData(PaymentSourceType.MealVoucher, FinancialEntryType.Outcome, true)]
+    [InlineData(PaymentSourceType.CreditCard, FinancialEntryType.Income, true)]
+    [InlineData(PaymentSourceType.CreditCard, FinancialEntryType.Outcome, false)]
+    public void ShowsPaymentSourceInRow_HiddenOnlyForOutcomesOnACreditCardBill(PaymentSourceType sourceType, FinancialEntryType entryType, bool expected)
+    {
+        var projection = Make(FinancialMonthlyEntryStatus.Pending, effectiveAmount: 100m, paidAmount: 0m) with
+        {
+            EntryType = entryType,
+            PaymentSource = new PaymentSource { Id = 1, Name = "Fonte", Type = sourceType }
+        };
+
+        projection.ShowsPaymentSourceInRow.Should().Be(expected);
+    }
+
+    [Fact]
+    public void ShowsPaymentSourceInRow_WithoutSource_False()
+    {
+        Make(FinancialMonthlyEntryStatus.Pending, effectiveAmount: 100m, paidAmount: 0m).ShowsPaymentSourceInRow.Should().BeFalse();
+    }
+
     private static MonthlyEntryProjection Make(
         FinancialMonthlyEntryStatus status, decimal effectiveAmount, decimal paidAmount, decimal? plannedAmount = null,
         DateTime? dueDate = null) =>

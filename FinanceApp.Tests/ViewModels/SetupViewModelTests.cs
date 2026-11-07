@@ -243,6 +243,36 @@ public class SetupViewModelTests
         _vm.ExpensesSource.Should().BeNull();
     }
 
+    [Fact]
+    public async Task Next_OnSourcesStepWithTypedSourceNotAdded_AddsIt()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        await _vm.NextCommand.ExecuteAsync(null);
+        _vm.NewSourceName = "Nubank";
+        _vm.NewSourceBalance = 2500;
+
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        _vm.IsIncomeStep.Should().BeTrue();
+        var nubank = _vm.NewSources.Should().ContainSingle().Subject;
+        (nubank.Name, nubank.Type, nubank.Balance).Should().Be(("Nubank", PaymentSourceType.BankAccount, 2500m));
+        _vm.SalarySource.Should().BeSameAs(nubank);
+        _vm.NewSourceName.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Next_OnSourcesStepWithEmptyForm_AddsNothing()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        await _vm.NextCommand.ExecuteAsync(null);
+        _vm.NewSourceName = "  ";
+
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        _vm.IsIncomeStep.Should().BeTrue();
+        _vm.NewSources.Should().BeEmpty();
+    }
+
     // --- Expenses ---
 
     [Fact]

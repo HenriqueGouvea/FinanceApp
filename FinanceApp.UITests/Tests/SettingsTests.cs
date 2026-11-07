@@ -27,7 +27,9 @@ public sealed class SettingsTests : E2ETestBase
         settings.EditName("Ana");
 
         settings.ProfileNameText.Should().Be("Ana");
-        settings.GoToHome().ReadMenuGreeting().Should().Be(AppLabels.MenuGreeting("Ana"));
+        var home = settings.GoToHome();
+        home.HeaderAvatarInitialText.Should().Be("A");
+        home.ReadMenuGreeting().Should().Be(AppLabels.MenuGreeting("Ana"));
 
         Session.Relaunch();
 

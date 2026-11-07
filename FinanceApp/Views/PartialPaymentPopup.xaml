@@ -8,9 +8,7 @@
                x:Class="FinanceApp.Views.PartialPaymentPopup"
                x:DataType="vm:PartialPaymentViewModel">
 
-    <Border BackgroundColor="White"
-            StrokeShape="RoundRectangle 12"
-            Padding="20"
+    <Border Style="{StaticResource PopupCard}"
             WidthRequest="330"
             VerticalOptions="Center">
 
@@ -24,7 +22,7 @@
                 <Label AutomationId="PartialPaymentDescriptionLabel"
                        Text="{Binding Description}"
                        FontSize="14"
-                       TextColor="Gray"
+                       TextColor="{StaticResource Muted}"
                        HorizontalOptions="Center" />
             </VerticalStackLayout>
 
@@ -39,7 +37,7 @@
             </Label>
 
             <VerticalStackLayout Spacing="2">
-                <Label Text="{Binding AmountLabel}" FontSize="12" TextColor="Gray" />
+                <Label Text="{Binding AmountLabel}" Style="{StaticResource FieldCaption}" />
                 <Entry x:Name="AmountEntry"
                        AutomationId="PartialPaymentAmountEntry"
                        Placeholder="{Binding AmountLabel}"
@@ -50,19 +48,18 @@
                 </Entry>
                 <Label AutomationId="PartialPaymentNewTotalLabel"
                        Text="{Binding NewPaidAmount, Converter={x:Static converters:MoneyConverter.Instance}, StringFormat='Novo total: {0}'}"
-                       FontSize="12"
-                       TextColor="Gray" />
+                       Style="{StaticResource FieldCaption}" />
                 <Label AutomationId="PartialPaymentOverBudgetLabel"
                        Text="{Binding NewOverBudgetAmount, Converter={x:Static converters:MoneyConverter.Instance}, StringFormat='▲ {0} acima do previsto'}"
                        FontSize="12"
                        FontAttributes="Bold"
-                       TextColor="#EF6C00"
+                       TextColor="{StaticResource Partial}"
                        IsVisible="{Binding IsNewTotalOverBudget}" />
             </VerticalStackLayout>
 
             <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10">
                 <VerticalStackLayout Grid.Column="0" Spacing="2">
-                    <Label Text="Data" FontSize="12" TextColor="Gray" />
+                    <Label Text="Data" Style="{StaticResource FieldCaption}" />
                     <DatePicker AutomationId="PartialPaymentDatePicker"
                                 Date="{Binding PaymentDate}"
                                 MinimumDate="{Binding MinimumDate}"
@@ -70,7 +67,7 @@
                                 Format="dd/MM/yyyy" />
                 </VerticalStackLayout>
                 <VerticalStackLayout Grid.Column="1" Spacing="2">
-                    <Label Text="Descrição (opcional)" FontSize="12" TextColor="Gray" />
+                    <Label Text="Descrição (opcional)" Style="{StaticResource FieldCaption}" />
                     <Entry AutomationId="PartialPaymentDescriptionEntry"
                            Text="{Binding PaymentDescription}"
                            Placeholder="Ex.: feira da semana"
@@ -79,8 +76,8 @@
             </Grid>
 
             <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,8,0,0">
-                <Button Grid.Column="0" AutomationId="CancelPartialPaymentButton" Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="Gray" />
-                <Button Grid.Column="1" AutomationId="SavePartialPaymentButton" Text="Salvar" Command="{Binding SaveCommand}" BackgroundColor="{StaticResource Primary}" />
+                <Button Grid.Column="0" AutomationId="CancelPartialPaymentButton" Text="Cancelar" Clicked="OnCancelClicked" Style="{StaticResource SecondaryButton}" />
+                <Button Grid.Column="1" AutomationId="SavePartialPaymentButton" Text="Salvar" Command="{Binding SaveCommand}" />
             </Grid>
         </VerticalStackLayout>
     </Border>

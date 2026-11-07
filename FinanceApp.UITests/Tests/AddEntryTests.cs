@@ -90,7 +90,8 @@ public sealed class AddEntryTests : E2ETestBase
         page.Save();
 
         MainPage.WaitForEntry("Notebook E2E");
-        MainPage.VisibleInstallmentLabels.Should().ContainSingle().Which.Should().Be($"1/3 · Total {AppFormat.Money(300)}");
+        MainPage.VisibleInstallmentLabels.Should().ContainSingle().Which.Should().Be("1/3");
+        MainPage.VisibleInstallmentTotals.Should().ContainSingle().Which.Should().Be(AppFormat.InstallmentTotal(300));
         MainPage.VisibleEntryAmounts.Should().ContainSingle().Which.Should().Be(AppFormat.Money(100));
 
         MainPage.GoToNextMonth();

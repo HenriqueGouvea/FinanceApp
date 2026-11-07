@@ -14,6 +14,8 @@ public partial class App : Application
     public App(AppShell shell, IAppLockService appLockService, ISetupService setupService)
     {
         InitializeComponent();
+        // The Mensal palette is designed for a light background only.
+        UserAppTheme = AppTheme.Light;
         _shell = shell;
         _appLockService = appLockService;
         _setupService = setupService;
