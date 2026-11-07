@@ -264,37 +264,6 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public async Task ClearDatabaseAsync_CallsClearAllData()
-    {
-        await _vm.InitializeAsync();
-
-        await _vm.ClearDatabaseAsync();
-
-        await _service.Received(1).ClearAllDataAsync();
-    }
-
-    [Fact]
-    public async Task ClearDatabaseAsync_ClearsAllMonthEntries()
-    {
-        await _vm.InitializeAsync();
-        _vm.Months[0].Entries.Add(new MonthlyEntryProjection(
-            FinancialEntryId: 1,
-            FinancialMonthlyEntryId: null,
-            Description: "Test",
-            EffectiveAmount: 100m,
-            EntryType: FinancialEntryType.Income,
-            Category: null,
-            Status: FinancialMonthlyEntryStatus.Pending,
-            IsProjected: true,
-            InstallmentLabel: null,
-            InstallmentTotalAmount: null));
-
-        await _vm.ClearDatabaseAsync();
-
-        _vm.Months[0].Entries.Should().BeEmpty();
-    }
-
-    [Fact]
     public async Task CurrentPositionChanged_HidesRevealedEntryActions()
     {
         await _vm.InitializeAsync();

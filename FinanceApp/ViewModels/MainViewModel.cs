@@ -168,20 +168,6 @@ public partial class MainViewModel : ObservableObject,
 
     private bool CanGoToNextMonth() => CurrentPosition < Months.Count - 1;
 
-    [RelayCommand]
-    public async Task ClearDatabaseAsync()
-    {
-        await _financeService.ClearAllDataAsync();
-
-        foreach (var month in Months)
-        {
-            month.Entries.Clear();
-            month.IsLoaded = false;
-        }
-
-        await LoadNearbyMonthsAsync(CurrentPosition);
-    }
-
     partial void OnCurrentPositionChanged(int value)
     {
         IsHeaderCompact = false;
@@ -211,10 +197,7 @@ public partial class MainViewModel : ObservableObject,
 
             var entries = await _financeService.GetMergedEntriesForMonthAsync(month.Date.Year, month.Date.Month);
 
-            month.Entries.Clear();
-            foreach (var entry in entries)
-                month.Entries.Add(entry);
-
+            month.ReplaceEntries(entries);
             month.IsLoaded = true;
         }
     }

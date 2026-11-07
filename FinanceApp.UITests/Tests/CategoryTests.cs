@@ -22,10 +22,10 @@ public sealed class CategoryTests : E2ETestBase
     {
         var categories = MainPage.OpenCategories();
 
-        categories.VisibleCategoryNames.Should().BeEquivalentTo(
-            [.. AppLabels.DefaultOutcomeCategories, .. AppLabels.DefaultIncomeCategories]);
-        categories.VisibleGroupHeaders.Should().Equal(AppLabels.OutcomeCategoriesHeader, AppLabels.IncomeCategoriesHeader);
+        categories.VisibleGroupHeaders.Should().StartWith(AppLabels.OutcomeCategoriesHeader);
         categories.GroupOf("Moradia").Should().Be(AppLabels.OutcomeCategoriesHeader);
+        categories.AllCategoryNames().Should().BeEquivalentTo(
+            [.. AppLabels.DefaultOutcomeCategories, .. AppLabels.DefaultIncomeCategories]);
         categories.GroupOf("Salário").Should().Be(AppLabels.IncomeCategoriesHeader);
 
         var rows = await GetCategoryRowsAsync();

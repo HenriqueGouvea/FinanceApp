@@ -31,7 +31,11 @@ public class CategoriesPageObject
         return this;
     }
 
-    public IReadOnlyList<string> VisibleCategoryNames => _session.VisibleTexts(CategoryName);
+    /// <summary>
+    /// Every category on the page, scrolling through the list: the defaults don't fit CI's small screen.
+    /// Leaves the page scrolled to the bottom.
+    /// </summary>
+    public IReadOnlyList<string> AllCategoryNames() => _session.TextsWhileScrollingDown(CategoryName);
 
     public IReadOnlyList<string> VisibleGroupHeaders => _session.VisibleTexts(GroupHeader);
 

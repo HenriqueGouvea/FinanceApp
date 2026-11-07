@@ -1,6 +1,7 @@
 using FinanceApp.Models;
 using FinanceApp.ViewModels;
 using FluentAssertions;
+using FluentAssertions.Execution;
 using Xunit;
 
 namespace FinanceApp.Tests.ViewModels;
@@ -164,6 +165,40 @@ public class MonthViewModelTests
         _vm.Entries.Add(MakeProjection(1000m, FinancialEntryType.Income));
 
         notified.Should().Contain(nameof(MonthViewModel.IncomeEntries));
+    }
+
+    // --- ReplaceEntries ---
+
+    [Fact]
+    public void ReplaceEntries_WithExistingEntries_KeepsOnlyTheNewOnes()
+    {
+        _vm.Entries.Add(MakeProjection(100m, FinancialEntryType.Outcome));
+
+        _vm.ReplaceEntries([MakeProjection(300m, FinancialEntryType.Outcome), MakeProjection(1000m, FinancialEntryType.Income)]);
+
+        using (new AssertionScope())
+        {
+            _vm.Entries.Should().HaveCount(2);
+            _vm.TotalOutcomes.Should().Be(300m);
+            _vm.TotalIncomes.Should().Be(1000m);
+        }
+    }
+
+    [Fact]
+    public void ReplaceEntries_ManyEntries_NotifiesTheListsOnce()
+    {
+        var notified = new List<string>();
+        _vm.PropertyChanged += (_, e) => notified.Add(e.PropertyName!);
+
+        _vm.ReplaceEntries(Enumerable.Range(1, 10).Select(i => MakeProjection(i * 10m, FinancialEntryType.Outcome)));
+
+        using (new AssertionScope())
+        {
+            notified.Count(n => n == nameof(MonthViewModel.OutcomeEntries)).Should().Be(1);
+            notified.Count(n => n == nameof(MonthViewModel.IncomeEntries)).Should().Be(1);
+            notified.Count(n => n == nameof(MonthViewModel.CreditCardBills)).Should().Be(1);
+            notified.Count(n => n == nameof(MonthViewModel.TotalOutcomes)).Should().Be(1);
+        }
     }
 
     [Fact]

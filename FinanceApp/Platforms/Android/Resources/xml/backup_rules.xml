@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older. SecureStorage (the PIN hash) is encrypted with a Keystore key that never leaves the
+     device, so a restored copy can't be decrypted: leave it out, everything else (database, profile, settings)
+     is backed up. The file name carries the package id: update it if the id changes. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="com.companyname.financeapp.microsoft.maui.essentials.preferences.xml" />
+</full-backup-content>
