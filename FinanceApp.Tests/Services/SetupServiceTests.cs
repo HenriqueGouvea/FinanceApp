@@ -197,6 +197,101 @@ public sealed class SetupServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CompleteAsync_CreditCards_AreCreatedWithTheirBillAccount()
+    {
+        var itau = new PaymentSource { Name = "Itaú", Type = PaymentSourceType.BankAccount };
+        var existing = new PaymentSource { Name = "Bradesco", Type = PaymentSourceType.BankAccount };
+        await _paymentSourceService.SaveAsync(existing);
+
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            PaymentSources = [itau],
+            CreditCards =
+            [
+                new SetupCreditCard { Card = new PaymentSource { Name = "Nubank", Balance = 8000, BillDueDay = 10 }, BillAccount = itau },
+                new SetupCreditCard { Card = new PaymentSource { Name = "Visa", Balance = 3000 }, BillAccount = existing },
+                new SetupCreditCard { Card = new PaymentSource { Name = "Elo" } }
+            ]
+        });
+
+        var sources = await _paymentSourceService.GetAllAsync();
+        var itauId = sources.Single(s => s.Name == "Itaú").Id;
+        sources.Where(s => s.Type == PaymentSourceType.CreditCard)
+            .Select(s => (s.Name, s.Balance, s.BillDueDay, s.BillPaymentSourceId))
+            .Should().BeEquivalentTo(
+            [
+                ("Nubank", 8000m, (int?)10, (int?)itauId),
+                ("Visa", 3000m, (int?)null, (int?)existing.Id),
+                ("Elo", 0m, (int?)null, (int?)null)
+            ]);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_InstallmentPurchase_StartsSoCurrentInstallmentFallsThisMonth()
+    {
+        var card = new PaymentSource { Name = "Nubank" };
+
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            CreditCards = [new SetupCreditCard { Card = card }],
+            Entries =
+            [
+                new SetupEntry
+                {
+                    Description = "Celular", Amount = 250, Recurrence = RecurrenceType.Installments,
+                    TotalInstallments = 10, CurrentInstallment = 3, PaymentSource = card
+                }
+            ]
+        });
+
+        var entry = (await GetEntriesAsync()).Single();
+        (entry.Recurrence, entry.TotalInstallments, entry.StartDate).Should()
+            .Be((RecurrenceType.Installments, (int?)10, new DateTime(2026, 9, 1)));
+        (await _financeService.GetMergedEntriesForMonthAsync(2026, 11)).Single().InstallmentLabel.Should().Be("3/10");
+        (await _financeService.GetMergedEntriesForMonthAsync(2027, 6)).Single().InstallmentLabel.Should().Be("10/10");
+        (await _financeService.GetMergedEntriesForMonthAsync(2027, 7)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CompleteAsync_InstallmentPurchaseWithoutCurrentInstallment_StartsThisMonth()
+    {
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            Entries = [new SetupEntry { Description = "Sofá", Amount = 300, Recurrence = RecurrenceType.Installments, TotalInstallments = 5 }]
+        });
+
+        (await GetEntriesAsync()).Single().StartDate.Should().Be(new DateTime(2026, 11, 1));
+    }
+
+    [Fact]
+    public async Task CompleteAsync_OneTimePurchase_OnlyInCurrentMonth()
+    {
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            Entries = [new SetupEntry { Description = "Tênis", Amount = 300, Recurrence = RecurrenceType.OneTime }]
+        });
+
+        (await _financeService.GetMergedEntriesForMonthAsync(2026, 11)).Should().ContainSingle(p => p.Description == "Tênis");
+        (await _financeService.GetMergedEntriesForMonthAsync(2026, 12)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CompleteAsync_OutcomePaidWithCreditCard_IsNeitherEstimatedNorPartiallyPaid()
+    {
+        var card = new PaymentSource { Name = "Nubank" };
+
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            CreditCards = [new SetupCreditCard { Card = card }],
+            Entries = [new SetupEntry { Description = "Mercado", Amount = 1000, IsEstimated = true, AllowsPartialPayment = true, PaymentSource = card }]
+        });
+
+        var entry = (await GetEntriesAsync()).Single();
+        (entry.IsEstimated, entry.AllowsPartialPayment).Should().Be((false, false));
+        entry.PaymentSourceId.Should().Be((await _paymentSourceService.GetAllAsync()).Single().Id);
+    }
+
+    [Fact]
     public async Task CompleteAsync_RunAgain_KeepsExistingData()
     {
         await _service.CompleteAsync(new NewUserSetup

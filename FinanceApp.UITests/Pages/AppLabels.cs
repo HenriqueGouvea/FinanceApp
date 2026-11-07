@@ -38,6 +38,8 @@ public static class AppLabels
     public static string MenuGreeting(string name) => $"Olá, {name}!";
     public const string MenuGreetingWithoutName = "Olá!";
     public static string SetupSchedule(params string[] parts) => string.Join(" · ", ["Todo mês", .. parts]);
+    public static string SetupInstallmentSchedule(int current, int total, string card) => $"Parcela {current} de {total} · {card}";
+    public const string SetupAdvanceDescription = "Adiantamento salarial";
     public const string EstimatedValue = "valor estimado";
     public const string PartialPaymentValue = "pagamento parcial";
 
@@ -86,6 +88,6 @@ public static class AppLabels
     public const string OutcomeCategoriesHeader = "Despesas";
     public const string IncomeCategoriesHeader = "Receitas";
 
-    public static readonly string[] DefaultOutcomeCategories = ["Moradia", "Educação", "Mercado", "Lazer"];
+    public static readonly string[] DefaultOutcomeCategories = ["Moradia", "Educação", "Mercado", "Saúde", "Lazer"];
     public static readonly string[] DefaultIncomeCategories = ["Salário", "Investimentos"];
 }

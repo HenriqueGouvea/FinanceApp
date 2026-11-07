@@ -9,14 +9,21 @@ using System.Collections.ObjectModel;
 namespace FinanceApp.ViewModels;
 
 /// <summary>
-/// The setup wizard: name and photo, accounts and cards, salary and house expenses, then a summary of the
-/// recurrent entries it will create. Shown on the first run and again from the settings to add more.
+/// The setup wizard: name and photo, accounts and vouchers, credit cards and the purchases already on them, income,
+/// house expenses and other expenses (health, children's school, eating out), then a summary of the entries it will
+/// create. Shown on the first run and again from the settings to add more.
 /// </summary>
 public partial class SetupViewModel : ObservableObject
 {
     public const int NoDueDay = 0;
     public const int DefaultSalaryDay = 5;
+    public const int DefaultAdvanceDay = 20;
     public const string SalaryCategory = "Salário";
+    public const string SalaryDescription = "Salário";
+    public const string AdvanceDescription = "Adiantamento salarial";
+    public const string PurchaseIcon = "💳";
+
+    private const string SalaryIcon = "💼";
 
     private readonly ISetupService _setupService;
     private readonly IPaymentSourceService _paymentSourceService;
@@ -27,7 +34,8 @@ public partial class SetupViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StepNumber), nameof(Progress), nameof(IsFirstStep), nameof(IsLastStep), nameof(NextButtonText),
-        nameof(IsWelcomeStep), nameof(IsPaymentSourcesStep), nameof(IsIncomeStep), nameof(IsHouseExpensesStep), nameof(IsSummaryStep))]
+        nameof(IsWelcomeStep), nameof(IsPaymentSourcesStep), nameof(IsCreditCardsStep), nameof(IsIncomeStep),
+        nameof(IsHouseExpensesStep), nameof(IsOtherExpensesStep), nameof(IsSummaryStep))]
     SetupStep step = SetupStep.Welcome;
 
     [ObservableProperty]
@@ -49,10 +57,65 @@ public partial class SetupViewModel : ObservableObject
     [ObservableProperty] PaymentSourceType newSourceType = PaymentSourceType.BankAccount;
     [ObservableProperty] decimal newSourceBalance;
 
-    [ObservableProperty] decimal salary;
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddCardCommand))]
+    string newCardName = string.Empty;
+
+    [ObservableProperty] decimal newCardLimit;
+    [ObservableProperty] int newCardBillDueDay = NoDueDay;
+    [ObservableProperty] PaymentSource? newCardBillAccount;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddPurchaseCommand))]
+    string newPurchaseDescription = string.Empty;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddPurchaseCommand))]
+    PaymentSource? newPurchaseCard;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsNewPurchaseInstallments))]
+    [NotifyCanExecuteChangedFor(nameof(AddPurchaseCommand))]
+    RecurrenceType newPurchaseRecurrence = RecurrenceType.OneTime;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddPurchaseCommand))]
+    decimal newPurchaseAmount;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddPurchaseCommand))]
+    int? newPurchaseCurrentInstallment;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddPurchaseCommand))]
+    int? newPurchaseTotalInstallments;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MonthlySalary))]
+    decimal salary;
+
     [ObservableProperty] int salaryDay = DefaultSalaryDay;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SalaryCaption), nameof(MonthlySalary))]
+    bool isSalarySplit;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MonthlySalary))]
+    decimal advance;
+
+    [ObservableProperty] int advanceDay = DefaultAdvanceDay;
     [ObservableProperty] PaymentSource? salarySource;
-    [ObservableProperty] PaymentSource? expensesSource;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsExpensesSourceCreditCard))]
+    PaymentSource? expensesSource;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsOtherExpensesSourceCreditCard))]
+    PaymentSource? otherExpensesSource;
+
+    [ObservableProperty] bool hasChildren;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Balance))]
@@ -69,8 +132,10 @@ public partial class SetupViewModel : ObservableObject
     public bool IsLastStep => Step == SetupStep.Summary;
     public bool IsWelcomeStep => Step == SetupStep.Welcome;
     public bool IsPaymentSourcesStep => Step == SetupStep.PaymentSources;
+    public bool IsCreditCardsStep => Step == SetupStep.CreditCards;
     public bool IsIncomeStep => Step == SetupStep.Income;
     public bool IsHouseExpensesStep => Step == SetupStep.HouseExpenses;
+    public bool IsOtherExpensesStep => Step == SetupStep.OtherExpenses;
     public bool IsSummaryStep => Step == SetupStep.Summary;
     public string NextButtonText => IsLastStep ? "Começar" : "Continuar";
 
@@ -85,21 +150,57 @@ public partial class SetupViewModel : ObservableObject
     public decimal Balance => TotalIncome - TotalOutcome;
     public bool HasNewSources => NewSources.Count > 0;
     public bool HasAvailableSources => AvailableSources.Count > 0;
+    public bool HasBillAccounts => BillAccounts.Count > 0;
+    public bool HasNewCards => NewCards.Count > 0;
+    public bool HasCreditCards => CreditCards.Count > 0;
+    public bool HasPurchases => Purchases.Count > 0;
     public bool HasSummaryRows => SummaryRows.Count > 0;
+    public bool IsNewPurchaseInstallments => NewPurchaseRecurrence == RecurrenceType.Installments;
 
     /// <summary>
-    /// Accounts, cards and vouchers added in this run, created only when the wizard finishes.
+    /// Split in two, the salary field holds what is left once the advance is paid.
+    /// </summary>
+    public string SalaryCaption => IsSalarySplit ? "Pagamento (restante do salário)" : "Salário";
+
+    public decimal MonthlySalary => Salary + (IsSalarySplit ? Advance : 0);
+
+    // Expenses paid with a credit card go to its bill, which is never estimated nor paid little by little.
+    public bool IsExpensesSourceCreditCard => ExpensesSource?.Type == PaymentSourceType.CreditCard;
+    public bool IsOtherExpensesSourceCreditCard => OtherExpensesSource?.Type == PaymentSourceType.CreditCard;
+
+    /// <summary>
+    /// Accounts and vouchers added in this run, created only when the wizard finishes.
     /// </summary>
     public ObservableCollection<PaymentSource> NewSources { get; } = [];
+
+    /// <summary>
+    /// Credit cards added in this run, created only when the wizard finishes.
+    /// </summary>
+    public ObservableCollection<SetupCreditCardItem> NewCards { get; } = [];
 
     /// <summary>
     /// Sources offered to receive the salary and pay the expenses: the existing ones followed by the new ones.
     /// </summary>
     public ObservableCollection<PaymentSource> AvailableSources { get; } = [];
 
+    /// <summary>
+    /// Bank accounts offered to pay a new card's bill: the existing ones followed by the new ones.
+    /// </summary>
+    public ObservableCollection<PaymentSource> BillAccounts { get; } = [];
+
+    /// <summary>
+    /// Cards offered for a purchase: the existing ones followed by the new ones.
+    /// </summary>
+    public ObservableCollection<PaymentSource> CreditCards { get; } = [];
+
+    public ObservableCollection<SetupPurchaseItem> Purchases { get; } = [];
     public ObservableCollection<SetupExpenseItem> Expenses { get; } = [];
+    public ObservableCollection<SetupExpenseItem> HealthExpenses { get; } = [];
+    public ObservableCollection<SetupExpenseItem> SchoolExpenses { get; } = [];
+    public ObservableCollection<SetupExpenseItem> LeisureExpenses { get; } = [];
     public ObservableCollection<SetupSummaryRow> SummaryRows { get; } = [];
     public List<int> DueDays { get; } = [NoDueDay, .. Enumerable.Range(1, 31)];
+    public List<RecurrenceType> PurchaseRecurrences { get; } = [RecurrenceType.OneTime, RecurrenceType.Installments, RecurrenceType.Recurrent];
 
     public SetupViewModel(
         ISetupService setupService,
@@ -114,7 +215,11 @@ public partial class SetupViewModel : ObservableObject
         _mediaPicker = mediaPicker;
         _messenger = messenger;
         NewSources.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasNewSources));
+        NewCards.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasNewCards));
         AvailableSources.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasAvailableSources));
+        BillAccounts.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasBillAccounts));
+        CreditCards.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasCreditCards));
+        Purchases.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasPurchases));
         SummaryRows.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasSummaryRows));
     }
 
@@ -129,19 +234,33 @@ public partial class SetupViewModel : ObservableObject
         PhotoPath = _profileService.PhotoPath;
 
         NewSources.Clear();
+        NewCards.Clear();
         AvailableSources.Clear();
+        BillAccounts.Clear();
+        CreditCards.Clear();
+        Purchases.Clear();
         foreach (var source in await _paymentSourceService.GetAllAsync())
-            AvailableSources.Add(source);
+            AddToPickers(source);
         ResetNewSourceForm();
+        ResetNewCardForm();
+        ResetNewPurchaseForm();
+        NewCardBillAccount = null;
+        NewPurchaseCard = CreditCards.FirstOrDefault();
 
         Salary = 0;
         SalaryDay = DefaultSalaryDay;
+        IsSalarySplit = false;
+        Advance = 0;
+        AdvanceDay = DefaultAdvanceDay;
         SalarySource = null;
         ExpensesSource = null;
+        OtherExpensesSource = null;
+        HasChildren = false;
 
-        Expenses.Clear();
-        foreach (var expense in CreateExpenses())
-            Expenses.Add(expense);
+        Reset(Expenses, CreateHouseExpenses());
+        Reset(HealthExpenses, CreateHealthExpenses());
+        Reset(SchoolExpenses, CreateSchoolExpenses());
+        Reset(LeisureExpenses, CreateLeisureExpenses());
 
         SummaryRows.Clear();
         TotalIncome = 0;
@@ -166,25 +285,30 @@ public partial class SetupViewModel : ObservableObject
     [RelayCommand]
     void RemovePhoto() => PhotoPath = null;
 
+    // --- Accounts and vouchers ---
+
     [RelayCommand]
     void SelectSourceType(PaymentSourceType value) => NewSourceType = value;
 
     private bool CanAddSource() => !string.IsNullOrWhiteSpace(NewSourceName);
 
     /// <summary>
-    /// The first bank account added becomes where the salary is received and the house expenses are paid.
+    /// The first bank account added becomes where the salary is received, the expenses are paid and the new cards'
+    /// bills are debited.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanAddSource))]
     void AddSource()
     {
         var source = new PaymentSource { Name = NewSourceName.Trim(), Type = NewSourceType, Balance = NewSourceBalance };
         NewSources.Add(source);
-        AvailableSources.Add(source);
+        AddToPickers(source);
 
         if (source.Type == PaymentSourceType.BankAccount)
         {
             SalarySource ??= source;
             ExpensesSource ??= source;
+            OtherExpensesSource ??= source;
+            NewCardBillAccount ??= source;
         }
 
         ResetNewSourceForm();
@@ -194,16 +318,84 @@ public partial class SetupViewModel : ObservableObject
     void RemoveSource(PaymentSource source)
     {
         NewSources.Remove(source);
-        AvailableSources.Remove(source);
+        RemoveFromPickers(source);
 
-        if (SalarySource == source)
-            SalarySource = null;
-        if (ExpensesSource == source)
-            ExpensesSource = null;
+        if (NewCardBillAccount == source)
+            NewCardBillAccount = null;
+        foreach (var card in NewCards.Where(c => c.BillAccount == source))
+            card.BillAccount = null;
+    }
+
+    // --- Credit cards ---
+
+    private bool CanAddCard() => !string.IsNullOrWhiteSpace(NewCardName);
+
+    [RelayCommand(CanExecute = nameof(CanAddCard))]
+    void AddCard()
+    {
+        var card = new PaymentSource
+        {
+            Name = NewCardName.Trim(),
+            Type = PaymentSourceType.CreditCard,
+            Balance = NewCardLimit,
+            BillDueDay = NewCardBillDueDay == NoDueDay ? null : NewCardBillDueDay
+        };
+        NewCards.Add(new SetupCreditCardItem(card, NewCardBillAccount));
+        AddToPickers(card);
+        NewPurchaseCard ??= card;
+
+        ResetNewCardForm();
     }
 
     [RelayCommand]
+    void RemoveCard(SetupCreditCardItem item)
+    {
+        NewCards.Remove(item);
+        RemoveFromPickers(item.Card);
+
+        foreach (var purchase in Purchases.Where(p => p.Card == item.Card).ToList())
+            Purchases.Remove(purchase);
+        if (NewPurchaseCard == item.Card)
+            NewPurchaseCard = CreditCards.FirstOrDefault();
+    }
+
+    [RelayCommand]
+    void SelectPurchaseRecurrence(RecurrenceType value) => NewPurchaseRecurrence = value;
+
+    private bool CanAddPurchase() =>
+        !string.IsNullOrWhiteSpace(NewPurchaseDescription)
+        && NewPurchaseCard is not null
+        && NewPurchaseAmount > 0
+        && (!IsNewPurchaseInstallments
+            || NewPurchaseTotalInstallments is > 0 && NewPurchaseCurrentInstallment is > 0
+            && NewPurchaseCurrentInstallment <= NewPurchaseTotalInstallments);
+
+    [RelayCommand(CanExecute = nameof(CanAddPurchase))]
+    void AddPurchase()
+    {
+        Purchases.Add(new SetupPurchaseItem(
+            NewPurchaseDescription.Trim(),
+            NewPurchaseAmount,
+            NewPurchaseRecurrence,
+            NewPurchaseCard!,
+            IsNewPurchaseInstallments ? NewPurchaseTotalInstallments : null,
+            IsNewPurchaseInstallments ? NewPurchaseCurrentInstallment : null));
+
+        ResetNewPurchaseForm();
+    }
+
+    [RelayCommand]
+    void RemovePurchase(SetupPurchaseItem purchase) => Purchases.Remove(purchase);
+
+    // --- Expenses ---
+
+    [RelayCommand]
     void ToggleExpense(SetupExpenseItem expense) => expense.IsSelected = !expense.IsSelected;
+
+    [RelayCommand]
+    void SelectHasChildren(bool value) => HasChildren = value;
+
+    // --- Navigation ---
 
     [RelayCommand]
     async Task Next()
@@ -214,9 +406,13 @@ public partial class SetupViewModel : ObservableObject
             return;
         }
 
-        // A source typed in the form but not added yet would otherwise be lost: "Continuar" reads as confirming it.
+        // What was typed in a form but not added yet would otherwise be lost: "Continuar" reads as confirming it.
         if (IsPaymentSourcesStep && CanAddSource())
             AddSource();
+        if (IsCreditCardsStep && CanAddCard())
+            AddCard();
+        if (IsCreditCardsStep && CanAddPurchase())
+            AddPurchase();
 
         Step++;
         if (IsSummaryStep)
@@ -254,34 +450,61 @@ public partial class SetupViewModel : ObservableObject
         Name = Name,
         PhotoPath = PhotoPath,
         PaymentSources = [.. NewSources],
-        Entries = [.. BuildEntries()]
+        CreditCards = [.. NewCards.Select(c => new SetupCreditCard { Card = c.Card, BillAccount = c.BillAccount })],
+        Entries = [.. BuildEntries().Select(e => e.Entry)]
     };
 
-    private IEnumerable<SetupEntry> BuildEntries()
+    private IEnumerable<(string Icon, SetupEntry Entry)> BuildEntries()
     {
         if (Salary > 0)
-            yield return new SetupEntry
-            {
-                Description = SalaryCategory,
-                Amount = Salary,
-                EntryType = FinancialEntryType.Income,
-                DueDay = SalaryDay == NoDueDay ? null : SalaryDay,
-                CategoryName = SalaryCategory,
-                PaymentSource = SalarySource
-            };
+            yield return (SalaryIcon, CreateIncome(SalaryDescription, Salary, SalaryDay));
 
-        foreach (var expense in Expenses.Where(e => e.IsSelected && e.Amount > 0))
-            yield return new SetupEntry
+        if (IsSalarySplit && Advance > 0)
+            yield return (SalaryIcon, CreateIncome(AdvanceDescription, Advance, AdvanceDay));
+
+        foreach (var purchase in Purchases)
+            yield return (PurchaseIcon, new SetupEntry
             {
-                Description = expense.Description,
-                Amount = expense.Amount,
-                EntryType = FinancialEntryType.Outcome,
-                DueDay = expense.DueDay == NoDueDay ? null : expense.DueDay,
-                IsEstimated = expense.IsEstimated,
-                AllowsPartialPayment = expense.AllowsPartialPayment,
-                CategoryName = expense.CategoryName,
-                PaymentSource = ExpensesSource
-            };
+                Description = purchase.Description,
+                Amount = purchase.Amount,
+                Recurrence = purchase.Recurrence,
+                TotalInstallments = purchase.TotalInstallments,
+                CurrentInstallment = purchase.CurrentInstallment,
+                PaymentSource = purchase.Card
+            });
+
+        foreach (var entry in BuildExpenses(Expenses, ExpensesSource))
+            yield return entry;
+
+        IEnumerable<SetupExpenseItem> otherExpenses = [.. HealthExpenses, .. HasChildren ? SchoolExpenses : Enumerable.Empty<SetupExpenseItem>(), .. LeisureExpenses];
+        foreach (var entry in BuildExpenses(otherExpenses, OtherExpensesSource))
+            yield return entry;
+    }
+
+    private SetupEntry CreateIncome(string description, decimal amount, int day) => new()
+    {
+        Description = description,
+        Amount = amount,
+        EntryType = FinancialEntryType.Income,
+        DueDay = day == NoDueDay ? null : day,
+        CategoryName = SalaryCategory,
+        PaymentSource = SalarySource
+    };
+
+    private static IEnumerable<(string Icon, SetupEntry Entry)> BuildExpenses(IEnumerable<SetupExpenseItem> expenses, PaymentSource? source)
+    {
+        var isOnCardBill = source?.Type == PaymentSourceType.CreditCard;
+
+        return expenses.Where(e => e.IsSelected && e.Amount > 0).Select(expense => (expense.Icon, new SetupEntry
+        {
+            Description = expense.Description,
+            Amount = expense.Amount,
+            DueDay = expense.DueDay == NoDueDay ? null : expense.DueDay,
+            IsEstimated = expense.IsEstimated && !isOnCardBill,
+            AllowsPartialPayment = expense.AllowsPartialPayment && !isOnCardBill,
+            CategoryName = expense.CategoryName,
+            PaymentSource = source
+        }));
     }
 
     private void BuildSummary()
@@ -289,22 +512,30 @@ public partial class SetupViewModel : ObservableObject
         var entries = BuildEntries().ToList();
 
         SummaryRows.Clear();
-        foreach (var entry in entries)
-            SummaryRows.Add(new SetupSummaryRow(
-                entry.EntryType == FinancialEntryType.Income ? "💼" : Expenses.First(e => e.Description == entry.Description).Icon,
-                entry.Description,
-                DescribeSchedule(entry),
-                entry.Amount,
-                entry.EntryType));
+        foreach (var (icon, entry) in entries)
+            SummaryRows.Add(new SetupSummaryRow(icon, entry.Description, DescribeSchedule(entry), entry.Amount, entry.EntryType));
 
-        TotalIncome = entries.Where(e => e.EntryType == FinancialEntryType.Income).Sum(e => e.Amount);
-        TotalOutcome = entries.Where(e => e.EntryType == FinancialEntryType.Outcome).Sum(e => e.Amount);
+        TotalIncome = entries.Where(e => e.Entry.EntryType == FinancialEntryType.Income).Sum(e => e.Entry.Amount);
+        TotalOutcome = entries.Where(e => e.Entry.EntryType == FinancialEntryType.Outcome).Sum(e => e.Entry.Amount);
     }
 
+    /// <summary>
+    /// "À vista", "Parcela 3 de 10" or "Todo mês".
+    /// </summary>
+    public static string DescribeRecurrence(RecurrenceType recurrence, int? totalInstallments, int? currentInstallment) => recurrence switch
+    {
+        RecurrenceType.OneTime => "À vista",
+        RecurrenceType.Installments => $"Parcela {currentInstallment ?? 1} de {totalInstallments}",
+        _ => "Todo mês"
+    };
+
+    // A credit card outcome falls due with the card's bill, so its own due day isn't shown.
     private static string DescribeSchedule(SetupEntry entry)
     {
-        List<string> parts = ["Todo mês"];
-        if (entry.DueDay is { } day)
+        var isOnCardBill = entry.EntryType == FinancialEntryType.Outcome && entry.PaymentSource?.Type == PaymentSourceType.CreditCard;
+
+        List<string> parts = [DescribeRecurrence(entry.Recurrence, entry.TotalInstallments, entry.CurrentInstallment)];
+        if (entry.DueDay is { } day && !isOnCardBill)
             parts.Add($"dia {day}");
         if (entry.IsEstimated)
             parts.Add("valor estimado");
@@ -315,6 +546,29 @@ public partial class SetupViewModel : ObservableObject
         return string.Join(" · ", parts);
     }
 
+    private void AddToPickers(PaymentSource source)
+    {
+        AvailableSources.Add(source);
+        if (source.Type == PaymentSourceType.BankAccount)
+            BillAccounts.Add(source);
+        if (source.Type == PaymentSourceType.CreditCard)
+            CreditCards.Add(source);
+    }
+
+    private void RemoveFromPickers(PaymentSource source)
+    {
+        AvailableSources.Remove(source);
+        BillAccounts.Remove(source);
+        CreditCards.Remove(source);
+
+        if (SalarySource == source)
+            SalarySource = null;
+        if (ExpensesSource == source)
+            ExpensesSource = null;
+        if (OtherExpensesSource == source)
+            OtherExpensesSource = null;
+    }
+
     private void ResetNewSourceForm()
     {
         NewSourceName = string.Empty;
@@ -322,7 +576,32 @@ public partial class SetupViewModel : ObservableObject
         NewSourceBalance = 0;
     }
 
-    private static IEnumerable<SetupExpenseItem> CreateExpenses() =>
+    // The bill account is kept for the next card: people usually pay every card from the same account.
+    private void ResetNewCardForm()
+    {
+        NewCardName = string.Empty;
+        NewCardLimit = 0;
+        NewCardBillDueDay = NoDueDay;
+    }
+
+    // The card is kept for the next purchase, which is usually on the same card.
+    private void ResetNewPurchaseForm()
+    {
+        NewPurchaseDescription = string.Empty;
+        NewPurchaseRecurrence = RecurrenceType.OneTime;
+        NewPurchaseAmount = 0;
+        NewPurchaseCurrentInstallment = null;
+        NewPurchaseTotalInstallments = null;
+    }
+
+    private static void Reset(ObservableCollection<SetupExpenseItem> list, IEnumerable<SetupExpenseItem> items)
+    {
+        list.Clear();
+        foreach (var item in items)
+            list.Add(item);
+    }
+
+    private static IEnumerable<SetupExpenseItem> CreateHouseExpenses() =>
     [
         new() { Icon = "🏠", Description = "Aluguel ou financiamento", CategoryName = "Moradia" },
         new() { Icon = "🏢", Description = "Condomínio", CategoryName = "Moradia" },
@@ -333,6 +612,32 @@ public partial class SetupViewModel : ObservableObject
         new()
         {
             Icon = "🛒", Description = "Mercado", CategoryName = "Mercado",
+            IsEstimated = true, AllowsPartialPayment = true
+        }
+    ];
+
+    private static IEnumerable<SetupExpenseItem> CreateHealthExpenses() =>
+    [
+        new() { Icon = "🩺", Description = "Plano de saúde", CategoryName = "Saúde" },
+        new()
+        {
+            Icon = "💊", Description = "Farmácia", CategoryName = "Saúde",
+            IsEstimated = true, AllowsPartialPayment = true
+        }
+    ];
+
+    private static IEnumerable<SetupExpenseItem> CreateSchoolExpenses() =>
+    [
+        new() { Icon = "🎒", Description = "Mensalidade escolar", CategoryName = "Educação" },
+        new() { Icon = "🚌", Description = "Transporte escolar", CategoryName = "Educação" },
+        new() { Icon = "⚽", Description = "Cursos e atividades", CategoryName = "Educação" }
+    ];
+
+    private static IEnumerable<SetupExpenseItem> CreateLeisureExpenses() =>
+    [
+        new()
+        {
+            Icon = "🍽️", Description = "Restaurantes e delivery", CategoryName = "Lazer",
             IsEstimated = true, AllowsPartialPayment = true
         }
     ];

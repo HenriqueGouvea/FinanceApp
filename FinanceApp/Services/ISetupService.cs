@@ -15,8 +15,8 @@ public interface ISetupService
     Task<bool> ShouldShowAsync();
 
     /// <summary>
-    /// Saves the profile, creates the payment sources and then one recurrent entry per <see cref="SetupEntry"/>,
-    /// starting in the current month. Existing data is kept, so the setup can be run again to add more.
+    /// Saves the profile, creates the accounts, vouchers and credit cards and then one entry per <see cref="SetupEntry"/>
+    /// from the current month: recurrent, unless it is a credit card purchase made once or in installments. Existing data is kept, so the setup can be run again to add more.
     /// </summary>
     Task CompleteAsync(NewUserSetup setup);
 

@@ -54,6 +54,13 @@ public class SetupService : ISetupService
         foreach (var source in setup.PaymentSources)
             await _paymentSourceService.SaveAsync(source);
 
+        foreach (var item in setup.CreditCards)
+        {
+            item.Card.Type = PaymentSourceType.CreditCard;
+            item.Card.BillPaymentSourceId = item.BillAccount?.Id;
+            await _paymentSourceService.SaveAsync(item.Card);
+        }
+
         var categories = await _categoryService.GetAllAsync();
         var now = _timeProvider.GetLocalNow();
         var startDate = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Local);
@@ -61,16 +68,22 @@ public class SetupService : ISetupService
         foreach (var item in setup.Entries.Where(e => e.Amount > 0))
         {
             var category = categories.FirstOrDefault(c => c.EntryType == item.EntryType && c.Name == item.CategoryName);
+            var totalInstallments = item.Recurrence == RecurrenceType.Installments ? Math.Max(item.TotalInstallments ?? 1, 1) : (int?)null;
+            var currentInstallment = totalInstallments is { } total ? Math.Clamp(item.CurrentInstallment ?? 1, 1, total) : 1;
+            // A credit card purchase is paid with the bill, so it is never estimated nor paid little by little.
+            var isOnCardBill = item.EntryType == FinancialEntryType.Outcome && item.PaymentSource?.Type == PaymentSourceType.CreditCard;
+
             await _financeService.SaveEntryAsync(new FinancialEntry
             {
                 Description = item.Description.Trim(),
                 Amount = item.Amount,
                 EntryType = item.EntryType,
-                Recurrence = RecurrenceType.Recurrent,
-                StartDate = startDate,
+                Recurrence = item.Recurrence,
+                TotalInstallments = totalInstallments,
+                StartDate = startDate.AddMonths(1 - currentInstallment),
                 DueDay = item.DueDay,
-                IsEstimated = item.IsEstimated,
-                AllowsPartialPayment = item.AllowsPartialPayment,
+                IsEstimated = item.IsEstimated && !isOnCardBill,
+                AllowsPartialPayment = item.AllowsPartialPayment && !isOnCardBill,
                 CategoryId = category?.Id,
                 PaymentSourceId = item.PaymentSource?.Id
             });

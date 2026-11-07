@@ -5,7 +5,7 @@ Each test also asserts on the app's SQLite database, pulled from the device afte
 
 ## Prerequisites (one time)
 
-- Android emulator running (default serial `emulator-5554`, e.g. `galaxy_nexus_-_api_33`).
+- Android emulator running (default serial `emulator-5554`, e.g. `galaxy_a16_-_api_35`, Android 15).
 - Node.js ≥ 18, then install the pinned local Appium + driver:
   ```bash
   cd FinanceApp.UITests && npm install

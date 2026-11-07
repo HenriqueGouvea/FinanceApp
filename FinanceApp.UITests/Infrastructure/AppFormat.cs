@@ -34,7 +34,7 @@ public static class AppFormat
 
     public static string EntryCount(int count) => $"{count} lançamento(s)";
 
-    public const int SetupStepCount = 5;
+    public const int SetupStepCount = 7;
 
     public static string SetupStep(int step) => $"Passo {step} de {SetupStepCount}";
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Tech Stack
 - **Framework:** .NET 10 (MAUI)
-- **Runtime:** Android 13.0 (API 33) - Galaxy Nexus Emulator
+- **Runtime:** Android 15 (API 35) - Galaxy A16 emulator (AVD `galaxy_a16_-_api_35`, 1080×2340) for manual tests and local E2E runs
 - **Architecture:** MVVM (CommunityToolkit.Mvvm)
 - **Database:** SQLite-net-pcl (Fluent mapping via CreateFlags)
 
