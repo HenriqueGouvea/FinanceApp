@@ -13,4 +13,6 @@ public class InMemoryPreferences : IPreferencesService
     public string Get(string key, string defaultValue) => _values.TryGetValue(key, out var value) ? (string)value : defaultValue;
 
     public void Set(string key, string value) => _values[key] = value;
+
+    public void Clear() => _values.Clear();
 }

@@ -11,7 +11,8 @@ namespace FinanceApp.ViewModels;
 /// </summary>
 public partial class UserProfileViewModel : ObservableObject,
     IRecipient<SetupCompletedMessage>,
-    IRecipient<ProfileChangedMessage>
+    IRecipient<ProfileChangedMessage>,
+    IRecipient<DataReplacedMessage>
 {
     private readonly IUserProfileService _profileService;
 
@@ -40,6 +41,7 @@ public partial class UserProfileViewModel : ObservableObject,
 
     public void Receive(SetupCompletedMessage message) => Load();
     public void Receive(ProfileChangedMessage message) => Load();
+    public void Receive(DataReplacedMessage message) => Load();
 
     [RelayCommand]
     public void Load()

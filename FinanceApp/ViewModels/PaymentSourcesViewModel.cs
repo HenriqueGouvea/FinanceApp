@@ -8,7 +8,9 @@ using System.Collections.ObjectModel;
 
 namespace FinanceApp.ViewModels;
 
-public partial class PaymentSourcesViewModel : ObservableObject, IRecipient<PaymentSourcesChangedMessage>
+public partial class PaymentSourcesViewModel : ObservableObject,
+    IRecipient<PaymentSourcesChangedMessage>,
+    IRecipient<DataReplacedMessage>
 {
     private readonly IPaymentSourceService _paymentSourceService;
     private readonly IFinanceService _financeService;
@@ -34,11 +36,12 @@ public partial class PaymentSourcesViewModel : ObservableObject, IRecipient<Paym
         _messenger = messenger;
         _writeGuard = writeGuard;
         Groups.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
-        messenger.Register(this);
+        messenger.RegisterAll(this);
     }
 
     // Sources can also be edited from the hamburger menu while this page is open.
     public async void Receive(PaymentSourcesChangedMessage message) => await LoadAsync();
+    public async void Receive(DataReplacedMessage message) => await LoadAsync();
 
     [RelayCommand]
     public async Task LoadAsync()

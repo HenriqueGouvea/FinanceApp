@@ -71,7 +71,7 @@ public sealed class DeviceDatabase
         return output.ToArray();
     }
 
-    private static void RunAdb(params string[] args)
+    internal static void RunAdb(params string[] args)
     {
         using var process = StartAdb(args);
         var outputTask = process.StandardOutput.ReadToEndAsync();
@@ -83,7 +83,7 @@ public sealed class DeviceDatabase
                 $"adb {string.Join(' ', args)} failed (exit {process.ExitCode}): {outputTask.Result}{errorTask.Result}");
     }
 
-    private static Process StartAdb(IEnumerable<string> args)
+    internal static Process StartAdb(IEnumerable<string> args)
     {
         var startInfo = new ProcessStartInfo(E2ESettings.AdbPath)
         {

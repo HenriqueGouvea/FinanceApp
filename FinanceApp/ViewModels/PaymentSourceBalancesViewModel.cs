@@ -13,7 +13,8 @@ namespace FinanceApp.ViewModels;
 /// </summary>
 public partial class PaymentSourceBalancesViewModel : ObservableObject,
     IRecipient<PaymentSourcesChangedMessage>,
-    IRecipient<SetupCompletedMessage>
+    IRecipient<SetupCompletedMessage>,
+    IRecipient<DataReplacedMessage>
 {
     private readonly IPaymentSourceService _paymentSourceService;
     private readonly IFinanceService _financeService;
@@ -40,6 +41,7 @@ public partial class PaymentSourceBalancesViewModel : ObservableObject,
 
     public async void Receive(PaymentSourcesChangedMessage message) => await LoadAsync();
     public async void Receive(SetupCompletedMessage message) => await LoadAsync();
+    public async void Receive(DataReplacedMessage message) => await LoadAsync();
 
     /// <summary>
     /// Also called each time the menu opens, since paying a card's entries frees up its limit.
