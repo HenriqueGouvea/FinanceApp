@@ -21,7 +21,6 @@ public class SetupPageObject
     private static readonly By WelcomeStep = AppSession.AutomationId("SetupWelcomeStep");
     private static readonly By WelcomeTitle = AppSession.AutomationId("SetupWelcomeTitleLabel");
     private static readonly By Tagline = AppSession.AutomationId("SetupTaglineLabel");
-    private static readonly By NameEntry = AppSession.AutomationId("SetupNameEntry");
     private static readonly By AvatarInitial = AppSession.AutomationId("SetupAvatarInitialLabel");
     private static readonly By SourceBalanceEntry = AppSession.AutomationId("SetupSourceBalanceEntry");
     private static readonly By SourceBalanceCaption = AppSession.AutomationId("SetupSourceBalanceCaption");
@@ -138,13 +137,13 @@ public class SetupPageObject
 
     // --- 1. Welcome ---
 
-    public string NameText => _session.WaitForVisible(NameEntry).Text;
+    public string NameText => _session.ScrollTo("SetupNameEntry").Text;
 
     public string AvatarInitialText => _session.WaitForVisible(AvatarInitial).Text;
 
     public SetupPageObject EnterName(string name)
     {
-        var entry = _session.WaitForVisible(NameEntry);
+        var entry = _session.ScrollTo("SetupNameEntry");
         entry.Clear();
         entry.SendKeys(name);
         _session.HideKeyboardIfShown();
