@@ -27,6 +27,7 @@ public sealed class SetupTests : E2ETestBase
     private const string HealthPlan = "Plano de saúde";
     private const string School = "Mensalidade escolar";
     private const string EatingOut = "Restaurantes e delivery";
+    private const string Fuel = "Combustível";
 
     private readonly SetupPageObject _setup;
 
@@ -46,6 +47,7 @@ public sealed class SetupTests : E2ETestBase
             _setup.SkipButtonText.Should().Be(AppLabels.SetupSkip);
             _setup.NextButtonText.Should().Be(AppLabels.SetupContinue);
             _setup.IsBackVisible.Should().BeFalse();
+            _setup.IsOptionalHintVisible.Should().BeTrue();
         }
 
         _setup.EnterName(Name);
@@ -165,7 +167,7 @@ public sealed class SetupTests : E2ETestBase
     }
 
     [Fact]
-    public async Task SplitSalaryChildrenAndEatingOut_Finish_CreatesBothIncomesAndOtherExpenses()
+    public async Task SplitSalaryChildrenCarAndEatingOut_Finish_CreatesBothIncomesAndOtherExpenses()
     {
         _setup.Next().Next().Next()
             .EnterSalary(3000)
@@ -176,6 +178,8 @@ public sealed class SetupTests : E2ETestBase
             .SelectExpense(HealthPlan, 600, dueDay: 10)
             .SelectHasChildren()
             .SelectExpense(School, 1200, dueDay: 5)
+            .SelectHasCar()
+            .SelectExpense(Fuel, 500)
             .SelectExpense(EatingOut, 400)
             .Next();
 
@@ -184,13 +188,14 @@ public sealed class SetupTests : E2ETestBase
             (AppLabels.SetupAdvanceDescription, AppLabels.SetupSchedule("dia 20"), AppFormat.Money(2000)),
             (HealthPlan, AppLabels.SetupSchedule("dia 10"), AppFormat.Money(600)),
             (School, AppLabels.SetupSchedule("dia 5"), AppFormat.Money(1200)),
+            (Fuel, AppLabels.SetupSchedule(AppLabels.EstimatedValue), AppFormat.Money(500)),
             (EatingOut, AppLabels.SetupSchedule(AppLabels.EstimatedValue, AppLabels.PartialPaymentValue), AppFormat.Money(400)));
 
         var main = _setup.Finish();
 
         main.WaitForEntry(HealthPlan);
         main.SummaryIncomeText.Should().Be(AppFormat.Money(5000));
-        main.SummaryOutcomeText.Should().Be(AppFormat.Money(2200));
+        main.SummaryOutcomeText.Should().Be(AppFormat.Money(2700));
 
         var categories = await GetCategoryRowsAsync();
         int? CategoryId(string name) => categories.Single(c => c.Name == name).Id;
@@ -202,8 +207,34 @@ public sealed class SetupTests : E2ETestBase
                 (AppLabels.SetupAdvanceDescription, AppFormat.Income, (int?)20, false, false, CategoryId("Salário")),
                 (HealthPlan, AppFormat.Outcome, (int?)10, false, false, CategoryId("Saúde")),
                 (School, AppFormat.Outcome, (int?)5, false, false, CategoryId("Educação")),
+                (Fuel, AppFormat.Outcome, (int?)null, true, false, CategoryId("Transporte")),
                 (EatingOut, AppFormat.Outcome, (int?)null, true, true, CategoryId("Lazer"))
             ]);
+    }
+
+    [Fact]
+    public async Task SkipStep_AddedAccount_IsDiscardedAndListedOnSummary()
+    {
+        _setup.Next()
+            .AddSource(Account, AppFormat.BankAccount, 2500)
+            .SkipStep()
+            .Next()
+            .EnterSalary(5000)
+            .Next()
+            .Next()
+            .Next();
+
+        using (new AssertionScope())
+        {
+            _setup.SkippedStepsText.Should().Be(AppLabels.SetupSkippedSteps("Contas e vales"));
+            _setup.SummaryRows.Should().Equal((Salary, AppLabels.SetupSchedule("dia 5"), AppFormat.Money(5000)));
+            _setup.IsOptionalHintVisible.Should().BeFalse();
+        }
+
+        var main = _setup.Finish();
+        main.WaitFor(() => main.SummaryIncomeText == AppFormat.Money(5000));
+        (await GetPaymentSourceRowsAsync()).Should().BeEmpty("the skipped step's account isn't created");
+        (await GetEntryRowsAsync()).Single().PaymentSourceId.Should().BeNull();
     }
 
     [Fact]

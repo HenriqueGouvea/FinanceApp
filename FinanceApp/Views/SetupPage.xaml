@@ -106,7 +106,7 @@
         </DataTemplate>
     </ContentPage.Resources>
 
-    <Grid RowDefinitions="Auto, Auto, *, Auto">
+    <Grid RowDefinitions="Auto, Auto, Auto, *, Auto">
 
         <!-- Header: the step and a way out, on every step -->
         <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Padding="20,8,8,8">
@@ -137,8 +137,15 @@
                      Progress="{Binding Progress}"
                      ProgressColor="{StaticResource Primary}"
                      Margin="20,0" />
+        <Label Grid.Row="2"
+               AutomationId="SetupOptionalHint"
+               Text="Tudo é opcional: pule o que quiser e faça depois em Configurações › Refazer configuração inicial."
+               FontSize="11"
+               TextColor="{StaticResource Muted}"
+               Margin="20,6,20,0"
+               IsVisible="{Binding IsLastStep, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
 
-        <ScrollView x:Name="StepScroll" Grid.Row="2">
+        <ScrollView x:Name="StepScroll" Grid.Row="3">
             <Grid Padding="20,20,20,24">
 
                 <!-- 1. Welcome: name and photo -->
@@ -652,12 +659,12 @@
                     </VerticalStackLayout>
                 </VerticalStackLayout>
 
-                <!-- 6. Other expenses: health, children's school and eating out -->
+                <!-- 6. Other expenses: health, children's school, the car and eating out -->
                 <VerticalStackLayout AutomationId="SetupOtherExpensesStep" Spacing="12" IsVisible="{Binding IsOtherExpensesStep}">
                     <Label Text="E os outros gastos do mês?" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
                     <Label FontSize="14"
                            TextColor="{StaticResource Ink}"
-                           Text="Saúde, a escola dos filhos e o que você gasta comendo fora também viram despesas recorrentes." />
+                           Text="Saúde, a escola dos filhos, o carro e o que você gasta comendo fora também viram despesas recorrentes." />
 
                     <Label Text="Saúde" Style="{StaticResource GroupHeader}" />
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding HealthExpenses}"
@@ -723,6 +730,66 @@
                                          BindableLayout.ItemTemplate="{StaticResource SetupExpenseTemplate}"
                                          Spacing="8"
                                          IsVisible="{Binding HasChildren}" />
+
+                    <Label Text="Transporte" Style="{StaticResource GroupHeader}" />
+                    <Label Text="Você tem carro?" FontSize="15" />
+                    <Border Style="{StaticResource SegmentedControl}">
+                        <Grid ColumnDefinitions="*, *" ColumnSpacing="3">
+                            <Border Grid.Column="0"
+                                    AutomationId="SetupNoCarButton"
+                                    Style="{StaticResource SegmentOption}">
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding HasCar}" Value="False">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SelectHasCarCommand}">
+                                        <TapGestureRecognizer.CommandParameter>
+                                            <x:Boolean>False</x:Boolean>
+                                        </TapGestureRecognizer.CommandParameter>
+                                    </TapGestureRecognizer>
+                                </Border.GestureRecognizers>
+                                <Label Text="Não" Style="{StaticResource SegmentLabel}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding HasCar}" Value="False">
+                                            <Setter Property="TextColor" Value="White" />
+                                            <Setter Property="FontAttributes" Value="Bold" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Border>
+                            <Border Grid.Column="1"
+                                    AutomationId="SetupHasCarButton"
+                                    Style="{StaticResource SegmentOption}">
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding HasCar}" Value="True">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SelectHasCarCommand}">
+                                        <TapGestureRecognizer.CommandParameter>
+                                            <x:Boolean>True</x:Boolean>
+                                        </TapGestureRecognizer.CommandParameter>
+                                    </TapGestureRecognizer>
+                                </Border.GestureRecognizers>
+                                <Label Text="Sim" Style="{StaticResource SegmentLabel}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding HasCar}" Value="True">
+                                            <Setter Property="TextColor" Value="White" />
+                                            <Setter Property="FontAttributes" Value="Bold" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <VerticalStackLayout AutomationId="SetupCarExpenses"
+                                         BindableLayout.ItemsSource="{Binding CarExpenses}"
+                                         BindableLayout.ItemTemplate="{StaticResource SetupExpenseTemplate}"
+                                         Spacing="8"
+                                         IsVisible="{Binding HasCar}" />
 
                     <Label Text="Lazer" Style="{StaticResource GroupHeader}" />
                     <Label FontSize="12"
@@ -790,6 +857,25 @@
                                    FontSize="14" FontAttributes="Bold" />
                         </Grid>
                     </VerticalStackLayout>
+
+                    <Border AutomationId="SetupSkippedSteps"
+                            Style="{StaticResource Card}"
+                            Padding="14"
+                            IsVisible="{Binding HasSkippedSteps}">
+                        <VerticalStackLayout Spacing="4">
+                            <Label AutomationId="SetupSkippedStepsLabel" FontSize="14" TextColor="{StaticResource Ink}">
+                                <Label.FormattedText>
+                                    <FormattedString>
+                                        <Span Text="Etapas puladas: " FontAttributes="Bold" />
+                                        <Span Text="{Binding SkippedStepsText}" />
+                                    </FormattedString>
+                                </Label.FormattedText>
+                            </Label>
+                            <Label Text="Para preenchê-las agora, toque em Voltar. Ou faça depois em Configurações › Refazer configuração inicial."
+                                   FontSize="12"
+                                   TextColor="{StaticResource Muted}" />
+                        </VerticalStackLayout>
+                    </Border>
 
                     <Label AutomationId="SetupSummaryEmptyLabel"
                            Text="Nenhum lançamento será criado agora. Você pode adicioná-los quando quiser pelo botão +."
@@ -861,15 +947,26 @@
             </Grid>
         </ScrollView>
 
-        <!-- Footer -->
-        <Grid Grid.Row="3" ColumnDefinitions="*, *" ColumnSpacing="10" Padding="20,8,20,16">
-            <Button Grid.Column="0"
+        <!-- Footer: skipping a step discards what was filled in on it -->
+        <Grid Grid.Row="4" ColumnDefinitions="*, *" RowDefinitions="Auto, Auto" ColumnSpacing="10" Padding="20,0,20,16">
+            <Button Grid.Row="0"
+                    Grid.ColumnSpan="2"
+                    AutomationId="SetupSkipStepButton"
+                    Text="Pular esta etapa"
+                    Style="{StaticResource TextButton}"
+                    FontSize="14"
+                    HorizontalOptions="Center"
+                    IsVisible="{Binding IsLastStep, Converter={x:Static converters:InverseBoolConverter.Instance}}"
+                    Command="{Binding SkipStepCommand}" />
+            <Button Grid.Row="1"
+                    Grid.Column="0"
                     AutomationId="SetupBackButton"
                     Text="Voltar"
                     Style="{StaticResource SecondaryButton}"
                     IsVisible="{Binding IsFirstStep, Converter={x:Static converters:InverseBoolConverter.Instance}}"
                     Command="{Binding BackCommand}" />
-            <Button Grid.Column="1"
+            <Button Grid.Row="1"
+                    Grid.Column="1"
                     AutomationId="SetupNextButton"
                     Text="{Binding NextButtonText}"
                     Command="{Binding NextCommand}" />

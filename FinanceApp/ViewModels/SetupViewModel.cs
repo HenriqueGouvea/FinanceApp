@@ -10,7 +10,7 @@ namespace FinanceApp.ViewModels;
 
 /// <summary>
 /// The setup wizard: name and photo, accounts and vouchers, credit cards and the purchases already on them, income,
-/// house expenses and other expenses (health, children's school, eating out), then a summary of the entries it will
+/// house expenses and other expenses (health, children's school, the car, eating out), then a summary of the entries it will
 /// create. Shown on the first run and again from the settings to add more.
 /// </summary>
 public partial class SetupViewModel : ObservableObject
@@ -30,6 +30,7 @@ public partial class SetupViewModel : ObservableObject
     private readonly IUserProfileService _profileService;
     private readonly IMediaPicker _mediaPicker;
     private readonly IMessenger _messenger;
+    private readonly HashSet<SetupStep> _skippedSteps = [];
     private Func<bool, Task>? _onClosed;
 
     [ObservableProperty]
@@ -116,6 +117,11 @@ public partial class SetupViewModel : ObservableObject
     PaymentSource? otherExpensesSource;
 
     [ObservableProperty] bool hasChildren;
+    [ObservableProperty] bool hasCar;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSkippedSteps))]
+    string skippedStepsText = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Balance))]
@@ -142,9 +148,10 @@ public partial class SetupViewModel : ObservableObject
     /// <summary>
     /// The first run can be skipped for good; run again from the settings, the wizard is just closed.
     /// </summary>
-    public string SkipButtonText => IsRerun ? "Fechar" : "Pular";
+    public string SkipButtonText => IsRerun ? "Fechar" : "Pular tudo";
 
     public bool HasPhoto => PhotoPath is not null;
+    public bool HasSkippedSteps => SkippedStepsText.Length > 0;
     public string Initial => string.IsNullOrWhiteSpace(Name) ? "👤" : Name.Trim()[..1].ToUpperInvariant();
     public string SummaryTitle => string.IsNullOrWhiteSpace(Name) ? "Tudo pronto!" : $"Tudo pronto, {Name.Trim()}!";
     public decimal Balance => TotalIncome - TotalOutcome;
@@ -198,6 +205,7 @@ public partial class SetupViewModel : ObservableObject
     public ObservableCollection<SetupExpenseItem> HealthExpenses { get; } = [];
     public ObservableCollection<SetupExpenseItem> SchoolExpenses { get; } = [];
     public ObservableCollection<SetupExpenseItem> LeisureExpenses { get; } = [];
+    public ObservableCollection<SetupExpenseItem> CarExpenses { get; } = [];
     public ObservableCollection<SetupSummaryRow> SummaryRows { get; } = [];
     public List<int> DueDays { get; } = [NoDueDay, .. Enumerable.Range(1, 31)];
     public List<RecurrenceType> PurchaseRecurrences { get; } = [RecurrenceType.OneTime, RecurrenceType.Installments, RecurrenceType.Recurrent];
@@ -256,11 +264,15 @@ public partial class SetupViewModel : ObservableObject
         ExpensesSource = null;
         OtherExpensesSource = null;
         HasChildren = false;
+        HasCar = false;
+        _skippedSteps.Clear();
+        SkippedStepsText = string.Empty;
 
         Reset(Expenses, CreateHouseExpenses());
         Reset(HealthExpenses, CreateHealthExpenses());
         Reset(SchoolExpenses, CreateSchoolExpenses());
         Reset(LeisureExpenses, CreateLeisureExpenses());
+        Reset(CarExpenses, CreateCarExpenses());
 
         SummaryRows.Clear();
         TotalIncome = 0;
@@ -395,6 +407,9 @@ public partial class SetupViewModel : ObservableObject
     [RelayCommand]
     void SelectHasChildren(bool value) => HasChildren = value;
 
+    [RelayCommand]
+    void SelectHasCar(bool value) => HasCar = value;
+
     // --- Navigation ---
 
     [RelayCommand]
@@ -414,10 +429,85 @@ public partial class SetupViewModel : ObservableObject
         if (IsCreditCardsStep && CanAddPurchase())
             AddPurchase();
 
+        _skippedSteps.Remove(Step);
+        GoForward();
+    }
+
+    /// <summary>
+    /// Discards what was filled in on the current step and moves on. The summary lists the skipped steps, which can
+    /// be filled in by going back or later from the settings.
+    /// </summary>
+    [RelayCommand]
+    void SkipStep()
+    {
+        if (IsLastStep)
+            return;
+
+        ClearStep(Step);
+        _skippedSteps.Add(Step);
+        GoForward();
+    }
+
+    private void GoForward()
+    {
         Step++;
         if (IsSummaryStep)
             BuildSummary();
     }
+
+    private void ClearStep(SetupStep step)
+    {
+        switch (step)
+        {
+            case SetupStep.Welcome:
+                Name = _profileService.Name;
+                PhotoPath = _profileService.PhotoPath;
+                break;
+            case SetupStep.PaymentSources:
+                foreach (var source in NewSources.ToList())
+                    RemoveSource(source);
+                ResetNewSourceForm();
+                break;
+            case SetupStep.CreditCards:
+                foreach (var card in NewCards.ToList())
+                    RemoveCard(card);
+                ResetNewCardForm();
+                ResetNewPurchaseForm();
+                break;
+            case SetupStep.Income:
+                Salary = 0;
+                SalaryDay = DefaultSalaryDay;
+                IsSalarySplit = false;
+                Advance = 0;
+                AdvanceDay = DefaultAdvanceDay;
+                break;
+            case SetupStep.HouseExpenses:
+                Reset(Expenses, CreateHouseExpenses());
+                break;
+            case SetupStep.OtherExpenses:
+                HasChildren = false;
+                HasCar = false;
+                Reset(HealthExpenses, CreateHealthExpenses());
+                Reset(SchoolExpenses, CreateSchoolExpenses());
+                Reset(CarExpenses, CreateCarExpenses());
+                Reset(LeisureExpenses, CreateLeisureExpenses());
+                break;
+        }
+    }
+
+    /// <summary>
+    /// "Nome e foto", "Cartões de crédito"...: how the summary names a skipped step.
+    /// </summary>
+    public static string DescribeStep(SetupStep step) => step switch
+    {
+        SetupStep.Welcome => "Nome e foto",
+        SetupStep.PaymentSources => "Contas e vales",
+        SetupStep.CreditCards => "Cartões de crédito",
+        SetupStep.Income => "Renda",
+        SetupStep.HouseExpenses => "Gastos da casa",
+        SetupStep.OtherExpenses => "Outros gastos",
+        _ => string.Empty
+    };
 
     [RelayCommand]
     void Back()
@@ -476,7 +566,13 @@ public partial class SetupViewModel : ObservableObject
         foreach (var entry in BuildExpenses(Expenses, ExpensesSource))
             yield return entry;
 
-        IEnumerable<SetupExpenseItem> otherExpenses = [.. HealthExpenses, .. HasChildren ? SchoolExpenses : Enumerable.Empty<SetupExpenseItem>(), .. LeisureExpenses];
+        IEnumerable<SetupExpenseItem> otherExpenses =
+        [
+            .. HealthExpenses,
+            .. HasChildren ? SchoolExpenses : Enumerable.Empty<SetupExpenseItem>(),
+            .. HasCar ? CarExpenses : Enumerable.Empty<SetupExpenseItem>(),
+            .. LeisureExpenses
+        ];
         foreach (var entry in BuildExpenses(otherExpenses, OtherExpensesSource))
             yield return entry;
     }
@@ -517,6 +613,8 @@ public partial class SetupViewModel : ObservableObject
 
         TotalIncome = entries.Where(e => e.Entry.EntryType == FinancialEntryType.Income).Sum(e => e.Entry.Amount);
         TotalOutcome = entries.Where(e => e.Entry.EntryType == FinancialEntryType.Outcome).Sum(e => e.Entry.Amount);
+
+        SkippedStepsText = string.Join(", ", Enum.GetValues<SetupStep>().Where(_skippedSteps.Contains).Select(DescribeStep));
     }
 
     /// <summary>
@@ -640,5 +738,11 @@ public partial class SetupViewModel : ObservableObject
             Icon = "🍽️", Description = "Restaurantes e delivery", CategoryName = "Lazer",
             IsEstimated = true, AllowsPartialPayment = true
         }
+    ];
+
+    private static IEnumerable<SetupExpenseItem> CreateCarExpenses() =>
+    [
+        new() { Icon = "⛽", Description = "Combustível", CategoryName = "Transporte", IsEstimated = true },
+        new() { Icon = "🛡️", Description = "Seguro do carro", CategoryName = "Transporte" }
     ];
 }

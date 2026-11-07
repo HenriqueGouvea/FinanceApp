@@ -340,9 +340,44 @@ public class SetupPageObject
     {
         _session.HideKeyboardIfShown();
         _session.ScrollToAndTap("SetupHasChildrenButton");
-        _session.WaitForVisible(AppSession.AutomationId("SetupSchoolExpenses"));
+        // The revealed expenses open below the fold.
+        ScrollToText("Mensalidade escolar");
         return this;
     }
+
+    /// <summary>
+    /// Answers "Você tem carro?" with "Sim", which shows the car expenses.
+    /// </summary>
+    public SetupPageObject SelectHasCar()
+    {
+        _session.HideKeyboardIfShown();
+        _session.ScrollToAndTap("SetupHasCarButton");
+        ScrollToText("Combustível");
+        return this;
+    }
+
+    // --- Skipping ---
+
+    /// <summary>
+    /// Taps "Pular esta etapa", which discards what was filled in on the step and moves on.
+    /// </summary>
+    public SetupPageObject SkipStep()
+    {
+        var step = CurrentStep;
+        _session.HideKeyboardIfShown();
+        _session.Tap(AppSession.AutomationId("SetupSkipStepButton"));
+        return WaitForStep(step + 1);
+    }
+
+    /// <summary>
+    /// "Tudo é opcional...", shown on every step but the summary.
+    /// </summary>
+    public bool IsOptionalHintVisible => _session.IsVisible(AppSession.AutomationId("SetupOptionalHint"));
+
+    /// <summary>
+    /// "Etapas puladas: Contas e vales, Renda" on the summary, see <see cref="AppLabels.SetupSkippedSteps"/>.
+    /// </summary>
+    public string SkippedStepsText => _session.ScrollTo("SetupSkippedStepsLabel").Text;
 
     // --- 7. Summary ---
 

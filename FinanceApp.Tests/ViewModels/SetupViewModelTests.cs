@@ -42,7 +42,7 @@ public class SetupViewModelTests
         _vm.Step.Should().Be(SetupStep.Welcome);
         _vm.StepNumber.Should().Be(1);
         _vm.StepCount.Should().Be(7);
-        _vm.SkipButtonText.Should().Be("Pular");
+        _vm.SkipButtonText.Should().Be("Pular tudo");
         _vm.NextButtonText.Should().Be("Continuar");
         _vm.SalaryDay.Should().Be(SetupViewModel.DefaultSalaryDay);
         _vm.Expenses.Select(e => e.Description).Should().Equal(
@@ -703,6 +703,197 @@ public class SetupViewModelTests
         _vm.SummaryRows.Should().ContainSingle(r => r.Description == "Mensalidade escolar" && r.Amount == 1200 && r.Icon == "🎒");
     }
 
+    [Fact]
+    public async Task CarExpenses_FuelIsEstimatedAndInsuranceIsFixed()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+
+        _vm.HasCar.Should().BeFalse();
+        _vm.CarExpenses.Select(e => (e.Description, e.CategoryName, e.IsEstimated, e.AllowsPartialPayment)).Should().Equal(
+            ("Combustível", "Transporte", true, false),
+            ("Seguro do carro", "Transporte", false, false));
+    }
+
+    [Fact]
+    public async Task Summary_HasCar_IncludesCarExpenses()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.SelectHasCarCommand.Execute(true);
+        Select(_vm.CarExpenses, "Combustível", 500);
+        Select(_vm.CarExpenses, "Seguro do carro", 250, dueDay: 15);
+
+        await GoToSummaryAsync();
+
+        _vm.SummaryRows.Select(r => (r.Description, r.Detail, r.Amount)).Should().Equal(
+            ("Combustível", "Todo mês · valor estimado", 500m),
+            ("Seguro do carro", "Todo mês · dia 15", 250m));
+    }
+
+    [Fact]
+    public async Task Summary_NoCar_LeavesCarExpensesOut()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.SelectHasCarCommand.Execute(true);
+        Select(_vm.CarExpenses, "Combustível", 500);
+        _vm.SelectHasCarCommand.Execute(false);
+
+        await GoToSummaryAsync();
+
+        _vm.HasSummaryRows.Should().BeFalse();
+    }
+
+    // --- Skipping steps ---
+
+    [Fact]
+    public async Task SkipStep_GoesToNextStepAndSummaryListsIt()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        _vm.SkipStepCommand.Execute(null);
+
+        _vm.Step.Should().Be(SetupStep.CreditCards);
+        await GoToSummaryAsync();
+        _vm.HasSkippedSteps.Should().BeTrue();
+        _vm.SkippedStepsText.Should().Be("Contas e vales");
+    }
+
+    [Fact]
+    public async Task SkipStep_EveryStep_ListsThemInOrder()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+
+        while (!_vm.IsSummaryStep)
+            _vm.SkipStepCommand.Execute(null);
+
+        _vm.SkippedStepsText.Should().Be("Nome e foto, Contas e vales, Cartões de crédito, Renda, Gastos da casa, Outros gastos");
+        _vm.HasSummaryRows.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SkipStep_OnSummary_DoesNothing()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        await GoToSummaryAsync();
+
+        _vm.SkipStepCommand.Execute(null);
+
+        _vm.IsSummaryStep.Should().BeTrue();
+        _vm.HasSkippedSteps.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SkipStep_Welcome_KeepsStoredProfile()
+    {
+        _profileService.Name.Returns("Ana");
+        _profileService.PhotoPath.Returns("/data/profile.jpg");
+        await _vm.PrepareAsync(isRerun: true);
+        _vm.Name = "Bia";
+        _vm.PhotoPath = null;
+
+        _vm.SkipStepCommand.Execute(null);
+
+        _vm.Name.Should().Be("Ana");
+        _vm.PhotoPath.Should().Be("/data/profile.jpg");
+    }
+
+    [Fact]
+    public async Task SkipStep_Sources_DiscardsThemAndTheirSelections()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        await _vm.NextCommand.ExecuteAsync(null);
+        AddSource("Itaú", PaymentSourceType.BankAccount);
+        _vm.NewSourceName = "VR";
+
+        _vm.SkipStepCommand.Execute(null);
+
+        _vm.NewSources.Should().BeEmpty("a skipped step creates nothing, typed or added");
+        _vm.AvailableSources.Should().BeEmpty();
+        _vm.SalarySource.Should().BeNull();
+        _vm.NewCardBillAccount.Should().BeNull();
+        _vm.NewSourceName.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SkipStep_CreditCards_DiscardsCardsAndPurchases()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        await _vm.NextCommand.ExecuteAsync(null);
+        await _vm.NextCommand.ExecuteAsync(null);
+        AddCard("Nubank");
+        AddPurchase("Tênis", 300, RecurrenceType.OneTime);
+        _vm.NewCardName = "Visa";
+
+        _vm.SkipStepCommand.Execute(null);
+
+        _vm.IsIncomeStep.Should().BeTrue();
+        _vm.NewCards.Should().BeEmpty();
+        _vm.CreditCards.Should().BeEmpty();
+        _vm.Purchases.Should().BeEmpty();
+        _vm.NewCardName.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SkipStep_Income_DiscardsSalary()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        await GoToStepAsync(SetupStep.Income);
+        _vm.IsSalarySplit = true;
+        _vm.Salary = 3000;
+        _vm.Advance = 2000;
+        _vm.SalaryDay = 7;
+
+        _vm.SkipStepCommand.Execute(null);
+
+        (_vm.Salary, _vm.Advance, _vm.IsSalarySplit, _vm.SalaryDay).Should().Be((0m, 0m, false, SetupViewModel.DefaultSalaryDay));
+    }
+
+    [Fact]
+    public async Task SkipStep_Expenses_UnselectsThem()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        await GoToStepAsync(SetupStep.HouseExpenses);
+        SelectExpense("Aluguel ou financiamento", 1500);
+        _vm.SkipStepCommand.Execute(null);
+        _vm.SelectHasChildrenCommand.Execute(true);
+        _vm.SelectHasCarCommand.Execute(true);
+        Select(_vm.CarExpenses, "Combustível", 500);
+        Select(_vm.LeisureExpenses, "Restaurantes e delivery", 400);
+
+        _vm.SkipStepCommand.Execute(null);
+
+        _vm.HasSummaryRows.Should().BeFalse();
+        (_vm.HasChildren, _vm.HasCar).Should().Be((false, false));
+        _vm.SkippedStepsText.Should().Be("Gastos da casa, Outros gastos");
+    }
+
+    [Fact]
+    public async Task SkippedStep_FilledLaterAndContinued_IsNoLongerSkipped()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        await GoToStepAsync(SetupStep.Income);
+        _vm.SkipStepCommand.Execute(null);
+        _vm.BackCommand.Execute(null);
+        _vm.Salary = 5000;
+
+        await GoToSummaryAsync();
+
+        _vm.HasSkippedSteps.Should().BeFalse();
+        _vm.SummaryRows.Select(r => r.Description).Should().Equal("Salário");
+    }
+
+    [Fact]
+    public async Task PrepareAsync_AfterSkippingSteps_ForgetsThem()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.SkipStepCommand.Execute(null);
+
+        await _vm.PrepareAsync(isRerun: false);
+        await GoToSummaryAsync();
+
+        _vm.HasSkippedSteps.Should().BeFalse();
+    }
+
     // --- Finish ---
 
     [Fact]
@@ -810,6 +1001,12 @@ public class SetupViewModelTests
         _vm.ToggleExpenseCommand.Execute(expense);
         expense.Amount = amount;
         expense.DueDay = dueDay;
+    }
+
+    private async Task GoToStepAsync(SetupStep step)
+    {
+        while (_vm.Step != step)
+            await _vm.NextCommand.ExecuteAsync(null);
     }
 
     private async Task GoToSummaryAsync()
