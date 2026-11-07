@@ -68,8 +68,10 @@ privacy policy and the Data safety form must be updated every time.
 | Crash reporting (Sentry, Firebase) | Crash traces, device model | Not needed for v1.0: Play Console's Android vitals already shows crashes and ANRs, without an SDK. |
 | Account and sync (Phase 3) | Everything: email, all financial data | Full LGPD program (section 6), account deletion in the app and on the web (a Play requirement for apps with accounts), access logs (Marco Civil). |
 
-Two features are still missing for users' control over their own data. They are good practice, and the second
-is a real need, because there is no account to recover data from:
+Two features were missing for users' control over their own data. They are good practice, and the second
+is a real need, because there is no account to recover data from. Both are done ("Data management" in the
+roadmap, under "Configurações › Seus dados"). The exported file stays on the user's side: the share sheet sends
+it wherever they choose, and the developer still receives nothing.
 
 - **"Apagar todos os dados"** in "Configurações", with a confirmation that names what will be deleted (entries,
   accounts and cards, categories, profile, PIN). It replaces the removed debug button. Uninstalling works too,

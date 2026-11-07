@@ -4,16 +4,30 @@ using FinanceApp.ViewModels;
 namespace FinanceApp.Views;
 
 /// <summary>
-/// "Configurações": the user's name and photo, the app lock and the setup wizard, grouped by subject.
+/// "Configurações": the user's name and photo, the app lock, the setup wizard and their data (export, import, wipe),
+/// grouped by subject.
 /// </summary>
 public partial class SettingsPage : ContentPage
 {
     private readonly UserProfileViewModel _viewModel;
 
-    public SettingsPage(UserProfileViewModel viewModel)
+    public SettingsPage(UserProfileViewModel viewModel, DataManagementViewModel dataViewModel)
     {
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
+        DataSection.BindingContext = dataViewModel;
+        dataViewModel.SetDataReplacedCallback(OnDataReplacedAsync);
+    }
+
+    // Both land on "Início"; after a wipe the app starts over as on a new install, with the setup wizard.
+    private static async Task OnDataReplacedAsync(bool deleted)
+    {
+        if (Shell.Current is not AppShell shell)
+            return;
+
+        await shell.GoToAsync("//MainPage");
+        if (deleted)
+            await shell.ShowSetupAsync(isRerun: false);
     }
 
     protected override void OnAppearing()

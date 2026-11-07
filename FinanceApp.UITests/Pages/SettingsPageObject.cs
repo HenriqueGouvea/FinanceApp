@@ -5,7 +5,7 @@ using OpenQA.Selenium.Appium;
 namespace FinanceApp.UITests.Pages;
 
 /// <summary>
-/// "Configurações": the user's name and photo, the app lock and the setup wizard.
+/// "Configurações": the user's name and photo, the app lock, the setup wizard and the user's data (export, import, wipe).
 /// </summary>
 public class SettingsPageObject
 {
@@ -14,6 +14,9 @@ public class SettingsPageObject
     private static readonly By SecurityRow = AppSession.AutomationId("SettingsSecurityRow");
     private static readonly By ProfileNameEntry = AppSession.AutomationId("ProfileNameEntry");
     private static readonly By SaveProfileButton = AppSession.AutomationId("SaveProfileButton");
+    // The share sheet belongs to the system ("android" up to Android 13, "com.android.intentresolver" from 14).
+    private static readonly By ShareSheetFileName =
+        MobileBy.AndroidUIAutomator("new UiSelector().resourceIdMatches(\".*:id/content_preview_filename\")");
     private static readonly By FlyoutButton =
         MobileBy.AndroidUIAutomator("new UiSelector().className(\"android.widget.ImageButton\").instance(0)");
 
@@ -34,7 +37,7 @@ public class SettingsPageObject
     /// The section headers, top to bottom.
     /// </summary>
     public IReadOnlyList<string> SectionHeaders =>
-        new[] { "SettingsUserHeader", "SettingsSecurityHeader", "SettingsGuideHeader" }
+        new[] { "SettingsUserHeader", "SettingsSecurityHeader", "SettingsGuideHeader", "SettingsDataHeader" }
             .Select(id => _session.ScrollTo(id).Text)
             .ToList();
 
@@ -65,6 +68,45 @@ public class SettingsPageObject
     public SetupPageObject RedoSetup()
     {
         _session.ScrollToAndTap("SettingsRedoSetupRow");
+        return new SetupPageObject(_session).WaitUntilLoaded();
+    }
+
+    /// <summary>
+    /// Taps "Exportar dados" and waits for Android's share sheet, which names the first shared file (the backup).
+    /// Returns that file name; close the sheet with <see cref="CloseShareSheet"/>.
+    /// </summary>
+    public string ExportData()
+    {
+        _session.ScrollToAndTap("SettingsExportRow");
+        return _session.WaitForVisible(ShareSheetFileName).Text;
+    }
+
+    public SettingsPageObject CloseShareSheet()
+    {
+        _session.PressBack();
+        _session.WaitForGone(ShareSheetFileName);
+        _session.WaitForVisible(ProfileRow);
+        return this;
+    }
+
+    /// <summary>
+    /// Taps "Importar backup", picks the file from Downloads, confirms and lands on "Início".
+    /// </summary>
+    public MainPageObject ImportBackup(string fileName)
+    {
+        _session.ScrollToAndTap("SettingsImportRow");
+        new SystemFilePickerObject(_session).Pick(fileName);
+        _session.Tap(AppSession.DialogOption(AppLabels.ImportBackupConfirm));
+        return new MainPageObject(_session).WaitUntilLoaded();
+    }
+
+    /// <summary>
+    /// Taps "Apagar todos os dados" and confirms; the app starts over with the setup wizard.
+    /// </summary>
+    public SetupPageObject DeleteAllData()
+    {
+        _session.ScrollToAndTap("SettingsDeleteAllRow");
+        _session.Tap(AppSession.DialogOption(AppLabels.DeleteAllDataConfirm));
         return new SetupPageObject(_session).WaitUntilLoaded();
     }
 

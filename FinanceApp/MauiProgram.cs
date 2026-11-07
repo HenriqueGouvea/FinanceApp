@@ -46,8 +46,11 @@ public static class MauiProgram
         builder.Services.AddSingleton<ISetupService, SetupService>();
         builder.Services.AddSingleton<IAlertService, AlertService>();
         builder.Services.AddSingleton<IWriteGuard, WriteGuard>();
+        builder.Services.AddSingleton<IDataManagementService, DataManagementService>();
         builder.Services.AddSingleton(FileSystem.Current);
         builder.Services.AddSingleton(MediaPicker.Default);
+        builder.Services.AddSingleton(Share.Default);
+        builder.Services.AddSingleton(FilePicker.Default);
         builder.Services.AddSingleton(TimeProvider.System);
 #if ANDROID
         builder.Services.AddSingleton<IBiometricService, BiometricService>();
@@ -72,6 +75,7 @@ public static class MauiProgram
         builder.Services.AddTransient<SetupViewModel>();
         builder.Services.AddTransient<UserProfileViewModel>();
         builder.Services.AddTransient<ProfileEditViewModel>();
+        builder.Services.AddTransient<DataManagementViewModel>();
 
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddTransient<MainPage>();

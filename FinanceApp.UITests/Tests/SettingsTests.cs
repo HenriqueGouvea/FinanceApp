@@ -21,7 +21,8 @@ public sealed class SettingsTests : E2ETestBase
     public void EditName_ShowsInSettingsAndMenuGreetingAndIsKeptAfterRestart()
     {
         var settings = MainPage.OpenSettings();
-        settings.SectionHeaders.Should().Equal(AppLabels.SettingsUserSection, AppLabels.SettingsSecuritySection, AppLabels.SettingsGuideSection);
+        settings.SectionHeaders.Should().Equal(
+            AppLabels.SettingsUserSection, AppLabels.SettingsSecuritySection, AppLabels.SettingsGuideSection, AppLabels.SettingsDataSection);
         settings.ProfileNameText.Should().Be(AppLabels.AddNameAndPhoto);
 
         settings.EditName("Ana");

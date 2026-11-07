@@ -28,6 +28,9 @@ public static class AppLabels
     public const string SettingsUserSection = "Usuário";
     public const string SettingsSecuritySection = "Segurança";
     public const string SettingsGuideSection = "Guia inicial";
+    public const string SettingsDataSection = "Seus dados";
+    public const string DeleteAllDataConfirm = "Apagar tudo";
+    public const string ImportBackupConfirm = "Importar";
     public const string AddNameAndPhoto = "Adicionar nome e foto";
 
     public const string SetupWelcomeTitle = "Bem-vindo ao Mensal!";

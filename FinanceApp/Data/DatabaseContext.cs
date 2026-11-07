@@ -66,9 +66,15 @@ public class DatabaseContext : IDatabaseContext
         return connection;
     }
 
+    /// <summary>
+    /// Fresh copies of the categories a new install starts with, outcomes first.
+    /// </summary>
+    public static IReadOnlyList<FinancialCategory> CreateDefaultCategories() =>
+        [.. Copy([.. DefaultOutcomeCategories, .. DefaultIncomeCategories])];
+
     private static async Task SeedDefaultCategoriesAsync(SQLiteAsyncConnection db)
     {
-        await InsertCopiesAsync(db, [.. DefaultOutcomeCategories, .. DefaultIncomeCategories]);
+        await db.InsertAllAsync(CreateDefaultCategories());
 
         // Databases created before category management stored the category name as text on FinancialEntry.
         var columns = await db.GetTableInfoAsync(nameof(FinancialEntry));
@@ -85,7 +91,7 @@ public class DatabaseContext : IDatabaseContext
         await db.ExecuteAsync(
             $"UPDATE {nameof(FinancialCategory)} SET {nameof(FinancialCategory.EntryType)} = ?",
             (int)FinancialEntryType.Outcome);
-        await InsertCopiesAsync(db, DefaultIncomeCategories);
+        await db.InsertAllAsync(Copy(DefaultIncomeCategories));
     }
 
     // Before the flag every entry accepted partial payments: keep it on for entries that already received some.
@@ -95,12 +101,12 @@ public class DatabaseContext : IDatabaseContext
             $"WHERE {nameof(FinancialEntry.Id)} IN (SELECT {nameof(FinancialMonthlyEntry.FinancialEntryId)} FROM {nameof(FinancialMonthlyEntry)} " +
             $"WHERE {nameof(FinancialMonthlyEntry.PaidAmount)} IS NOT NULL)");
 
-    private static Task InsertCopiesAsync(SQLiteAsyncConnection db, IEnumerable<FinancialCategory> categories) =>
-        db.InsertAllAsync(categories.Select(c => new FinancialCategory
+    private static IEnumerable<FinancialCategory> Copy(IEnumerable<FinancialCategory> categories) =>
+        categories.Select(c => new FinancialCategory
         {
             Name = c.Name,
             Icon = c.Icon,
             Color = c.Color,
             EntryType = c.EntryType
-        }));
+        });
 }
