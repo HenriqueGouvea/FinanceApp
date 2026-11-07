@@ -6,13 +6,27 @@ namespace FinanceApp.Services;
 public class CategoryService : ICategoryService
 {
     private readonly IDatabaseContext _context;
+    private Task<IReadOnlyList<FinancialCategory>>? _cache;
 
     public CategoryService(IDatabaseContext context)
     {
         _context = context;
     }
 
-    public async Task<IReadOnlyList<FinancialCategory>> GetAllAsync()
+    // Every month load needs the categories: read them once and keep them until one is written.
+    // Concurrent first callers share the same read, and a failed read is retried on the next call.
+    public Task<IReadOnlyList<FinancialCategory>> GetAllAsync()
+    {
+        var cache = _cache;
+        if (cache is null || cache.IsFaulted || cache.IsCanceled)
+            _cache = cache = LoadAllAsync();
+
+        return cache;
+    }
+
+    public void ClearCache() => _cache = null;
+
+    private async Task<IReadOnlyList<FinancialCategory>> LoadAllAsync()
     {
         var db = await _context.GetConnectionAsync();
         var categories = await db.Table<FinancialCategory>().ToListAsync();
@@ -31,6 +45,8 @@ public class CategoryService : ICategoryService
             await db.UpdateAsync(category);
         else
             await db.InsertAsync(category);
+
+        ClearCache();
     }
 
     public async Task<int> CountEntriesAsync(int categoryId)
@@ -50,5 +66,7 @@ public class CategoryService : ICategoryService
                 categoryId);
             conn.Delete<FinancialCategory>(categoryId);
         });
+
+        ClearCache();
     }
 }

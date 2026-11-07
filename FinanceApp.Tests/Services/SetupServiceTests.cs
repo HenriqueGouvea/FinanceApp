@@ -26,12 +26,12 @@ public sealed class SetupServiceTests : IDisposable
         _timeProvider.LocalTimeZone.Returns(TimeZoneInfo.Local);
         _timeProvider.GetUtcNow().Returns(new DateTimeOffset(Now.ToUniversalTime()));
 
-        _financeService = new FinanceService(_context);
         _categoryService = new CategoryService(_context);
         _paymentSourceService = new PaymentSourceService(_context);
+        _financeService = new FinanceService(_context, _categoryService, _paymentSourceService);
         _profileService = new UserProfileService(_preferences, _fileSystem);
         _service = new SetupService(
-            _context, _categoryService, _profileService, _preferences, _timeProvider);
+            _context, _categoryService, _paymentSourceService, _profileService, _preferences, _timeProvider);
     }
 
     public void Dispose() => _fileSystem.Dispose();
@@ -109,6 +109,19 @@ public sealed class SetupServiceTests : IDisposable
             ("Visa", PaymentSourceType.CreditCard, 8000m)
         ]);
     }
+    [Fact]
+    public async Task CompleteAsync_SourcesListedBefore_ListsTheNewSources()
+    {
+        await _paymentSourceService.GetAllAsync();
+
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            PaymentSources = [new PaymentSource { Name = "Nubank", Type = PaymentSourceType.BankAccount }]
+        });
+
+        (await _paymentSourceService.GetAllAsync()).Select(s => s.Name).Should().Equal("Nubank");
+    }
+
 
     [Fact]
     public async Task CompleteAsync_Entries_AreRecurrentFromCurrentMonth()

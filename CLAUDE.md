@@ -124,6 +124,8 @@ SQLite (FinanceDataV3.db3)
 
 **Multi-row writes:** A write that touches more than one row runs in one transaction (`FinanceService.InTransactionAsync`, or `RunInTransactionAsync` with the synchronous `SQLiteConnection` inside), so an app killed halfway leaves no half-made change.
 
+**Cached categories and payment sources:** `CategoryService` and `PaymentSourceService` read their table once and keep the list (`GetAllAsync`) until one of their own writes; `FinanceService` reads them through these services, not from the DB. The list items are shared, so never change them (build a new object to save). Any other code that writes those tables (`SetupService`, `DataManagementService`) must call `ClearCache()` on the service after the write; the change messages aren't used for this because their recipients' order isn't guaranteed, so a view could reload before the cache is cleared. Indexes are created in `DatabaseContext.CreateIndexesAsync`.
+
 **Failed writes:** Services never catch exceptions. A ViewModel runs every write the user triggers through `IWriteGuard.TryAsync`, the one place that logs the error (`ILogger`, with no provider in Release) and shows "Não foi possível salvar. Tente de novo."; when it returns false, the ViewModel stops (no save callback, no refresh). Never use `Console.WriteLine`.
 
 **Backup format:** "Exportar dados" writes every table as a `DataBackup` (JSON, `BackupJsonContext`) and "Importar backup" restores it with the same ids (`DataManagementService`). A new table or column must be added to `DataBackup` too, and a change that older backups can't be read into needs a migration on import and a bump of `DataBackup.CurrentVersion` (newer backups are refused with "Atualize o app").

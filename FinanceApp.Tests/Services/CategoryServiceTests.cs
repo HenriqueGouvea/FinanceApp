@@ -16,7 +16,7 @@ public class CategoryServiceTests
     {
         _context = new TestDatabaseContext();
         _service = new CategoryService(_context);
-        _financeService = new FinanceService(_context);
+        _financeService = new FinanceService(_context, _service, new PaymentSourceService(_context));
     }
 
     // --- GetAllAsync ---
@@ -40,6 +40,43 @@ public class CategoryServiceTests
 
         result.Select(c => c.Name).Should().Equal("alimentação", "Lazer", "Transporte");
     }
+    [Fact]
+    public async Task GetAllAsync_ListLoadedBefore_ReflectsSavesAndDeletes()
+    {
+        await _service.GetAllAsync();
+        var category = new FinancialCategory { Name = "Lazer" };
+
+        await _service.SaveAsync(category);
+        (await _service.GetAllAsync()).Select(c => c.Name).Should().Equal("Lazer");
+
+        await _service.SaveAsync(new FinancialCategory { Id = category.Id, Name = "Viagens" });
+        (await _service.GetAllAsync()).Select(c => c.Name).Should().Equal("Viagens");
+
+        await _service.DeleteAsync(category.Id);
+        (await _service.GetAllAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetAllAsync_RowWrittenElsewhere_ShowsOnlyAfterClearCache()
+    {
+        await _service.GetAllAsync();
+        var db = await _context.GetConnectionAsync();
+        await db.InsertAsync(new FinancialCategory { Name = "Lazer" });
+
+        (await _service.GetAllAsync()).Should().BeEmpty();
+        _service.ClearCache();
+        (await _service.GetAllAsync()).Select(c => c.Name).Should().Equal("Lazer");
+    }
+
+    [Fact]
+    public async Task GetAllAsync_ConcurrentCalls_ShareOneRead()
+    {
+        var first = _service.GetAllAsync();
+        var second = _service.GetAllAsync();
+
+        (await first).Should().BeSameAs(await second);
+    }
+
 
     // --- SaveAsync ---
 

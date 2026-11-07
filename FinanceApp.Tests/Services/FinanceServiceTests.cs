@@ -1,3 +1,4 @@
+using FinanceApp.Data;
 using FinanceApp.Models;
 using FinanceApp.Services;
 using FinanceApp.Tests.Infrastructure;
@@ -10,6 +11,8 @@ namespace FinanceApp.Tests.Services;
 public class FinanceServiceTests
 {
     private readonly TestDatabaseContext _context;
+    private readonly CategoryService _categoryService;
+    private readonly PaymentSourceService _paymentSourceService;
     private readonly FinanceService _service;
 
     private static readonly DateTime AprilTenth = new(2026, 4, 10, 0, 0, 0, DateTimeKind.Local);
@@ -17,7 +20,9 @@ public class FinanceServiceTests
     public FinanceServiceTests()
     {
         _context = new TestDatabaseContext();
-        _service = new FinanceService(_context);
+        _categoryService = new CategoryService(_context);
+        _paymentSourceService = new PaymentSourceService(_context);
+        _service = new FinanceService(_context, _categoryService, _paymentSourceService);
     }
 
     [Fact]
@@ -280,7 +285,7 @@ public class FinanceServiceTests
     public async Task GetMergedEntries_EntryWithCategory_ResolvesCategoryOnProjection()
     {
         var category = new FinancialCategory { Name = "Moradia", Icon = "🏠", Color = "#1E88E5" };
-        await new CategoryService(_context).SaveAsync(category);
+        await _categoryService.SaveAsync(category);
         var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
         template.CategoryId = category.Id;
         await _service.SaveEntryAsync(template);
@@ -307,7 +312,7 @@ public class FinanceServiceTests
     public async Task GetMergedEntries_EntryWithPaymentSource_ResolvesSourceOnProjection()
     {
         var source = new PaymentSource { Name = "Nubank", Type = PaymentSourceType.CreditCard, Balance = 5000m };
-        await new PaymentSourceService(_context).SaveAsync(source);
+        await _paymentSourceService.SaveAsync(source);
         var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
         template.PaymentSourceId = source.Id;
         await _service.SaveEntryAsync(template);
@@ -323,7 +328,7 @@ public class FinanceServiceTests
     public async Task GetMergedEntries_PhysicalRecordWithPaymentSource_ResolvesSourceOnProjection()
     {
         var source = new PaymentSource { Name = "Itaú" };
-        await new PaymentSourceService(_context).SaveAsync(source);
+        await _paymentSourceService.SaveAsync(source);
         var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
         template.PaymentSourceId = source.Id;
         await _service.SaveEntryAsync(template);
@@ -1358,7 +1363,7 @@ public class FinanceServiceTests
     public async Task GetMergedEntries_OutcomeOnCreditCard_ResolvesBillPaymentAccount()
     {
         var account = new PaymentSource { Name = "Itaú", Type = PaymentSourceType.BankAccount };
-        await new PaymentSourceService(_context).SaveAsync(account);
+        await _paymentSourceService.SaveAsync(account);
         var card = await SaveCardAsync(billPaymentSourceId: account.Id);
         await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
 
@@ -1386,7 +1391,7 @@ public class FinanceServiceTests
     public async Task GetMergedEntries_OutcomeOnBankAccount_KeepsItsOwnDueDate()
     {
         var account = new PaymentSource { Name = "Itaú", Type = PaymentSourceType.BankAccount };
-        await new PaymentSourceService(_context).SaveAsync(account);
+        await _paymentSourceService.SaveAsync(account);
         await SaveTemplateAsync(RecurrenceType.Recurrent, dueDay: 25, paymentSourceId: account.Id);
 
         var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
@@ -1628,7 +1633,7 @@ public class FinanceServiceTests
         var card = await SaveCardAsync();
         var otherCard = await SaveCardAsync();
         var account = new PaymentSource { Name = "Itaú", Type = PaymentSourceType.BankAccount };
-        await new PaymentSourceService(_context).SaveAsync(account);
+        await _paymentSourceService.SaveAsync(account);
         var refund = await SaveTemplateAsync(RecurrenceType.OneTime, paymentSourceId: card.Id);
         refund.EntryType = FinancialEntryType.Income;
         await _service.SaveEntryAsync(refund);
@@ -1639,6 +1644,79 @@ public class FinanceServiceTests
         var used = await _service.GetUsedCreditLimitsAsync(2026, 4);
 
         used.Should().BeEquivalentTo(new Dictionary<int, decimal> { [card.Id] = 0m, [otherCard.Id] = 100m });
+    }
+
+    [Fact]
+    public async Task GetUsedCreditLimitsAsync_MonthRecordsOfOtherSources_DoNotCount()
+    {
+        var card = await SaveCardAsync();
+        var account = new PaymentSource { Name = "Itaú", Type = PaymentSourceType.BankAccount };
+        await _paymentSourceService.SaveAsync(account);
+        var netflix = await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: card.Id);
+        var rent = await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: account.Id);
+        await _service.SetEntryStatusAsync(netflix.Id, 2026, 4, FinancialMonthlyEntryStatus.Paid);
+        await _service.SetEntryStatusAsync(rent.Id, 2026, 5, FinancialMonthlyEntryStatus.Paid);
+
+        var used = await _service.GetUsedCreditLimitsAsync(2026, 5);
+
+        used[card.Id].Should().Be(100m);
+    }
+
+    [Fact]
+    public async Task GetUsedCreditLimitsAsync_NoCreditCards_ReturnsEmpty()
+    {
+        var account = new PaymentSource { Name = "Itaú", Type = PaymentSourceType.BankAccount };
+        await _paymentSourceService.SaveAsync(account);
+        await SaveTemplateAsync(RecurrenceType.Recurrent, paymentSourceId: account.Id);
+
+        var used = await _service.GetUsedCreditLimitsAsync(2026, 5);
+
+        used.Should().BeEmpty();
+    }
+
+    // --- Cached categories and payment sources ---
+
+    [Fact]
+    public async Task GetMergedEntries_CategoryRenamedAfterAMonthLoaded_ShowsTheNewName()
+    {
+        var category = new FinancialCategory { Name = "Moradia", Icon = "🏠", Color = "#1E88E5" };
+        await _categoryService.SaveAsync(category);
+        var rent = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        rent.CategoryId = category.Id;
+        await _service.SaveEntryAsync(rent);
+        await _service.GetMergedEntriesForMonthAsync(2026, 4);
+
+        await _categoryService.SaveAsync(new FinancialCategory { Id = category.Id, Name = "Casa", Icon = "🏠", Color = "#1E88E5" });
+        var result = await _service.GetMergedEntriesForMonthAsync(2026, 4);
+
+        result.Single().Category!.Name.Should().Be("Casa");
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_CardAddedAfterAMonthLoaded_PutsItsEntriesOnTheBill()
+    {
+        await _service.GetMergedEntriesForMonthAsync(2026, 4);
+
+        var card = await SaveCardAsync(billDueDay: 10);
+        await SaveTemplateAsync(RecurrenceType.OneTime, paymentSourceId: card.Id);
+        var result = await _service.GetMergedEntriesForMonthAsync(2026, 4);
+
+        result.Single().IsOnCreditCardBill.Should().BeTrue();
+    }
+
+    // --- Indexes ---
+
+    [Theory]
+    [InlineData("SELECT * FROM FinancialMonthlyEntry WHERE Year = 2026 AND Month = 4", DatabaseContext.MonthIndex)]
+    [InlineData("SELECT * FROM FinancialMonthlyEntry WHERE FinancialEntryId = 1", DatabaseContext.MonthlyEntryTemplateIndex)]
+    [InlineData("SELECT * FROM FinancialPayment WHERE FinancialMonthlyEntryId = 1", DatabaseContext.PaymentMonthlyEntryIndex)]
+    public async Task CreateIndexesAsync_FrequentLookups_UseAnIndex(string query, string expectedIndex)
+    {
+        var db = await _context.GetConnectionAsync();
+
+        var plan = await db.QueryAsync<QueryPlanStep>($"EXPLAIN QUERY PLAN {query}");
+
+        plan.Select(p => p.detail).Should().ContainMatch($"*USING INDEX {expectedIndex}*");
     }
 
     // Makes the given write fail, as a full disk or a killed app would.
@@ -1657,7 +1735,7 @@ public class FinanceServiceTests
             BillDueDay = billDueDay,
             BillPaymentSourceId = billPaymentSourceId
         };
-        await new PaymentSourceService(_context).SaveAsync(card);
+        await _paymentSourceService.SaveAsync(card);
         return card;
     }
 
@@ -1676,5 +1754,11 @@ public class FinanceServiceTests
         };
         await _service.SaveEntryAsync(entry);
         return entry;
+    }
+
+    // Mirrors the columns of SQLite's EXPLAIN QUERY PLAN, whose names are lowercase.
+    private sealed class QueryPlanStep
+    {
+        public string detail { get; set; } = string.Empty;
     }
 }

@@ -9,6 +9,7 @@ public class SetupService : ISetupService
 
     private readonly IDatabaseContext _context;
     private readonly ICategoryService _categoryService;
+    private readonly IPaymentSourceService _paymentSourceService;
     private readonly IUserProfileService _profileService;
     private readonly IPreferencesService _preferences;
     private readonly TimeProvider _timeProvider;
@@ -16,12 +17,14 @@ public class SetupService : ISetupService
     public SetupService(
         IDatabaseContext context,
         ICategoryService categoryService,
+        IPaymentSourceService paymentSourceService,
         IUserProfileService profileService,
         IPreferencesService preferences,
         TimeProvider timeProvider)
     {
         _context = context;
         _categoryService = categoryService;
+        _paymentSourceService = paymentSourceService;
         _profileService = profileService;
         _preferences = preferences;
         _timeProvider = timeProvider;
@@ -68,6 +71,7 @@ public class SetupService : ISetupService
             foreach (var item in setup.Entries.Where(e => e.Amount > 0))
                 conn.Insert(BuildEntry(item, categories, startDate));
         });
+        _paymentSourceService.ClearCache();
 
         await _profileService.SaveAsync(setup.Name, setup.PhotoPath);
         Skip();

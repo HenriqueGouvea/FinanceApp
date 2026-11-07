@@ -78,7 +78,8 @@ public class SettingsPageObject
     public string ExportData()
     {
         _session.ScrollToAndTap("SettingsExportRow");
-        return _session.WaitForVisible(ShareSheetFileName).Text;
+        // Some Android versions append the other files' count ("mensal-backup-….json + 1 file"); the names have no spaces.
+        return _session.WaitForVisible(ShareSheetFileName).Text.Split(' ')[0];
     }
 
     public SettingsPageObject CloseShareSheet()

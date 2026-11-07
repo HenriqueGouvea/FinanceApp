@@ -16,7 +16,7 @@ public class PaymentSourceServiceTests
     {
         _context = new TestDatabaseContext();
         _service = new PaymentSourceService(_context);
-        _financeService = new FinanceService(_context);
+        _financeService = new FinanceService(_context, new CategoryService(_context), _service);
     }
 
     // --- GetAllAsync ---
@@ -40,6 +40,43 @@ public class PaymentSourceServiceTests
 
         result.Select(s => s.Name).Should().Equal("Alelo", "itaú", "Nubank");
     }
+    [Fact]
+    public async Task GetAllAsync_ListLoadedBefore_ReflectsSavesAndDeletes()
+    {
+        await _service.GetAllAsync();
+        var source = new PaymentSource { Name = "Nubank" };
+
+        await _service.SaveAsync(source);
+        (await _service.GetAllAsync()).Select(s => s.Name).Should().Equal("Nubank");
+
+        await _service.SaveAsync(new PaymentSource { Id = source.Id, Name = "Inter" });
+        (await _service.GetAllAsync()).Select(s => s.Name).Should().Equal("Inter");
+
+        await _service.DeleteAsync(source.Id);
+        (await _service.GetAllAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetAllAsync_RowWrittenElsewhere_ShowsOnlyAfterClearCache()
+    {
+        await _service.GetAllAsync();
+        var db = await _context.GetConnectionAsync();
+        await db.InsertAsync(new PaymentSource { Name = "Nubank" });
+
+        (await _service.GetAllAsync()).Should().BeEmpty();
+        _service.ClearCache();
+        (await _service.GetAllAsync()).Select(s => s.Name).Should().Equal("Nubank");
+    }
+
+    [Fact]
+    public async Task GetAllAsync_ConcurrentCalls_ShareOneRead()
+    {
+        var first = _service.GetAllAsync();
+        var second = _service.GetAllAsync();
+
+        (await first).Should().BeSameAs(await second);
+    }
+
 
     // --- SaveAsync ---
 

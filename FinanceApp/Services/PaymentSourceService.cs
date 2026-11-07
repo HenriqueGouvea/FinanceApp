@@ -10,13 +10,27 @@ public class PaymentSourceService : IPaymentSourceService
         $"UPDATE {nameof(PaymentSource)} SET {nameof(PaymentSource.BillPaymentSourceId)} = NULL WHERE {nameof(PaymentSource.BillPaymentSourceId)} = ?";
 
     private readonly IDatabaseContext _context;
+    private Task<IReadOnlyList<PaymentSource>>? _cache;
 
     public PaymentSourceService(IDatabaseContext context)
     {
         _context = context;
     }
 
-    public async Task<IReadOnlyList<PaymentSource>> GetAllAsync()
+    // Every month load needs the payment sources: read them once and keep them until one is written.
+    // Concurrent first callers share the same read, and a failed read is retried on the next call.
+    public Task<IReadOnlyList<PaymentSource>> GetAllAsync()
+    {
+        var cache = _cache;
+        if (cache is null || cache.IsFaulted || cache.IsCanceled)
+            _cache = cache = LoadAllAsync();
+
+        return cache;
+    }
+
+    public void ClearCache() => _cache = null;
+
+    private async Task<IReadOnlyList<PaymentSource>> LoadAllAsync()
     {
         var db = await _context.GetConnectionAsync();
         var sources = await db.Table<PaymentSource>().ToListAsync();
@@ -31,14 +45,19 @@ public class PaymentSourceService : IPaymentSourceService
         var db = await _context.GetConnectionAsync();
         Normalize(source);
 
-        if (source.Id != 0)
-            await db.UpdateAsync(source);
-        else
-            await db.InsertAsync(source);
+        await db.RunInTransactionAsync(conn =>
+        {
+            if (source.Id != 0)
+                conn.Update(source);
+            else
+                conn.Insert(source);
 
-        // Only bank accounts pay bills: a source that stopped being one no longer pays any card's bill.
-        if (source.Type != PaymentSourceType.BankAccount)
-            await UnlinkBillPaymentsAsync(db, source.Id);
+            // Only bank accounts pay bills: a source that stopped being one no longer pays any card's bill.
+            if (source.Type != PaymentSourceType.BankAccount)
+                conn.Execute(UnlinkBillPaymentsSql, source.Id);
+        });
+
+        ClearCache();
     }
 
     public async Task<int> CountEntriesAsync(int sourceId)
@@ -59,6 +78,8 @@ public class PaymentSourceService : IPaymentSourceService
             conn.Execute(UnlinkBillPaymentsSql, sourceId);
             conn.Delete<PaymentSource>(sourceId);
         });
+
+        ClearCache();
     }
 
     internal static void Normalize(PaymentSource source)
@@ -72,7 +93,4 @@ public class PaymentSourceService : IPaymentSourceService
             source.BillPaymentSourceId = null;
         }
     }
-
-    private static Task UnlinkBillPaymentsAsync(SQLiteAsyncConnection db, int accountId) =>
-        db.ExecuteAsync(UnlinkBillPaymentsSql, accountId);
 }
