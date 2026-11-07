@@ -355,6 +355,71 @@ public class SetupPageObject
         return this;
     }
 
+    /// <summary>
+    /// Answers "Você tem casa própria?" with "Sim", which shows the home form.
+    /// </summary>
+    public SetupPageObject SelectHasOwnHome()
+    {
+        _session.HideKeyboardIfShown();
+        _session.ScrollToAndTap("SetupHasOwnHomeButton");
+        _session.ScrollTo("SetupHomeNameEntry");
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a home with its IPTU (the amount of each installment), which keeps its default first month (February).
+    /// </summary>
+    public SetupPageObject AddHome(string name, decimal iptu, int iptuInstallments)
+    {
+        var count = ScrolledTexts("SetupHomeNameLabel", AppSession.AutomationId("SetupHomeNameLabel")).Count;
+        TypeText("SetupHomeNameEntry", name);
+        TypeAmount(_session.ScrollTo("SetupHomeIptuEntry"), AppSession.AutomationId("SetupHomeIptuEntry"), iptu);
+        SelectOption("SetupHomeIptuInstallmentsPicker", AppLabels.AnnualInstallments(iptuInstallments));
+        _session.ScrollToAndTap("SetupAddHomeButton");
+        _session.WaitFor(() => ScrolledTexts("SetupHomeNameLabel", AppSession.AutomationId("SetupHomeNameLabel")).Count == count + 1,
+            $"\"{name}\" to be added");
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a car with its IPVA (the amount of each installment, from January) and its licensing fee (in July), the
+    /// default months.
+    /// </summary>
+    public SetupPageObject AddCar(string name, decimal ipva, int ipvaInstallments, decimal licensing)
+    {
+        var count = ScrolledTexts("SetupCarNameLabel", AppSession.AutomationId("SetupCarNameLabel")).Count;
+        TypeText("SetupCarNameEntry", name);
+        TypeAmount(_session.ScrollTo("SetupCarIpvaEntry"), AppSession.AutomationId("SetupCarIpvaEntry"), ipva);
+        SelectOption("SetupCarIpvaInstallmentsPicker", AppLabels.AnnualInstallments(ipvaInstallments));
+        TypeAmount(_session.ScrollTo("SetupCarLicensingEntry"), AppSession.AutomationId("SetupCarLicensingEntry"), licensing);
+        _session.ScrollToAndTap("SetupAddCarButton");
+        _session.WaitFor(() => ScrolledTexts("SetupCarNameLabel", AppSession.AutomationId("SetupCarNameLabel")).Count == count + 1,
+            $"\"{name}\" to be added");
+        return this;
+    }
+
+    /// <summary>
+    /// "IPTU todo ano, fevereiro a novembro (10x)" for each home added.
+    /// </summary>
+    public IReadOnlyList<string> HomeDetails => ScrolledTexts("SetupHomeDetailLabel", AppSession.AutomationId("SetupHomeDetailLabel"));
+
+    public IReadOnlyList<string> CarDetails => ScrolledTexts("SetupCarDetailLabel", AppSession.AutomationId("SetupCarDetailLabel"));
+
+    private void TypeText(string automationId, string text)
+    {
+        var entry = _session.ScrollTo(automationId);
+        entry.Clear();
+        entry.SendKeys(text);
+        _session.HideKeyboardIfShown();
+    }
+
+    private void SelectOption(string pickerId, string label)
+    {
+        _session.ScrollToAndTap(pickerId);
+        _session.ScrollDialogListToAndTap(label);
+        _session.WaitForText(AppSession.AutomationId(pickerId), label);
+    }
+
     // --- Skipping ---
 
     /// <summary>

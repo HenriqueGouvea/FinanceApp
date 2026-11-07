@@ -480,26 +480,38 @@ public class FinanceService : IFinanceService
             RecurrenceType.Recurrent =>
                 firstOfStart <= targetDate,
 
+            RecurrenceType.Annual =>
+                MonthsSinceStart(entry, targetDate.Year, targetDate.Month) is var months and >= 0
+                && months % 12 < AnnualInstallments(entry),
+
             _ => false
         };
     }
 
-    private static string? BuildInstallmentLabel(FinancialEntry entry, int year, int month)
+    private static string? BuildInstallmentLabel(FinancialEntry entry, int year, int month) => entry.Recurrence switch
     {
-        if (entry.Recurrence != RecurrenceType.Installments)
-            return null;
+        RecurrenceType.Installments => $"{MonthsSinceStart(entry, year, month) + 1}/{entry.TotalInstallments}",
+        RecurrenceType.Annual when AnnualInstallments(entry) > 1 =>
+            $"{MonthsSinceStart(entry, year, month) % 12 + 1}/{AnnualInstallments(entry)}",
+        _ => null
+    };
 
-        int n = (year - entry.StartDate.Year) * 12 + (month - entry.StartDate.Month) + 1;
-        return $"{n}/{entry.TotalInstallments}";
-    }
+    private static int MonthsSinceStart(FinancialEntry entry, int year, int month) =>
+        (year - entry.StartDate.Year) * 12 + (month - entry.StartDate.Month);
+
+    // An annual entry is paid at once (one installment) or in up to 12 consecutive months each year.
+    private static int AnnualInstallments(FinancialEntry entry) => Math.Clamp(entry.TotalInstallments ?? 1, 1, 12);
 
     private static DateTime? BuildDueDate(int? dueDay, int year, int month) =>
         dueDay is { } day
             ? new DateTime(year, month, Math.Clamp(day, 1, DateTime.DaysInMonth(year, month)), 0, 0, 0, DateTimeKind.Local)
             : null;
 
-    private static decimal? BuildInstallmentTotal(FinancialEntry entry) =>
-        entry.Recurrence == RecurrenceType.Installments
-            ? entry.Amount * entry.TotalInstallments
-            : null;
+    // For an annual entry in installments, the total of each year.
+    private static decimal? BuildInstallmentTotal(FinancialEntry entry) => entry.Recurrence switch
+    {
+        RecurrenceType.Installments => entry.Amount * entry.TotalInstallments,
+        RecurrenceType.Annual when AnnualInstallments(entry) > 1 => entry.Amount * AnnualInstallments(entry),
+        _ => null
+    };
 }

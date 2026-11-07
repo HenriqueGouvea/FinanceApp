@@ -12,6 +12,7 @@ public class RecurrenceTypeToLabelConverter : IValueConverter
         RecurrenceType.OneTime => "Única",
         RecurrenceType.Recurrent => "Todo mês (recorrente)",
         RecurrenceType.Installments => "Parcelada",
+        RecurrenceType.Annual => "Todo ano (anual)",
         _ => string.Empty
     };
 

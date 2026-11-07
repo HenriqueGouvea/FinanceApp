@@ -16,6 +16,7 @@ public class AddEntryPageObject
     private const string RecurrencePickerId = "RecurrencePicker";
     private static readonly By RecurrencePicker = AppSession.AutomationId(RecurrencePickerId);
     private static readonly By InstallmentsEntry = AppSession.AutomationId("InstallmentsEntry");
+    private static readonly By AnnualInstallmentsEntry = AppSession.AutomationId("AnnualInstallmentsEntry");
     private static readonly By AmountEntry = AppSession.AutomationId("AmountEntry");
     private static readonly By InstallmentsTotal = AppSession.AutomationId("InstallmentsTotalLabel");
     private const string CategoryPickerId = "CategoryPicker";
@@ -99,6 +100,15 @@ public class AddEntryPageObject
     public AddEntryPageObject SelectRecurrence(string recurrenceLabel)
     {
         PickOption(RecurrencePickerId, recurrenceLabel);
+        return this;
+    }
+
+    /// <summary>
+    /// "Parcelas no ano" of an annual entry ("Todo ano").
+    /// </summary>
+    public AddEntryPageObject EnterAnnualInstallments(string installments)
+    {
+        Type(AnnualInstallmentsEntry, installments);
         return this;
     }
 

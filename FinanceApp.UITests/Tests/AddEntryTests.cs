@@ -108,6 +108,34 @@ public sealed class AddEntryTests : E2ETestBase
     }
 
     [Fact]
+    public async Task AddEntry_AnnualInInstallments_FallsInTheSameMonthsEveryYear()
+    {
+        var page = MainPage.OpenAddEntry()
+            .EnterDescription("IPVA E2E")
+            .SelectRecurrence(AppLabels.Annual);
+        page.IsInstallmentsVisible.Should().BeFalse("an annual entry has its own installments field");
+
+        page.EnterAnnualInstallments("2").EnterAmount(500);
+        page.InstallmentsTotalText.Should().Be($"Total: {AppFormat.Money(1000)}");
+        page.Save();
+
+        MainPage.WaitForEntry("IPVA E2E");
+        MainPage.VisibleInstallmentLabels.Should().ContainSingle().Which.Should().Be("1/2");
+        MainPage.GoToNextMonth();
+        MainPage.VisibleInstallmentLabels.Should().ContainSingle().Which.Should().StartWith("2/2");
+        MainPage.GoToNextMonth();
+        MainPage.IsEntryVisible("IPVA E2E").Should().BeFalse("the year's two installments are over");
+
+        MainPage.GoToMonth(AppFormat.CurrentMonth.AddYears(1)).WaitForEntry("IPVA E2E");
+        MainPage.VisibleInstallmentLabels.Should().ContainSingle().Which.Should().Be("1/2", "it comes back the next year");
+
+        var row = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
+        row.Recurrence.Should().Be(AppFormat.Annual);
+        row.TotalInstallments.Should().Be(2);
+        row.StartDate.Date.Should().Be(AppFormat.CurrentMonth);
+    }
+
+    [Fact]
     public async Task AddEntry_CancelBackButtonOrSystemBack_DiscardsAndReturnsToMonth()
     {
         var month = AppFormat.CurrentMonth.AddMonths(1);

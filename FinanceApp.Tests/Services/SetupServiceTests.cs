@@ -263,6 +263,52 @@ public sealed class SetupServiceTests : IDisposable
         (await GetEntriesAsync()).Single().StartDate.Should().Be(new DateTime(2026, 11, 1));
     }
 
+    [Theory]
+    [InlineData(1, 1, 2027)]
+    [InlineData(1, 3, 2027)]
+    [InlineData(12, 1, 2026)]
+    [InlineData(11, 1, 2026)]
+    [InlineData(2, 10, 2026)]
+    public async Task CompleteAsync_AnnualEntry_StartsThisYearWhileItsInstallmentsAreStillToCome(int startMonth, int installments, int expectedYear)
+    {
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            Entries =
+            [
+                new SetupEntry
+                {
+                    Description = "IPVA", Amount = 800, Recurrence = RecurrenceType.Annual,
+                    TotalInstallments = installments, AnnualStartMonth = startMonth
+                }
+            ]
+        });
+
+        var entry = (await GetEntriesAsync()).Single();
+        (entry.Recurrence, entry.StartDate).Should().Be((RecurrenceType.Annual, new DateTime(expectedYear, startMonth, 1)));
+        entry.TotalInstallments.Should().Be(installments > 1 ? installments : null);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_AnnualEntryInInstallments_FallsInItsMonthsEveryYear()
+    {
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            Entries =
+            [
+                new SetupEntry
+                {
+                    Description = "IPVA", Amount = 800, Recurrence = RecurrenceType.Annual,
+                    TotalInstallments = 3, AnnualStartMonth = 1
+                }
+            ]
+        });
+
+        (await _financeService.GetMergedEntriesForMonthAsync(2026, 11)).Should().BeEmpty();
+        (await _financeService.GetMergedEntriesForMonthAsync(2027, 2)).Single().InstallmentLabel.Should().Be("2/3");
+        (await _financeService.GetMergedEntriesForMonthAsync(2027, 4)).Should().BeEmpty();
+        (await _financeService.GetMergedEntriesForMonthAsync(2028, 3)).Single().InstallmentLabel.Should().Be("3/3");
+    }
+
     [Fact]
     public async Task CompleteAsync_OneTimePurchase_OnlyInCurrentMonth()
     {

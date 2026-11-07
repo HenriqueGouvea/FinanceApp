@@ -19,7 +19,7 @@ public sealed class SetupTests : E2ETestBase
     private const string Account = "Nubank";
     private const string Card = "Visa";
     private const string Salary = "Salário";
-    private const string Rent = "Aluguel ou financiamento";
+    private const string Rent = "Aluguel";
     private const string Energy = "Energia";
     private const string Supermarket = "Mercado";
     private const string Internet = "Internet";
@@ -209,6 +209,39 @@ public sealed class SetupTests : E2ETestBase
                 (School, AppFormat.Outcome, (int?)5, false, false, CategoryId("Educação")),
                 (Fuel, AppFormat.Outcome, (int?)null, true, false, CategoryId("Transporte")),
                 (EatingOut, AppFormat.Outcome, (int?)null, true, true, CategoryId("Lazer"))
+            ]);
+    }
+
+    [Fact]
+    public async Task OwnHomeAndCar_Finish_CreatesTheirAnnualTaxes()
+    {
+        _setup.Next().Next().Next().Next()
+            .SelectHasOwnHome()
+            .AddHome("Apartamento", iptu: 150, iptuInstallments: 10);
+        _setup.HomeDetails.Should().Equal("IPTU todo ano, fevereiro a novembro (10x)");
+
+        _setup.Next()
+            .SelectHasCar()
+            .AddCar("Onix", ipva: 800, ipvaInstallments: 3, licensing: 160);
+        _setup.CarDetails.Should().Equal("IPVA todo ano, janeiro a março (3x) · Licenciamento todo ano em julho");
+
+        _setup.Next();
+        _setup.SummaryRows.Should().Equal(
+            ("IPTU (Apartamento)", "Todo ano, fevereiro a novembro (10x)", AppFormat.Money(150)),
+            ("IPVA (Onix)", "Todo ano, janeiro a março (3x)", AppFormat.Money(800)),
+            ("Licenciamento (Onix)", "Todo ano em julho", AppFormat.Money(160)));
+
+        _setup.Finish();
+
+        var categories = await GetCategoryRowsAsync();
+        int? CategoryId(string name) => categories.Single(c => c.Name == name).Id;
+        (await GetEntryRowsAsync())
+            .Select(e => (e.Description, e.Recurrence, e.StartDate.Date, e.TotalInstallments, e.Amount, e.CategoryId))
+            .Should().BeEquivalentTo(
+            [
+                ("IPTU (Apartamento)", AppFormat.Annual, AppFormat.AnnualStart(2, 10), (int?)10, 150m, CategoryId("Moradia")),
+                ("IPVA (Onix)", AppFormat.Annual, AppFormat.AnnualStart(1, 3), (int?)3, 800m, CategoryId("Transporte")),
+                ("Licenciamento (Onix)", AppFormat.Annual, AppFormat.AnnualStart(7, 1), (int?)null, 160m, CategoryId("Transporte"))
             ]);
     }
 

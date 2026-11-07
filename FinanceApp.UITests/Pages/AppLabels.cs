@@ -8,6 +8,8 @@ public static class AppLabels
     public const string OneTime = "Única";
     public const string Recurrent = "Todo mês (recorrente)";
     public const string Installments = "Parcelada";
+    public const string Annual = "Todo ano (anual)";
+    public static string AnnualInstallments(int count) => count > 1 ? $"{count} parcelas" : "Cota única";
 
     public const string NewEntryTitle = "Novo Lançamento";
     public const string EditEntryTitle = "Editar Lançamento";

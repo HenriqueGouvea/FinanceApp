@@ -47,9 +47,16 @@ public class SetupEntry
     public RecurrenceType Recurrence { get; set; } = RecurrenceType.Recurrent;
 
     /// <summary>
-    /// Installments only: how many installments the purchase has.
+    /// Installments: how many installments the purchase has. Annual: how many installments fall each year, in
+    /// consecutive months (one when not set).
     /// </summary>
     public int? TotalInstallments { get; set; }
+
+    /// <summary>
+    /// Annual only: the month (1–12) of the first installment each year, e.g. 1 for an IPVA paid from January.
+    /// The entry starts this year while any of this year's installments is still to come, otherwise next year.
+    /// </summary>
+    public int? AnnualStartMonth { get; set; }
 
     /// <summary>
     /// Installments only: the installment that falls in the current month (e.g. 3 for "3/10"), so the entry starts

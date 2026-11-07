@@ -46,7 +46,7 @@ public class SetupViewModelTests
         _vm.NextButtonText.Should().Be("Continuar");
         _vm.SalaryDay.Should().Be(SetupViewModel.DefaultSalaryDay);
         _vm.Expenses.Select(e => e.Description).Should().Equal(
-            "Aluguel ou financiamento", "Condomínio", "Energia", "Água", "Internet", "Celular", "Mercado");
+            "Aluguel", "Condomínio", "Energia", "Água", "Internet", "Celular", "Mercado");
         _vm.Expenses.Should().OnlyContain(e => !e.IsSelected);
     }
 
@@ -582,7 +582,7 @@ public class SetupViewModelTests
         _vm.Name = "Ana";
         AddSource("Nubank", PaymentSourceType.BankAccount);
         _vm.Salary = 5000;
-        SelectExpense("Aluguel ou financiamento", 1500, dueDay: 10);
+        SelectExpense("Aluguel", 1500, dueDay: 10);
         SelectExpense("Energia", 200);
         SelectExpense("Internet", 0);
         SelectExpense("Mercado", 1000);
@@ -592,7 +592,7 @@ public class SetupViewModelTests
         _vm.SummaryTitle.Should().Be("Tudo pronto, Ana!");
         _vm.SummaryRows.Select(r => (r.Description, r.Detail, r.Amount)).Should().Equal(
             ("Salário", "Todo mês · dia 5 · Nubank", 5000m),
-            ("Aluguel ou financiamento", "Todo mês · dia 10 · Nubank", 1500m),
+            ("Aluguel", "Todo mês · dia 10 · Nubank", 1500m),
             ("Energia", "Todo mês · valor estimado · Nubank", 200m),
             ("Mercado", "Todo mês · valor estimado · pagamento parcial · Nubank", 1000m));
         _vm.TotalIncome.Should().Be(5000);
@@ -742,6 +742,192 @@ public class SetupViewModelTests
         _vm.HasSummaryRows.Should().BeFalse();
     }
 
+    // --- Homes and cars ---
+
+    [Fact]
+    public async Task AddHome_NoAmount_CannotExecute()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+
+        _vm.NewHomeName = "Apartamento";
+
+        _vm.AddHomeCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AddHome_AddsHomeAndResetsForm()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.NewHomeName = " Apartamento ";
+        _vm.NewHomeFinancing = 2000;
+        _vm.NewHomeFinancingDueDay = 10;
+        _vm.NewHomeIptu = 150;
+        _vm.NewHomeIptuStartMonth = 2;
+        _vm.NewHomeIptuInstallments = 10;
+
+        _vm.AddHomeCommand.Execute(null);
+
+        var home = _vm.Homes.Should().ContainSingle().Subject;
+        home.Should().Be(new SetupHomeItem("Apartamento", 2000, 10, 150, 2, 10));
+        home.Detail.Should().Be("Financiamento · IPTU todo ano, fevereiro a novembro (10x)");
+        (_vm.NewHomeName, _vm.NewHomeFinancing, _vm.NewHomeIptu, _vm.NewHomeIptuStartMonth, _vm.NewHomeIptuInstallments)
+            .Should().Be((string.Empty, 0m, 0m, SetupViewModel.DefaultIptuStartMonth, 1));
+    }
+
+    [Fact]
+    public async Task AddHome_NoName_IsCalledCasa()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.NewHomeIptu = 1200;
+
+        _vm.AddHomeCommand.Execute(null);
+
+        _vm.Homes.Single().Name.Should().Be("Casa");
+        _vm.Homes.Single().Detail.Should().Be("IPTU todo ano em fevereiro");
+    }
+
+    [Fact]
+    public async Task AddCar_AddsCarAndResetsForm()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.NewCarName = "Onix";
+        _vm.NewCarIpva = 800;
+        _vm.NewCarIpvaStartMonth = 1;
+        _vm.NewCarIpvaInstallments = 3;
+        _vm.NewCarLicensing = 160;
+        _vm.NewCarLicensingMonth = 7;
+
+        _vm.AddCarCommand.Execute(null);
+
+        var car = _vm.Cars.Should().ContainSingle().Subject;
+        car.Should().Be(new SetupCarItem("Onix", 800, 1, 3, 160, 7));
+        car.Detail.Should().Be("IPVA todo ano, janeiro a março (3x) · Licenciamento todo ano em julho");
+        (_vm.NewCarName, _vm.NewCarIpva, _vm.NewCarLicensing).Should().Be((string.Empty, 0m, 0m));
+    }
+
+    [Fact]
+    public async Task AddCar_NoAmount_CannotExecute()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+
+        _vm.NewCarName = "Onix";
+
+        _vm.AddCarCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void DescribeAnnual_InstallmentsAcrossTheYearEnd_WrapToJanuary()
+    {
+        SetupViewModel.DescribeAnnual(11, 4).Should().Be("Todo ano, novembro a fevereiro (4x)");
+    }
+
+    [Fact]
+    public async Task Summary_HomesAndCars_CreateFinancingAndAnnualTaxes()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        AddSource("Itaú", PaymentSourceType.BankAccount);
+        SelectExpense("Aluguel", 1500, dueDay: 5);
+        _vm.SelectHasOwnHomeCommand.Execute(true);
+        _vm.NewHomeName = "Apartamento";
+        _vm.NewHomeFinancing = 2000;
+        _vm.NewHomeFinancingDueDay = 10;
+        _vm.NewHomeIptu = 150;
+        _vm.NewHomeIptuInstallments = 10;
+        _vm.AddHomeCommand.Execute(null);
+        _vm.SelectHasCarCommand.Execute(true);
+        _vm.NewCarName = "Onix";
+        _vm.NewCarIpva = 800;
+        _vm.NewCarIpvaInstallments = 3;
+        _vm.NewCarLicensing = 160;
+        _vm.AddCarCommand.Execute(null);
+
+        await GoToSummaryAsync();
+
+        _vm.SummaryRows.Select(r => (r.Icon, r.Description, r.Detail, r.Amount)).Should().Equal(
+            ("🏠", "Aluguel", "Todo mês · dia 5 · Itaú", 1500m),
+            ("🏠", "Financiamento (Apartamento)", "Todo mês · dia 10 · Itaú", 2000m),
+            ("🧾", "IPTU (Apartamento)", "Todo ano, fevereiro a novembro (10x) · Itaú", 150m),
+            ("🚗", "IPVA (Onix)", "Todo ano, janeiro a março (3x) · Itaú", 800m),
+            ("📄", "Licenciamento (Onix)", "Todo ano em julho · Itaú", 160m));
+    }
+
+    [Fact]
+    public async Task Next_WithTypedHomeAndCar_AddsThem()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        await GoToStepAsync(SetupStep.HouseExpenses);
+        _vm.SelectHasOwnHomeCommand.Execute(true);
+        _vm.NewHomeIptu = 1200;
+        await _vm.NextCommand.ExecuteAsync(null);
+        _vm.SelectHasCarCommand.Execute(true);
+        _vm.NewCarLicensing = 160;
+
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        _vm.Homes.Should().ContainSingle();
+        _vm.Cars.Should().ContainSingle();
+        _vm.SummaryRows.Select(r => r.Description).Should().Equal("IPTU (Casa)", "Licenciamento (Carro)");
+    }
+
+    [Fact]
+    public async Task Summary_NoOwnHomeNorCar_LeavesTheirTaxesOut()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.SelectHasOwnHomeCommand.Execute(true);
+        _vm.NewHomeIptu = 1200;
+        _vm.AddHomeCommand.Execute(null);
+        _vm.SelectHasOwnHomeCommand.Execute(false);
+        _vm.SelectHasCarCommand.Execute(true);
+        _vm.NewCarIpva = 800;
+        _vm.AddCarCommand.Execute(null);
+        _vm.SelectHasCarCommand.Execute(false);
+
+        await GoToSummaryAsync();
+
+        _vm.HasSummaryRows.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Finish_AnnualTaxes_AreSentAsAnnualEntries()
+    {
+        NewUserSetup? saved = null;
+        await _setupService.CompleteAsync(Arg.Do<NewUserSetup>(s => saved = s));
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.SelectHasCarCommand.Execute(true);
+        _vm.NewCarIpva = 800;
+        _vm.NewCarIpvaStartMonth = 3;
+        _vm.NewCarIpvaInstallments = 3;
+        _vm.AddCarCommand.Execute(null);
+        await GoToSummaryAsync();
+
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        var ipva = saved!.Entries.Single();
+        (ipva.Description, ipva.Recurrence, ipva.AnnualStartMonth, ipva.TotalInstallments, ipva.CategoryName)
+            .Should().Be(("IPVA (Carro)", RecurrenceType.Annual, (int?)3, (int?)3, "Transporte"));
+    }
+
+    [Fact]
+    public async Task SkipStep_HouseAndOther_DiscardHomesAndCars()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        await GoToStepAsync(SetupStep.HouseExpenses);
+        _vm.SelectHasOwnHomeCommand.Execute(true);
+        _vm.NewHomeIptu = 1200;
+        _vm.AddHomeCommand.Execute(null);
+        _vm.SkipStepCommand.Execute(null);
+        _vm.SelectHasCarCommand.Execute(true);
+        _vm.NewCarIpva = 800;
+        _vm.AddCarCommand.Execute(null);
+
+        _vm.SkipStepCommand.Execute(null);
+
+        (_vm.HasOwnHome, _vm.HasCar).Should().Be((false, false));
+        _vm.Homes.Should().BeEmpty();
+        _vm.Cars.Should().BeEmpty();
+        _vm.HasSummaryRows.Should().BeFalse();
+    }
+
     // --- Skipping steps ---
 
     [Fact]
@@ -853,7 +1039,7 @@ public class SetupViewModelTests
     {
         await _vm.PrepareAsync(isRerun: false);
         await GoToStepAsync(SetupStep.HouseExpenses);
-        SelectExpense("Aluguel ou financiamento", 1500);
+        SelectExpense("Aluguel", 1500);
         _vm.SkipStepCommand.Execute(null);
         _vm.SelectHasChildrenCommand.Execute(true);
         _vm.SelectHasCarCommand.Execute(true);

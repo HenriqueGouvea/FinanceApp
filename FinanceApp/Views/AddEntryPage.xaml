@@ -100,6 +100,18 @@
                        Keyboard="Numeric" />
             </VerticalStackLayout>
 
+            <!-- Annual (e.g. IPVA, IPTU): falls in this month every year, or in N consecutive months from it -->
+            <VerticalStackLayout Spacing="0" IsVisible="{Binding IsAnnual}">
+                <Label Text="Parcelas no ano" Style="{StaticResource FieldCaption}" />
+                <Entry AutomationId="AnnualInstallmentsEntry"
+                       Placeholder="1 (pagamento único)"
+                       Text="{Binding TotalInstallments}"
+                       Keyboard="Numeric" />
+                <Label AutomationId="AnnualHintLabel"
+                       Text="Começa neste mês e se repete todo ano, como IPVA e IPTU. Com parcelas, elas caem nos meses seguintes (até 12)."
+                       Style="{StaticResource Hint}" />
+            </VerticalStackLayout>
+
             <!-- Amount: only shown once the recurrence defines what the amount means -->
             <VerticalStackLayout Spacing="0" IsVisible="{Binding HasRecurrence}">
                 <Label Text="{Binding SelectedRecurrence, Converter={x:Static converters:RecurrenceTypeToAmountLabelConverter.Instance}}"

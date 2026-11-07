@@ -45,7 +45,12 @@ public partial class AddEntryViewModel : ObservableObject
 
     public bool HasRecurrence => SelectedRecurrence is not null;
     public bool IsInstallments => SelectedRecurrence == RecurrenceType.Installments;
-    public decimal? InstallmentsTotal => IsInstallments && TotalInstallments is > 0 ? Amount * TotalInstallments : null;
+    public bool IsAnnual => SelectedRecurrence == RecurrenceType.Annual;
+    /// <summary>
+    /// The installment purchase's total, or the yearly total of an annual entry paid in installments.
+    /// </summary>
+    public decimal? InstallmentsTotal =>
+        (IsInstallments && TotalInstallments is > 0) || (IsAnnual && TotalInstallments is > 1) ? Amount * TotalInstallments : null;
     public bool IsIncome => EntryType == FinancialEntryType.Income;
     public string PaidAmountLabel => IsIncome ? "Valor já recebido neste mês" : "Valor já pago neste mês";
     public string PaymentsHeader => IsIncome ? "Recebimentos neste mês" : "Pagamentos neste mês";
@@ -76,7 +81,8 @@ public partial class AddEntryViewModel : ObservableObject
     /// Partial payments recorded in the month being edited. Deleting one only takes effect on save.
     /// </summary>
     public ObservableCollection<PaymentItem> Payments { get; } = [];
-    public List<RecurrenceType> RecurrenceTypes { get; } = [RecurrenceType.OneTime, RecurrenceType.Recurrent, RecurrenceType.Installments];
+    public List<RecurrenceType> RecurrenceTypes { get; } =
+        [RecurrenceType.OneTime, RecurrenceType.Recurrent, RecurrenceType.Installments, RecurrenceType.Annual];
     public List<int> DueDays { get; } = [NoDueDay, .. Enumerable.Range(1, 31)];
 
     public AddEntryViewModel(IFinanceService financeService, ICategoryService categoryService, IPaymentSourceService paymentSourceService)
@@ -95,9 +101,10 @@ public partial class AddEntryViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(HasRecurrence));
         OnPropertyChanged(nameof(IsInstallments));
+        OnPropertyChanged(nameof(IsAnnual));
         OnPropertyChanged(nameof(InstallmentsTotal));
         SaveCommand.NotifyCanExecuteChanged();
-        if (value != RecurrenceType.Installments)
+        if (value is not (RecurrenceType.Installments or RecurrenceType.Annual))
             TotalInstallments = null;
     }
 
@@ -227,7 +234,13 @@ public partial class AddEntryViewModel : ObservableObject
             EndDate = _editingEndDate,
             EntryType = EntryType,
             Recurrence = recurrence,
-            TotalInstallments = TotalInstallments,
+            TotalInstallments = recurrence switch
+            {
+                RecurrenceType.Installments => TotalInstallments,
+                // Within a year: one installment (a single payment) is stored as none.
+                RecurrenceType.Annual when TotalInstallments is > 1 => Math.Min(TotalInstallments.Value, 12),
+                _ => null
+            },
             IsEstimated = IsEstimated && !IsOnCreditCardBill,
             AllowsPartialPayment = AllowsPartialPayment && !IsOnCreditCardBill,
             DueDay = SelectedDueDay == NoDueDay || IsOnCreditCardBill ? null : SelectedDueDay
