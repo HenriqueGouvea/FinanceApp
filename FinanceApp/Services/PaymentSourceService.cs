@@ -29,14 +29,7 @@ public class PaymentSourceService : IPaymentSourceService
     public async Task SaveAsync(PaymentSource source)
     {
         var db = await _context.GetConnectionAsync();
-        source.Name = source.Name.Trim();
-
-        // Only credit cards have a bill.
-        if (source.Type != PaymentSourceType.CreditCard)
-        {
-            source.BillDueDay = null;
-            source.BillPaymentSourceId = null;
-        }
+        Normalize(source);
 
         if (source.Id != 0)
             await db.UpdateAsync(source);
@@ -66,6 +59,18 @@ public class PaymentSourceService : IPaymentSourceService
             conn.Execute(UnlinkBillPaymentsSql, sourceId);
             conn.Delete<PaymentSource>(sourceId);
         });
+    }
+
+    internal static void Normalize(PaymentSource source)
+    {
+        source.Name = source.Name.Trim();
+
+        // Only credit cards have a bill.
+        if (source.Type != PaymentSourceType.CreditCard)
+        {
+            source.BillDueDay = null;
+            source.BillPaymentSourceId = null;
+        }
     }
 
     private static Task UnlinkBillPaymentsAsync(SQLiteAsyncConnection db, int accountId) =>

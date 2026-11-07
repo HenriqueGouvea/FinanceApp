@@ -91,9 +91,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## DI Registration
 All registrations are in `MauiProgram.cs`:
 - `IDatabaseContext` → Singleton (resolved by `DatabaseContext`)
-- `IFinanceService`, `ICategoryService`, `IPaymentSourceService`, `IPreferencesService`, `ISecureStorageService`, `IAppLockService`, `IUserProfileService`, `ISetupService`, `TimeProvider`, `IFileSystem` (`FileSystem.Current`), `IMediaPicker` (`MediaPicker.Default`) → Singleton
+- `IFinanceService`, `ICategoryService`, `IPaymentSourceService`, `IPreferencesService`, `ISecureStorageService`, `IAppLockService`, `IUserProfileService`, `ISetupService`, `IAlertService`, `IWriteGuard`, `TimeProvider`, `IFileSystem` (`FileSystem.Current`), `IMediaPicker` (`MediaPicker.Default`) → Singleton
 - `IBiometricService` → Singleton: `BiometricService` (AndroidX BiometricPrompt, in `Platforms/Android`) on Android, `UnavailableBiometricService` elsewhere
-- `App` shows the setup wizard (`SetupPage`, modal, via `AppShell.ShowSetupAsync`) on the first run (`ISetupService.ShouldShowAsync`); otherwise it locks itself with `PinPage` (modal) on start when a PIN is set, and on resume after `AppLockService.LockTimeout` in the background
+- `IRecentsPrivacyService` → Singleton: `RecentsPrivacyService` (in `Platforms/Android`; hides the app in the recent apps list while a PIN is on and "Ocultar conteúdo nos apps recentes" is set) on Android, `UnavailableRecentsPrivacyService` elsewhere
+- `App` shows the setup wizard (`SetupPage`, modal, via `AppShell.ShowSetupAsync`) on the first run (`ISetupService.ShouldShowAsync`); otherwise it locks itself with `PinPage` (modal) on start when a PIN is set, and on resume after `AppLockService.LockTimeout` in the background. From the fifth wrong PIN in a row, `AppLockService` locks the keypad for 30 s, doubling each time up to an hour (counted in preferences, so killing the app doesn't reset it)
 - `AppShell` → Singleton, injected into `App`. Its menu is "Início" (`MainPage`), "Categorias", "Contas e cartões" and "Configurações" (`SettingsPage`, which edits the name and photo with `ProfileEditPopup`, pushes `SecurityPage` and reruns the setup wizard). Its flyout header greets the user with their name and photo (`UserProfileViewModel`), and its flyout footer lists the payment source balances and the credit cards' available limits (`PaymentSourceBalancesViewModel`, reloaded each time the flyout opens)
 - `IMessenger` → Singleton (`WeakReferenceMessenger.Default`), used to broadcast `CategoriesChangedMessage`, `PaymentSourcesChangedMessage`, `SetupCompletedMessage` and `ProfileChangedMessage` so `MainViewModel` (and every view showing payment sources) refreshes
 - `MainViewModel`, `AddEntryViewModel`, `CategoriesViewModel`, `CategoryEditViewModel`, `PaymentSourcesViewModel`, `PaymentSourceEditViewModel`, `PaymentSourceBalancesViewModel`, `MonthPickerViewModel`, `PartialPaymentViewModel`, `PinViewModel`, `SecurityViewModel`, `SetupViewModel`, `UserProfileViewModel`, `ProfileEditViewModel`, `MainPage`, `AddEntryPage`, `CategoriesPage`, `CategoryEditPopup`, `PaymentSourcesPage`, `PaymentSourceEditPopup`, `MonthPickerPopup`, `PartialPaymentPopup`, `PinPage`, `SecurityPage`, `SetupPage`, `SettingsPage`, `ProfileEditPopup` → Transient
@@ -120,6 +121,10 @@ SQLite (FinanceDataV3.db3)
 **Table Creation:** Use `CreateFlags.ImplicitPK | CreateFlags.AutoIncPK` in `DatabaseContext.GetConnectionAsync()` so domain models stay free of SQLite attributes.
 
 **Async DB Access:** All DB operations are async. `GetConnectionAsync()` uses a lazy-init pattern — call it at the start of every service method.
+
+**Multi-row writes:** A write that touches more than one row runs in one transaction (`FinanceService.InTransactionAsync`, or `RunInTransactionAsync` with the synchronous `SQLiteConnection` inside), so an app killed halfway leaves no half-made change.
+
+**Failed writes:** Services never catch exceptions. A ViewModel runs every write the user triggers through `IWriteGuard.TryAsync`, the one place that logs the error (`ILogger`, with no provider in Release) and shows "Não foi possível salvar. Tente de novo."; when it returns false, the ViewModel stops (no save callback, no refresh). Never use `Console.WriteLine`.
 
 **Fixed Timeline:** The dashboard uses a fixed range of ±24 months from the current date, pre-populated during `InitializeAsync`. Do not use dynamic scroll extension (lazy loading of months) to maintain CarouselView stability.
 

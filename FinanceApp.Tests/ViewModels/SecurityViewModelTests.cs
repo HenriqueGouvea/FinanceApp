@@ -10,13 +10,14 @@ public class SecurityViewModelTests
 {
     private readonly IAppLockService _appLock;
     private readonly IBiometricService _biometrics;
+    private readonly IRecentsPrivacyService _recentsPrivacy = Substitute.For<IRecentsPrivacyService>();
     private readonly SecurityViewModel _vm;
 
     public SecurityViewModelTests()
     {
         _appLock = Substitute.For<IAppLockService>();
         _biometrics = Substitute.For<IBiometricService>();
-        _vm = new SecurityViewModel(_appLock, _biometrics);
+        _vm = new SecurityViewModel(_appLock, _biometrics, _recentsPrivacy);
     }
 
     // --- LoadAsync ---
@@ -113,5 +114,45 @@ public class SecurityViewModelTests
         await _vm.ToggleBiometricCommand.ExecuteAsync(null);
 
         _appLock.DidNotReceiveWithAnyArgs().SetBiometricEnabled(default);
+    }
+
+    // --- Hide in recents ---
+
+    [Fact]
+    public async Task LoadAsync_AppliesHideInRecents()
+    {
+        _appLock.IsPinEnabledAsync().Returns(true);
+        _appLock.IsHideInRecentsEnabled.Returns(true);
+        _appLock.ShouldHideInRecentsAsync().Returns(true);
+
+        await _vm.LoadAsync();
+
+        _vm.IsHideInRecentsEnabled.Should().BeTrue();
+        _recentsPrivacy.Received(1).SetHidden(true);
+    }
+
+    [Fact]
+    public async Task ToggleHideInRecents_On_TurnsOffAndShowsTheApp()
+    {
+        _appLock.IsPinEnabledAsync().Returns(true);
+        _appLock.IsHideInRecentsEnabled.Returns(true);
+        await _vm.LoadAsync();
+        _recentsPrivacy.ClearReceivedCalls();
+
+        _vm.ToggleHideInRecentsCommand.Execute(null);
+
+        _vm.IsHideInRecentsEnabled.Should().BeFalse();
+        _appLock.Received(1).SetHideInRecentsEnabled(false);
+        _recentsPrivacy.Received(1).SetHidden(false);
+    }
+
+    [Fact]
+    public async Task ToggleHideInRecents_PinOff_DoesNothing()
+    {
+        await _vm.LoadAsync();
+
+        _vm.ToggleHideInRecentsCommand.Execute(null);
+
+        _appLock.DidNotReceiveWithAnyArgs().SetHideInRecentsEnabled(default);
     }
 }

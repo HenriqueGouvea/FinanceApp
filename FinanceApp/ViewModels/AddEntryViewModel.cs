@@ -11,6 +11,7 @@ public partial class AddEntryViewModel : ObservableObject
     private readonly IFinanceService _financeService;
     private readonly ICategoryService _categoryService;
     private readonly IPaymentSourceService _paymentSourceService;
+    private readonly IWriteGuard _writeGuard;
     private Func<FinancialEntry, Task>? _onSaved;
     private DateTime _targetMonth;
     private int _editingEntryId;
@@ -85,11 +86,12 @@ public partial class AddEntryViewModel : ObservableObject
         [RecurrenceType.OneTime, RecurrenceType.Recurrent, RecurrenceType.Installments, RecurrenceType.Annual];
     public List<int> DueDays { get; } = [NoDueDay, .. Enumerable.Range(1, 31)];
 
-    public AddEntryViewModel(IFinanceService financeService, ICategoryService categoryService, IPaymentSourceService paymentSourceService)
+    public AddEntryViewModel(IFinanceService financeService, ICategoryService categoryService, IPaymentSourceService paymentSourceService, IWriteGuard writeGuard)
     {
         _financeService = financeService;
         _categoryService = categoryService;
         _paymentSourceService = paymentSourceService;
+        _writeGuard = writeGuard;
         Payments.CollectionChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(HasPayments));
@@ -246,20 +248,23 @@ public partial class AddEntryViewModel : ObservableObject
             DueDay = SelectedDueDay == NoDueDay || IsOnCreditCardBill ? null : SelectedDueDay
         };
 
-        await _financeService.SaveEntryAsync(entry);
-
-        if (IsEditing)
+        var saved = await _writeGuard.TryAsync(async () =>
         {
-            foreach (var payment in _deletedPayments)
-                await _financeService.DeletePaymentAsync(payment.Id);
+            await _financeService.SaveEntryAsync(entry);
 
-            // Deleting payments already lowers the month's paid amount; only a further manual change is saved on top.
-            var paidAfterDeletes = Math.Max(0, _initialPaidAmount - _deletedPayments.Sum(p => p.Amount));
-            if (PaidAmount != paidAfterDeletes)
-                await _financeService.SetPaidAmountAsync(entry.Id, _editingMonth.Year, _editingMonth.Month, PaidAmount);
-        }
+            if (IsEditing)
+            {
+                foreach (var payment in _deletedPayments)
+                    await _financeService.DeletePaymentAsync(payment.Id);
 
-        if (_onSaved is not null)
+                // Deleting payments already lowers the month's paid amount; only a further manual change is saved on top.
+                var paidAfterDeletes = Math.Max(0, _initialPaidAmount - _deletedPayments.Sum(p => p.Amount));
+                if (PaidAmount != paidAfterDeletes)
+                    await _financeService.SetPaidAmountAsync(entry.Id, _editingMonth.Year, _editingMonth.Month, PaidAmount);
+            }
+        });
+
+        if (saved && _onSaved is not null)
             await _onSaved(entry);
     }
 

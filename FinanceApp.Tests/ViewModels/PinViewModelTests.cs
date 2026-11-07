@@ -141,6 +141,67 @@ public class PinViewModelTests
     }
 
     [Fact]
+    public async Task Unlock_WrongPinStartsLockout_ShowsWaitAndBlocksKeypad()
+    {
+        _vm.Prepare(PinPurpose.Unlock);
+        _appLock.GetRemainingLockout().Returns(TimeSpan.FromSeconds(30));
+
+        await TypeAsync("9999");
+
+        _vm.IsLockedOut.Should().BeTrue();
+        _vm.ErrorMessage.Should().Be("Muitas tentativas. Tente de novo em 30 s");
+        _vm.AddDigitCommand.CanExecute("1").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Prepare_LockoutStillRunning_StartsLocked()
+    {
+        _appLock.GetRemainingLockout().Returns(TimeSpan.FromSeconds(90));
+
+        _vm.Prepare(PinPurpose.Unlock);
+
+        _vm.IsLockedOut.Should().BeTrue();
+        _vm.ErrorMessage.Should().Be("Muitas tentativas. Tente de novo em 2 min");
+    }
+
+    [Fact]
+    public void Prepare_CreatingPin_IgnoresLockout()
+    {
+        _appLock.GetRemainingLockout().Returns(TimeSpan.FromSeconds(30));
+
+        _vm.Prepare(PinPurpose.Create);
+
+        _vm.IsLockedOut.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RefreshLockout_WaitOver_UnlocksKeypadAndClearsMessage()
+    {
+        _appLock.GetRemainingLockout().Returns(TimeSpan.FromSeconds(1));
+        _vm.Prepare(PinPurpose.Unlock);
+
+        _appLock.GetRemainingLockout().Returns(TimeSpan.Zero);
+        _vm.RefreshLockout();
+
+        _vm.IsLockedOut.Should().BeFalse();
+        _vm.ErrorMessage.Should().BeEmpty();
+        await TypeAsync("1234");
+        _completedCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task AddDigit_LockedOut_IgnoresDigits()
+    {
+        _appLock.GetRemainingLockout().Returns(TimeSpan.FromSeconds(30));
+        _vm.Prepare(PinPurpose.Unlock);
+
+        await TypeAsync("1234");
+
+        _vm.Pin.Should().BeEmpty();
+        await _appLock.DidNotReceiveWithAnyArgs().VerifyPinAsync(default!);
+    }
+
+    [Fact]
     public async Task Unlock_DigitAfterError_ClearsError()
     {
         _vm.Prepare(PinPurpose.Unlock);

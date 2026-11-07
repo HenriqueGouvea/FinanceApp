@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using CommunityToolkit.Mvvm.Messaging;
 using FinanceApp.Messages;
 using FinanceApp.Models;
@@ -25,7 +26,7 @@ public class CategoriesViewModelTests
         _service = Substitute.For<ICategoryService>();
         _service.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<FinancialCategory>>([Housing, Leisure]));
         _messenger.Register<CategoriesChangedMessage>(this, (_, m) => _sentMessages.Add(m));
-        _vm = new CategoriesViewModel(_service, _messenger);
+        _vm = new CategoriesViewModel(_service, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
     }
 
     // --- LoadAsync ---

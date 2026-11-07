@@ -64,13 +64,15 @@ public partial class MainViewModel : ObservableObject,
 
     private readonly IFinanceService _financeService;
     private readonly IPreferencesService _preferencesService;
+    private readonly IWriteGuard _writeGuard;
     private bool _isSyncing;
     private bool _isInitialized;
 
-    public MainViewModel(IFinanceService financeService, IPreferencesService preferencesService, IMessenger messenger)
+    public MainViewModel(IFinanceService financeService, IPreferencesService preferencesService, IMessenger messenger, IWriteGuard writeGuard)
     {
         _financeService = financeService;
         _preferencesService = preferencesService;
+        _writeGuard = writeGuard;
         ShowSwipeHint = preferencesService.Get(ShowSwipeHintKey, true);
         messenger.RegisterAll(this);
     }
@@ -112,8 +114,9 @@ public partial class MainViewModel : ObservableObject,
         if (SelectedMonth is not { } month)
             return;
 
-        await _financeService.DeleteEntryAsync(projection.FinancialEntryId, month.Date.Year, month.Date.Month, scope);
-        await RefreshAllAsync();
+        if (await _writeGuard.TryAsync(() =>
+                _financeService.DeleteEntryAsync(projection.FinancialEntryId, month.Date.Year, month.Date.Month, scope)))
+            await RefreshAllAsync();
     }
 
     public async Task ToggleEntryStatusAsync(MonthlyEntryProjection projection)
@@ -124,8 +127,9 @@ public partial class MainViewModel : ObservableObject,
         month.HideEntryActions();
 
         var status = projection.IsPaid ? FinancialMonthlyEntryStatus.Pending : FinancialMonthlyEntryStatus.Paid;
-        await _financeService.SetEntryStatusAsync(projection.FinancialEntryId, month.Date.Year, month.Date.Month, status);
-        await RefreshAllAsync();
+        if (await _writeGuard.TryAsync(() =>
+                _financeService.SetEntryStatusAsync(projection.FinancialEntryId, month.Date.Year, month.Date.Month, status)))
+            await RefreshAllAsync();
     }
 
     /// <summary>
@@ -139,8 +143,9 @@ public partial class MainViewModel : ObservableObject,
         month.HideEntryActions();
 
         var status = bill.IsPaid ? FinancialMonthlyEntryStatus.Pending : FinancialMonthlyEntryStatus.Paid;
-        await _financeService.SetCreditCardBillStatusAsync(bill.Card.Id, month.Date.Year, month.Date.Month, status);
-        await RefreshAllAsync();
+        if (await _writeGuard.TryAsync(() =>
+                _financeService.SetCreditCardBillStatusAsync(bill.Card.Id, month.Date.Year, month.Date.Month, status)))
+            await RefreshAllAsync();
     }
 
     public void GoToMonth(DateTime date)

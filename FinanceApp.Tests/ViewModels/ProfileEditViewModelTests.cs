@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using CommunityToolkit.Mvvm.Messaging;
 using FinanceApp.Messages;
 using FinanceApp.Services;
@@ -23,7 +24,7 @@ public class ProfileEditViewModelTests
         _profileService.Name.Returns("Ana");
         _profileService.PhotoPath.Returns("/data/profile.jpg");
         _mediaPicker = Substitute.For<IMediaPicker>();
-        _vm = new ProfileEditViewModel(_profileService, _mediaPicker, _messenger);
+        _vm = new ProfileEditViewModel(_profileService, _mediaPicker, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
     }
 
     [Fact]

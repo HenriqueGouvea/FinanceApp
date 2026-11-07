@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using FinanceApp.Models;
 using FinanceApp.Services;
 using FinanceApp.ViewModels;
@@ -20,7 +21,7 @@ public class PaymentSourceEditViewModelTests
     {
         _service = Substitute.For<IPaymentSourceService>();
         _service.GetAllAsync().Returns([Checking, Savings, Card]);
-        _vm = new PaymentSourceEditViewModel(_service);
+        _vm = new PaymentSourceEditViewModel(_service, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
     }
 
     // --- Prepare ---

@@ -14,6 +14,7 @@ public partial class PaymentSourcesViewModel : ObservableObject, IRecipient<Paym
     private readonly IFinanceService _financeService;
     private readonly TimeProvider _timeProvider;
     private readonly IMessenger _messenger;
+    private readonly IWriteGuard _writeGuard;
     private IReadOnlyList<PaymentSourceSummary> _sources = [];
 
     public ObservableCollection<PaymentSourceGroup> Groups { get; } = [];
@@ -24,12 +25,14 @@ public partial class PaymentSourcesViewModel : ObservableObject, IRecipient<Paym
         IPaymentSourceService paymentSourceService,
         IFinanceService financeService,
         TimeProvider timeProvider,
-        IMessenger messenger)
+        IMessenger messenger,
+        IWriteGuard writeGuard)
     {
         _paymentSourceService = paymentSourceService;
         _financeService = financeService;
         _timeProvider = timeProvider;
         _messenger = messenger;
+        _writeGuard = writeGuard;
         Groups.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
         messenger.Register(this);
     }
@@ -53,8 +56,8 @@ public partial class PaymentSourcesViewModel : ObservableObject, IRecipient<Paym
 
     public async Task DeleteAsync(PaymentSource source)
     {
-        await _paymentSourceService.DeleteAsync(source.Id);
-        _messenger.Send(new PaymentSourcesChangedMessage());
+        if (await _writeGuard.TryAsync(() => _paymentSourceService.DeleteAsync(source.Id)))
+            _messenger.Send(new PaymentSourcesChangedMessage());
     }
 
     /// <summary>

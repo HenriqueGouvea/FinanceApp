@@ -50,6 +50,26 @@ public class PinPageObject
         return this;
     }
 
+    public string ErrorText => _session.Driver.FindElements(ErrorLabel).FirstOrDefault(e => e.Displayed)?.Text ?? string.Empty;
+
+    /// <summary>
+    /// The keys are disabled while too many wrong PINs keep the keypad locked (and briefly while a PIN is checked).
+    /// </summary>
+    public bool IsKeypadEnabled => _session.WaitForVisible(AppSession.AutomationId("PinKey0")).Enabled;
+
+    /// <summary>
+    /// Types a wrong PIN and waits until it's rejected: the first digit clears the previous error, and checking the
+    /// PIN sets it again. Then the keypad takes digits again, unless the rejection locked it.
+    /// </summary>
+    public PinPageObject TypeWrongPin(string pin)
+    {
+        Type(pin);
+        _session.WaitFor(
+            () => ErrorText.StartsWith(AppLabels.TooManyAttempts) || (ErrorText.Length > 0 && IsKeypadEnabled),
+            "the wrong PIN to be rejected");
+        return this;
+    }
+
     /// <summary>
     /// Types the digits on the keypad. The fourth digit submits the step.
     /// </summary>

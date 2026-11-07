@@ -167,4 +167,129 @@ public class AppLockServiceTests
 
         (await _service.ShouldLockOnResumeAsync()).Should().BeFalse();
     }
+
+    // --- Failed attempts ---
+
+    [Fact]
+    public async Task VerifyPinAsync_FourWrongPins_DoesNotLock()
+    {
+        await _service.SetPinAsync("1234");
+
+        await FailAsync(4);
+
+        _service.GetRemainingLockout().Should().Be(TimeSpan.Zero);
+        (await _service.VerifyPinAsync("1234")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task VerifyPinAsync_FifthWrongPin_LocksFor30SecondsEvenWithTheRightPin()
+    {
+        await _service.SetPinAsync("1234");
+
+        await FailAsync(5);
+
+        _service.GetRemainingLockout().Should().Be(TimeSpan.FromSeconds(30));
+        (await _service.VerifyPinAsync("1234")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task VerifyPinAsync_LockoutOver_AcceptsTheRightPinAndResetsTheCount()
+    {
+        await _service.SetPinAsync("1234");
+        await FailAsync(5);
+
+        _now += TimeSpan.FromSeconds(30);
+
+        _service.GetRemainingLockout().Should().Be(TimeSpan.Zero);
+        (await _service.VerifyPinAsync("1234")).Should().BeTrue();
+        await FailAsync(4);
+        _service.GetRemainingLockout().Should().Be(TimeSpan.Zero);
+    }
+
+    [Fact]
+    public async Task VerifyPinAsync_EachFurtherWrongPin_DoublesTheWait()
+    {
+        await _service.SetPinAsync("1234");
+        await FailAsync(5);
+
+        _now += TimeSpan.FromSeconds(30);
+        await FailAsync(1);
+        _service.GetRemainingLockout().Should().Be(TimeSpan.FromSeconds(60));
+
+        _now += TimeSpan.FromSeconds(60);
+        await FailAsync(1);
+        _service.GetRemainingLockout().Should().Be(TimeSpan.FromSeconds(120));
+    }
+
+    [Fact]
+    public async Task VerifyPinAsync_ManyWrongPins_WaitsAtMostAnHour()
+    {
+        await _service.SetPinAsync("1234");
+
+        for (var i = 0; i < 30; i++)
+        {
+            await FailAsync(1);
+            _now += _service.GetRemainingLockout();
+        }
+
+        await FailAsync(1);
+        _service.GetRemainingLockout().Should().Be(AppLockService.MaxLockout);
+    }
+
+    [Fact]
+    public async Task VerifyPinAsync_AppRestarted_KeepsTheLockout()
+    {
+        await _service.SetPinAsync("1234");
+        await FailAsync(5);
+
+        var restarted = new AppLockService(_secureStorage, _preferences, _timeProvider);
+
+        restarted.GetRemainingLockout().Should().Be(TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
+    public async Task Disable_AfterWrongPins_ResetsTheCount()
+    {
+        await _service.SetPinAsync("1234");
+        await FailAsync(4);
+
+        _service.Disable();
+        await _service.SetPinAsync("1234");
+        await FailAsync(1);
+
+        _service.GetRemainingLockout().Should().Be(TimeSpan.Zero);
+    }
+
+    // --- Hide in recents ---
+
+    [Fact]
+    public async Task ShouldHideInRecentsAsync_PinOnByDefault_ReturnsTrue()
+    {
+        await _service.SetPinAsync("1234");
+
+        _service.IsHideInRecentsEnabled.Should().BeTrue();
+        (await _service.ShouldHideInRecentsAsync()).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ShouldHideInRecentsAsync_NoPin_ReturnsFalse()
+    {
+        (await _service.ShouldHideInRecentsAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ShouldHideInRecentsAsync_SwitchedOff_ReturnsFalse()
+    {
+        await _service.SetPinAsync("1234");
+
+        _service.SetHideInRecentsEnabled(false);
+
+        (await _service.ShouldHideInRecentsAsync()).Should().BeFalse();
+    }
+
+    private async Task FailAsync(int times)
+    {
+        for (var i = 0; i < times; i++)
+            await _service.VerifyPinAsync("0000");
+    }
 }

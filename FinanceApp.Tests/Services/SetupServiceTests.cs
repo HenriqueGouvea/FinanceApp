@@ -31,7 +31,7 @@ public sealed class SetupServiceTests : IDisposable
         _paymentSourceService = new PaymentSourceService(_context);
         _profileService = new UserProfileService(_preferences, _fileSystem);
         _service = new SetupService(
-            _context, _financeService, _categoryService, _paymentSourceService, _profileService, _preferences, _timeProvider);
+            _context, _categoryService, _profileService, _preferences, _timeProvider);
     }
 
     public void Dispose() => _fileSystem.Dispose();
@@ -354,6 +354,25 @@ public sealed class SetupServiceTests : IDisposable
 
         (await _paymentSourceService.GetAllAsync()).Select(s => s.Name).Should().BeEquivalentTo(["Itaú", "Nubank"]);
         (await GetEntriesAsync()).Select(e => e.Description).Should().BeEquivalentTo(["Aluguel", "Internet"]);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_FailsHalfway_ThrowsAndSavesNothing()
+    {
+        var db = await _context.GetConnectionAsync();
+        await db.ExecuteAsync("CREATE TRIGGER FailWrite BEFORE INSERT ON FinancialEntry BEGIN SELECT RAISE(ABORT, 'write failed'); END");
+
+        var act = () => _service.CompleteAsync(new NewUserSetup
+        {
+            Name = "Ana",
+            PaymentSources = [new PaymentSource { Name = "Nubank", Type = PaymentSourceType.BankAccount, Balance = 2500 }],
+            Entries = [new SetupEntry { Description = "Aluguel", Amount = 1500 }]
+        });
+
+        await act.Should().ThrowAsync<SQLite.SQLiteException>();
+        (await _paymentSourceService.GetAllAsync()).Should().BeEmpty();
+        _profileService.Name.Should().BeEmpty();
+        (await _service.ShouldShowAsync()).Should().BeTrue();
     }
 
     private async Task<List<FinancialEntry>> GetEntriesAsync()

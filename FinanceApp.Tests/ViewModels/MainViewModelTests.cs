@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using CommunityToolkit.Mvvm.Messaging;
 using FinanceApp.Messages;
 using FinanceApp.Models;
@@ -26,7 +27,7 @@ public class MainViewModelTests
         _preferencesService = Substitute.For<IPreferencesService>();
         _preferencesService.Get(Arg.Any<string>(), Arg.Any<bool>()).Returns(true);
 
-        _vm = new MainViewModel(_service, _preferencesService, _messenger);
+        _vm = new MainViewModel(_service, _preferencesService, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
     }
 
     // --- Initialization ---
@@ -143,7 +144,7 @@ public class MainViewModelTests
     public async Task InitializeAsync_SetsIsIncomesExpandedFromPreferences()
     {
         _preferencesService.Get("incomes_expanded", true).Returns(false);
-        var vm = new MainViewModel(_service, _preferencesService, _messenger);
+        var vm = new MainViewModel(_service, _preferencesService, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
 
         await vm.InitializeAsync();
 
@@ -154,7 +155,7 @@ public class MainViewModelTests
     public async Task InitializeAsync_SetsIsOutcomesExpandedFromPreferences()
     {
         _preferencesService.Get("outcomes_expanded", true).Returns(false);
-        var vm = new MainViewModel(_service, _preferencesService, _messenger);
+        var vm = new MainViewModel(_service, _preferencesService, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
 
         await vm.InitializeAsync();
 
@@ -606,7 +607,7 @@ public class MainViewModelTests
     {
         _preferencesService.Get("show_month_swipe_hint", Arg.Any<bool>()).Returns(false);
 
-        var vm = new MainViewModel(_service, _preferencesService, _messenger);
+        var vm = new MainViewModel(_service, _preferencesService, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
 
         vm.ShowSwipeHint.Should().BeFalse();
     }

@@ -8,6 +8,7 @@ namespace FinanceApp.ViewModels;
 public partial class CategoryEditViewModel : ObservableObject
 {
     private readonly ICategoryService _categoryService;
+    private readonly IWriteGuard _writeGuard;
     private Func<Task>? _onSaved;
     private int _editingCategoryId;
 
@@ -41,9 +42,10 @@ public partial class CategoryEditViewModel : ObservableObject
         "#F4511E", "#6D4C41", "#757575", "#546E7A"
     ];
 
-    public CategoryEditViewModel(ICategoryService categoryService)
+    public CategoryEditViewModel(ICategoryService categoryService, IWriteGuard writeGuard)
     {
         _categoryService = categoryService;
+        _writeGuard = writeGuard;
     }
 
     public void Prepare(FinancialEntryType entryType = FinancialEntryType.Outcome)
@@ -88,16 +90,16 @@ public partial class CategoryEditViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task Save()
     {
-        await _categoryService.SaveAsync(new FinancialCategory
+        var saved = await _writeGuard.TryAsync(() => _categoryService.SaveAsync(new FinancialCategory
         {
             Id = _editingCategoryId,
             Name = Name.Trim(),
             Icon = Icon,
             Color = Color,
             EntryType = EntryType
-        });
+        }));
 
-        if (_onSaved is not null)
+        if (saved && _onSaved is not null)
             await _onSaved();
     }
 }

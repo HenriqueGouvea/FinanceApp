@@ -15,7 +15,6 @@ public static class MediaPickerExtensions
         }
         catch (Exception ex) when (ex is PermissionException or FeatureNotSupportedException)
         {
-            Console.WriteLine($"Error picking the profile photo: {ex.Message}");
             return null;
         }
     }

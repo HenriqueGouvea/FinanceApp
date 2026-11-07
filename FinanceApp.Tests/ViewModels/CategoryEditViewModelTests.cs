@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using FinanceApp.Models;
 using FinanceApp.Services;
 using FinanceApp.ViewModels;
@@ -10,12 +11,13 @@ namespace FinanceApp.Tests.ViewModels;
 public class CategoryEditViewModelTests
 {
     private readonly ICategoryService _service;
+    private readonly IAlertService _alerts = Substitute.For<IAlertService>();
     private readonly CategoryEditViewModel _vm;
 
     public CategoryEditViewModelTests()
     {
         _service = Substitute.For<ICategoryService>();
-        _vm = new CategoryEditViewModel(_service);
+        _vm = new CategoryEditViewModel(_service, new WriteGuard(_alerts, NullLogger<WriteGuard>.Instance));
         _vm.Prepare();
     }
 
@@ -155,6 +157,24 @@ public class CategoryEditViewModelTests
         await _vm.SaveCommand.ExecuteAsync(null);
 
         await _service.Received(1).SaveAsync(Arg.Is<FinancialCategory>(c => c.EntryType == FinancialEntryType.Income));
+    }
+
+    [Fact]
+    public async Task SaveCommand_SaveFails_ShowsErrorAndDoesNotClose()
+    {
+        var closed = false;
+        _vm.SetSaveCallback(() =>
+        {
+            closed = true;
+            return Task.CompletedTask;
+        });
+        _vm.Name = "Pets";
+        _service.SaveAsync(Arg.Any<FinancialCategory>()).Returns(Task.FromException(new IOException("disk full")));
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        closed.Should().BeFalse();
+        await _alerts.Received(1).ShowAsync("Não foi possível salvar", "Tente de novo.");
     }
 
     [Theory]
