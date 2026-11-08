@@ -12,6 +12,8 @@ public class DataManagementService : IDataManagementService
     private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
 
     private readonly IDatabaseContext _context;
+    private readonly ICategoryService _categoryService;
+    private readonly IPaymentSourceService _paymentSourceService;
     private readonly IUserProfileService _profileService;
     private readonly IAppLockService _appLockService;
     private readonly IPreferencesService _preferences;
@@ -20,6 +22,8 @@ public class DataManagementService : IDataManagementService
 
     public DataManagementService(
         IDatabaseContext context,
+        ICategoryService categoryService,
+        IPaymentSourceService paymentSourceService,
         IUserProfileService profileService,
         IAppLockService appLockService,
         IPreferencesService preferences,
@@ -27,6 +31,8 @@ public class DataManagementService : IDataManagementService
         TimeProvider timeProvider)
     {
         _context = context;
+        _categoryService = categoryService;
+        _paymentSourceService = paymentSourceService;
         _profileService = profileService;
         _appLockService = appLockService;
         _preferences = preferences;
@@ -42,6 +48,7 @@ public class DataManagementService : IDataManagementService
             DeleteAllRows(conn);
             conn.InsertAll(DatabaseContext.CreateDefaultCategories(), runInTransaction: false);
         });
+        ClearCaches();
 
         await _profileService.SaveAsync(string.Empty, null);
         _appLockService.Disable();
@@ -105,6 +112,7 @@ public class DataManagementService : IDataManagementService
             foreach (var row in backup.MonthlyEntries) conn.InsertOrReplace(row);
             foreach (var row in backup.Payments) conn.InsertOrReplace(row);
         });
+        ClearCaches();
 
         if (photo is null)
         {
@@ -122,6 +130,12 @@ public class DataManagementService : IDataManagementService
         {
             File.Delete(photoPath);
         }
+    }
+
+    private void ClearCaches()
+    {
+        _categoryService.ClearCache();
+        _paymentSourceService.ClearCache();
     }
 
     private static void DeleteAllRows(SQLite.SQLiteConnection conn)

@@ -5,6 +5,10 @@ namespace FinanceApp.Data;
 
 public class DatabaseContext : IDatabaseContext
 {
+    public const string MonthIndex = "IX_FinancialMonthlyEntry_Year_Month";
+    public const string MonthlyEntryTemplateIndex = "IX_FinancialMonthlyEntry_FinancialEntryId";
+    public const string PaymentMonthlyEntryIndex = "IX_FinancialPayment_FinancialMonthlyEntryId";
+
     private const string LegacyCategoryColumn = "Category";
 
     private static readonly FinancialCategory[] DefaultOutcomeCategories =
@@ -63,7 +67,22 @@ public class DatabaseContext : IDatabaseContext
         else if (!hadCategoryType)
             await MigrateCategoryTypesAsync(connection);
 
+        await CreateIndexesAsync(connection);
+
         return connection;
+    }
+
+    /// <summary>
+    /// Indexes for the lookups run on every month load and payment, created only when missing.
+    /// </summary>
+    public static async Task CreateIndexesAsync(SQLiteAsyncConnection db)
+    {
+        await db.CreateIndexAsync(MonthIndex, nameof(FinancialMonthlyEntry),
+            [nameof(FinancialMonthlyEntry.Year), nameof(FinancialMonthlyEntry.Month)]);
+        await db.CreateIndexAsync(MonthlyEntryTemplateIndex, nameof(FinancialMonthlyEntry),
+            [nameof(FinancialMonthlyEntry.FinancialEntryId)]);
+        await db.CreateIndexAsync(PaymentMonthlyEntryIndex, nameof(FinancialPayment),
+            [nameof(FinancialPayment.FinancialMonthlyEntryId)]);
     }
 
     /// <summary>

@@ -64,6 +64,19 @@ public sealed class DataManagementServiceTests : IDisposable
 
         (await _phone.Setup.ShouldShowAsync()).Should().BeTrue();
     }
+    [Fact]
+    public async Task DeleteAllAsync_ListsLoadedBefore_ShowOnlyTheDefaultCategories()
+    {
+        await _phone.SeedAsync();
+        await _phone.Categories.GetAllAsync();
+        await _phone.PaymentSources.GetAllAsync();
+
+        await _phone.Service.DeleteAllAsync();
+
+        (await _phone.Categories.GetAllAsync()).Should().HaveCount(DatabaseContext.CreateDefaultCategories().Count);
+        (await _phone.PaymentSources.GetAllAsync()).Should().BeEmpty();
+    }
+
 
     // --- ExportAsync ---
 
@@ -152,10 +165,23 @@ public sealed class DataManagementServiceTests : IDisposable
 
         await ImportIntoNewPhoneAsync();
 
-        var expected = await new FinanceService(_phone.Context).GetMergedEntriesForMonthAsync(2026, 11);
-        var imported = await new FinanceService(_newPhone.Context).GetMergedEntriesForMonthAsync(2026, 11);
+        var expected = await _phone.Finance.GetMergedEntriesForMonthAsync(2026, 11);
+        var imported = await _newPhone.Finance.GetMergedEntriesForMonthAsync(2026, 11);
         imported.Should().BeEquivalentTo(expected);
     }
+    [Fact]
+    public async Task ImportAsync_MonthLoadedBefore_ShowsTheImportedCategoriesAndSources()
+    {
+        await _phone.SeedAsync();
+        await _newPhone.Finance.GetMergedEntriesForMonthAsync(2026, 11);
+
+        await ImportIntoNewPhoneAsync();
+
+        var expected = await _phone.Finance.GetMergedEntriesForMonthAsync(2026, 11);
+        var imported = await _newPhone.Finance.GetMergedEntriesForMonthAsync(2026, 11);
+        imported.Should().BeEquivalentTo(expected);
+    }
+
 
     [Fact]
     public async Task ImportAsync_ExportFromAnotherPhone_RestoresNameAndPhoto()
@@ -239,6 +265,9 @@ public sealed class DataManagementServiceTests : IDisposable
         public TempFileSystem FileSystem { get; } = new();
         public UserProfileService Profile { get; }
         public AppLockService AppLock { get; }
+        public CategoryService Categories { get; }
+        public PaymentSourceService PaymentSources { get; }
+        public FinanceService Finance { get; }
         public SetupService Setup { get; }
         public DataManagementService Service { get; }
 
@@ -250,8 +279,11 @@ public sealed class DataManagementServiceTests : IDisposable
 
             Profile = new UserProfileService(Preferences, FileSystem);
             AppLock = new AppLockService(new InMemorySecureStorage(), Preferences, timeProvider);
-            Setup = new SetupService(Context, new CategoryService(Context), Profile, Preferences, timeProvider);
-            Service = new DataManagementService(Context, Profile, AppLock, Preferences, FileSystem, timeProvider);
+            Categories = new CategoryService(Context);
+            PaymentSources = new PaymentSourceService(Context);
+            Finance = new FinanceService(Context, Categories, PaymentSources);
+            Setup = new SetupService(Context, Categories, PaymentSources, Profile, Preferences, timeProvider);
+            Service = new DataManagementService(Context, Categories, PaymentSources, Profile, AppLock, Preferences, FileSystem, timeProvider);
         }
 
         /// <summary>

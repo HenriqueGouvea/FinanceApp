@@ -6,11 +6,22 @@ namespace FinanceApp.Services;
 
 public class FinanceService : IFinanceService
 {
-    private readonly IDatabaseContext _context;
+    // The monthly rows of outcomes paid with a credit card, the only ones that use up a card's limit.
+    private const string CreditCardMonthlyEntriesSql =
+        $"SELECT m.* FROM {nameof(FinancialMonthlyEntry)} m " +
+        $"JOIN {nameof(FinancialEntry)} e ON e.{nameof(FinancialEntry.Id)} = m.{nameof(FinancialMonthlyEntry.FinancialEntryId)} " +
+        $"JOIN {nameof(PaymentSource)} s ON s.{nameof(PaymentSource.Id)} = e.{nameof(FinancialEntry.PaymentSourceId)} " +
+        $"WHERE e.{nameof(FinancialEntry.EntryType)} = ? AND s.{nameof(PaymentSource.Type)} = ?";
 
-    public FinanceService(IDatabaseContext context)
+    private readonly IDatabaseContext _context;
+    private readonly ICategoryService _categoryService;
+    private readonly IPaymentSourceService _paymentSourceService;
+
+    public FinanceService(IDatabaseContext context, ICategoryService categoryService, IPaymentSourceService paymentSourceService)
     {
         _context = context;
+        _categoryService = categoryService;
+        _paymentSourceService = paymentSourceService;
     }
 
     public async Task<IEnumerable<MonthlyEntryProjection>> GetMergedEntriesForMonthAsync(int year, int month)
@@ -27,10 +38,10 @@ public class FinanceService : IFinanceService
 
         var physicalLookup = physicalRecords.ToDictionary(r => r.FinancialEntryId);
 
-        var categories = await db.Table<FinancialCategory>().ToListAsync();
+        var categories = await _categoryService.GetAllAsync();
         var categoryLookup = categories.ToDictionary(c => c.Id);
 
-        var sources = await db.Table<PaymentSource>().ToListAsync();
+        var sources = await _paymentSourceService.GetAllAsync();
         var sourceLookup = sources.ToDictionary(s => s.Id);
 
         var projections = new List<MonthlyEntryProjection>();
@@ -164,19 +175,19 @@ public class FinanceService : IFinanceService
         var db = await _context.GetConnectionAsync();
         var currentMonth = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Local);
 
-        var sources = await db.Table<PaymentSource>().ToListAsync();
+        var sources = await _paymentSourceService.GetAllAsync();
         var usedLimits = sources.Where(s => s.Type == PaymentSourceType.CreditCard).ToDictionary(s => s.Id, _ => 0m);
+        if (usedLimits.Count == 0)
+            return usedLimits;
 
-        var templates = await db.Table<FinancialEntry>().ToListAsync();
-        var cardTemplates = templates
-            .Where(e => e.EntryType == FinancialEntryType.Outcome && e.PaymentSourceId is { } id && usedLimits.ContainsKey(id))
-            .ToList();
-        var cardTemplateIds = cardTemplates.Select(e => e.Id).ToHashSet();
+        var templates = await db.Table<FinancialEntry>()
+            .Where(e => e.EntryType == FinancialEntryType.Outcome && e.PaymentSourceId != null)
+            .ToListAsync();
+        var cardTemplates = templates.Where(e => usedLimits.ContainsKey(e.PaymentSourceId!.Value)).ToList();
 
-        var records = await db.Table<FinancialMonthlyEntry>().ToListAsync();
-        var recordLookup = records
-            .Where(r => cardTemplateIds.Contains(r.FinancialEntryId))
-            .ToDictionary(r => (r.FinancialEntryId, r.Year, r.Month));
+        var records = await db.QueryAsync<FinancialMonthlyEntry>(
+            CreditCardMonthlyEntriesSql, (int)FinancialEntryType.Outcome, (int)PaymentSourceType.CreditCard);
+        var recordLookup = records.ToDictionary(r => (r.FinancialEntryId, r.Year, r.Month));
 
         foreach (var template in cardTemplates)
         {
