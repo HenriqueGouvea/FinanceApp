@@ -43,7 +43,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: e2e-apk
-        path: artifacts/e2e-apk/com.companyname.financeapp-Signed.apk
+        path: artifacts/e2e-apk/io.github.henriquegouvea.mensal-Signed.apk
         retention-days: 3
 
   e2e-android:

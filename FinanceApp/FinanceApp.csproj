@@ -16,11 +16,11 @@
 
 		<ApplicationTitle>Mensal</ApplicationTitle>
 
-		<!-- App Identifier -->
-		<ApplicationId>com.companyname.financeapp</ApplicationId>
+		<!-- App Identifier: final, Google Play doesn't allow changing it after the first upload -->
+		<ApplicationId>io.github.henriquegouvea.mensal</ApplicationId>
 
-		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<!-- Versions: release.yml sets both from the tag (v1.2.3 -> 1.2.3) and the run number (Android versionCode) -->
+		<ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->

@@ -28,7 +28,7 @@ You'll need to redeploy from the IDE afterwards.
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `E2E_APK_PATH` | `artifacts/e2e-apk/com.companyname.financeapp-Signed.apk` | APK under test |
+| `E2E_APK_PATH` | `artifacts/e2e-apk/io.github.henriquegouvea.mensal-Signed.apk` | APK under test |
 | `E2E_DEVICE` | `emulator-5554` | adb serial of the target device |
 | `E2E_APPIUM_URL` | *(local server started)* | Use an already running Appium server |
 | `ANDROID_HOME` | VS / Android Studio default SDK path | Android SDK location (adb, UiAutomator2) |

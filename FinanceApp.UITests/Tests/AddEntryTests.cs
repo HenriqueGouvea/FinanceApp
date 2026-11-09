@@ -30,6 +30,11 @@ public sealed class AddEntryTests : E2ETestBase
 
         page.EnterAmount(1234.56m);
         page.AmountText.Should().Be("R$ 1.234,56", "typed digits fill the currency mask from the cents");
+        using (new AssertionScope())
+        {
+            page.IsPaymentSourcePickerVisible.Should().BeFalse("there is no account, card or voucher to pick yet");
+            page.IsCreditCardChoiceHintVisible.Should().BeFalse("there is no credit card to pick");
+        }
         page.Save();
 
         MainPage.WaitForEntry("Celular E2E");

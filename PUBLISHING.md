@@ -17,7 +17,10 @@ network traffic, the PIN is stored properly, and the code has good test coverage
 1. **A debug "Nuke DB" button was on the home screen of every build.** One tap deleted every entry with no
    confirmation. **Fixed** (removed).
 2. **The package id is still `com.companyname.financeapp`.** It can never change after the first upload.
+   **Fixed in "Release pipeline":** `io.github.henriquegouvea.mensal`.
 3. **There is no release pipeline.** No signing key, the version is hard-coded, and nothing builds an AAB.
+   **Fixed in "Release pipeline":** `release.yml`, see [RELEASING.md](RELEASING.md) (the upload key, secrets
+   and Play Console steps are the owner's).
 4. **There is no privacy policy, store listing or "Sobre" screen.** Play requires the policy for every app.
 5. **A new personal Play developer account must run a closed test** with at least 12 testers for 14 days in a
    row before it can publish to production. This takes the longest, so start it as soon as an AAB exists.
@@ -103,6 +106,8 @@ What to do before release, and what to watch:
   if you have no domain). It can't change afterwards. Update `ApplicationId`, `E2ESettings.AppPackage`, the two
   backup rule files (the SecureStorage file name contains the id) and the CI scripts. Changing it installs a
   separate app, so existing test installs lose their data (no store users yet, so no harm).
+  **Done:** `io.github.henriquegouvea.mensal` (no domain needed; the GitHub namespace is the owner's).
+  Signing, versioning and the workflow below are done too: see [RELEASING.md](RELEASING.md).
 - **Signing.** Create an upload key (`keytool`), keep it outside the repo (password manager + GitHub secrets),
   and enrol in Play App Signing (mandatory for new apps). Losing the upload key can be fixed with Google's
   support; losing an app signing key can't, which is why Google holds it.
@@ -229,7 +234,7 @@ big enough to show all 8, so it only failed in the full post-merge run.
 
 ## 11. Decisions for the owner
 
-1. **Package id** (section 6). Blocks the release pipeline task.
+1. **Package id** (section 6). **Decided:** `io.github.henriquegouvea.mensal`.
 2. **v1.0 with or without ads** (recommended: without, section 9). Decides whether `INTERNET` goes (S8).
 3. **Individual or company** for the Play account and the income (section 7, ask an accountant).
 4. **Public repository?** It's public with no license, which means "all rights reserved", but anyone can read
