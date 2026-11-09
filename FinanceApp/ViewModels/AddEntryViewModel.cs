@@ -30,6 +30,7 @@ public partial class AddEntryViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsOnCreditCardBill))]
     [NotifyPropertyChangedFor(nameof(CreditCardBillDueHint))]
     [NotifyPropertyChangedFor(nameof(ShowsPaidAmount))]
+    [NotifyPropertyChangedFor(nameof(ShowsCreditCardChoiceHint))]
     PaymentSource? selectedPaymentSource;
     [ObservableProperty] FinancialEntryType entryType = FinancialEntryType.Outcome;
     [ObservableProperty] RecurrenceType? selectedRecurrence;
@@ -58,6 +59,15 @@ public partial class AddEntryViewModel : ObservableObject
     public string PartialPaymentLabel => IsIncome ? "Recebimento parcial" : "Pagamento parcial";
     public string PartialPaymentHint => IsIncome ? "Recebido aos poucos durante o mês" : "Pago aos poucos durante o mês, como mercado";
     public string PaymentSourceLabel => IsIncome ? "Recebido em" : "Pago com";
+    /// <summary>
+    /// "Pago com"/"Recebido em" is hidden while the user has no account, card or voucher to pick.
+    /// </summary>
+    public bool HasPaymentSources => PaymentSources.Count > 0;
+    /// <summary>
+    /// The note on what a credit card changes only makes sense for an outcome, when a card can be picked and isn't yet.
+    /// </summary>
+    public bool ShowsCreditCardChoiceHint => !IsIncome && !IsOnCreditCardBill
+        && PaymentSources.Any(s => s.Type == PaymentSourceType.CreditCard);
     /// <summary>
     /// An outcome paid with a credit card falls due with the card's bill, so it has no due day of its own.
     /// It is also neither estimated nor paid little by little: a card purchase has a known amount, paid with the bill.
@@ -135,6 +145,7 @@ public partial class AddEntryViewModel : ObservableObject
         OnPropertyChanged(nameof(PaymentSourceLabel));
         OnPropertyChanged(nameof(IsOnCreditCardBill));
         OnPropertyChanged(nameof(ShowsPaidAmount));
+        OnPropertyChanged(nameof(ShowsCreditCardChoiceHint));
         FilterCategories();
     }
 
@@ -285,6 +296,8 @@ public partial class AddEntryViewModel : ObservableObject
         PaymentSources.Clear();
         foreach (var source in await _paymentSourceService.GetAllAsync())
             PaymentSources.Add(source);
+        OnPropertyChanged(nameof(HasPaymentSources));
+        OnPropertyChanged(nameof(ShowsCreditCardChoiceHint));
     }
 
     // The edited entry keeps its category even when it belongs to the other type (data from before the split).

@@ -210,8 +210,8 @@
                 </VerticalStackLayout>
             </VerticalStackLayout>
 
-            <!-- Account, card or voucher the entry is paid with ("Pago com") or received in ("Recebido em"); it comes first since a credit card decides the due date -->
-            <VerticalStackLayout Spacing="0">
+            <!-- Account, card or voucher the entry is paid with ("Pago com") or received in ("Recebido em"); it comes first since a credit card decides the due date; hidden while there are none to pick -->
+            <VerticalStackLayout Spacing="0" IsVisible="{Binding HasPaymentSources}">
                 <Label AutomationId="PaymentSourcePickerLabel" Text="{Binding PaymentSourceLabel}" Style="{StaticResource FieldCaption}" />
                 <Picker AutomationId="PaymentSourcePicker"
                         Title="{Binding PaymentSourceLabel}"
@@ -250,13 +250,7 @@
             <Label AutomationId="CreditCardChoiceHintLabel"
                    Text="Com um cartão de crédito em “Pago com”, o vencimento passa a ser o da fatura e “Valor estimado” e “Pagamento parcial” somem."
                    Style="{StaticResource Hint}"
-                   IsVisible="{Binding IsIncome, Converter={x:Static converters:InverseBoolConverter.Instance}}">
-                <Label.Triggers>
-                    <DataTrigger TargetType="Label" Binding="{Binding IsOnCreditCardBill}" Value="True">
-                        <Setter Property="IsVisible" Value="False" />
-                    </DataTrigger>
-                </Label.Triggers>
-            </Label>
+                   IsVisible="{Binding ShowsCreditCardChoiceHint}" />
 
             <Grid ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,6,0,0">
                 <Button Grid.Column="0" AutomationId="CancelEntryButton" Text="Cancelar" Style="{StaticResource SecondaryButton}" Clicked="OnBackClicked" />

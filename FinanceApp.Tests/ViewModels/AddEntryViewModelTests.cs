@@ -1199,6 +1199,56 @@ public class AddEntryViewModelTests
     }
 
     [Fact]
+    public void HasPaymentSources_WithSources_IsTrue()
+    {
+        _vm.HasPaymentSources.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task HasPaymentSources_WithoutSources_IsFalse()
+    {
+        _paymentSourceService.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<PaymentSource>>([]));
+        using var monitor = _vm.Monitor();
+
+        await _vm.PrepareAsync(June);
+
+        _vm.HasPaymentSources.Should().BeFalse();
+        monitor.Should().RaisePropertyChangeFor(vm => vm.HasPaymentSources);
+    }
+
+    [Fact]
+    public void ShowsCreditCardChoiceHint_OutcomeWithCardAvailable_IsTrue()
+    {
+        _vm.ShowsCreditCardChoiceHint.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ShowsCreditCardChoiceHint_CardSelected_IsFalse()
+    {
+        _vm.SelectedPaymentSource = Card;
+
+        _vm.ShowsCreditCardChoiceHint.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ShowsCreditCardChoiceHint_Income_IsFalse()
+    {
+        _vm.SelectIncomeCommand.Execute(null);
+
+        _vm.ShowsCreditCardChoiceHint.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ShowsCreditCardChoiceHint_NoCreditCard_IsFalse()
+    {
+        _paymentSourceService.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<PaymentSource>>([Checking]));
+
+        await _vm.PrepareAsync(June);
+
+        _vm.ShowsCreditCardChoiceHint.Should().BeFalse();
+    }
+
+    [Fact]
     public void PaymentSources_DoNotDependOnEntryType()
     {
         _vm.SelectIncomeCommand.Execute(null);

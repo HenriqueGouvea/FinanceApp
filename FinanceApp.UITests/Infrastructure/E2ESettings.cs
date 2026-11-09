@@ -2,7 +2,7 @@ namespace FinanceApp.UITests.Infrastructure;
 
 public static class E2ESettings
 {
-    public const string AppPackage = "com.companyname.financeapp";
+    public const string AppPackage = "io.github.henriquegouvea.mensal";
     public const string DatabaseFileName = "FinanceDataV3.db3";
 
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(15);

@@ -24,6 +24,7 @@ public class AddEntryPageObject
     private const string CreditCardBillDueHintId = "CreditCardBillDueHintLabel";
     private const string PaymentSourcePickerId = "PaymentSourcePicker";
     private const string PaymentSourcePickerLabelId = "PaymentSourcePickerLabel";
+    private const string CreditCardChoiceHintId = "CreditCardChoiceHintLabel";
     private const string EstimatedSwitchId = "EstimatedSwitch";
     private const string PartialPaymentSwitchId = "PartialPaymentSwitch";
     private const string PaidAmountEntryId = "PaidAmountEntry";
@@ -256,6 +257,13 @@ public class AddEntryPageObject
     }
 
     public string PaymentSourceText => _session.ScrollTo(PaymentSourcePickerId).Text;
+
+    /// <summary>
+    /// "Pago com"/"Recebido em" only shows once there is an account, card or voucher to pick.
+    /// </summary>
+    public bool IsPaymentSourcePickerVisible => _session.TryScrollTo(PaymentSourcePickerId) is not null;
+
+    public bool IsCreditCardChoiceHintVisible => _session.TryScrollTo(CreditCardChoiceHintId) is not null;
 
     /// <summary>
     /// The label above the payment source picker: "Pago com" for outcomes, "Recebido em" for incomes.

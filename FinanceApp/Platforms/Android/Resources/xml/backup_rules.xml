@@ -3,5 +3,5 @@
      device, so a restored copy can't be decrypted: leave it out, everything else (database, profile, settings)
      is backed up. The file name carries the package id: update it if the id changes. -->
 <full-backup-content>
-    <exclude domain="sharedpref" path="com.companyname.financeapp.microsoft.maui.essentials.preferences.xml" />
+    <exclude domain="sharedpref" path="io.github.henriquegouvea.mensal.microsoft.maui.essentials.preferences.xml" />
 </full-backup-content>
