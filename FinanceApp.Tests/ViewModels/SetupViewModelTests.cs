@@ -19,6 +19,7 @@ public class SetupViewModelTests
     private readonly IUserProfileService _profileService;
     private readonly IMediaPicker _mediaPicker;
     private readonly IMessenger _messenger = new WeakReferenceMessenger();
+    private readonly TimeProvider _timeProvider = Substitute.For<TimeProvider>();
     private readonly SetupViewModel _vm;
 
     public SetupViewModelTests()
@@ -30,7 +31,10 @@ public class SetupViewModelTests
         _profileService.Name.Returns(string.Empty);
         _profileService.PhotoPath.Returns((string?)null);
         _mediaPicker = Substitute.For<IMediaPicker>();
-        _vm = new SetupViewModel(_setupService, _paymentSourceService, _profileService, _mediaPicker, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
+        _timeProvider.GetUtcNow().Returns(new DateTimeOffset(2026, 4, 15, 12, 0, 0, TimeSpan.Zero));
+        _timeProvider.LocalTimeZone.Returns(TimeZoneInfo.Utc);
+        _vm = new SetupViewModel(_setupService, _paymentSourceService, _profileService, _mediaPicker, _messenger,
+            new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance), _timeProvider);
     }
 
     // --- PrepareAsync ---
@@ -559,19 +563,62 @@ public class SetupViewModelTests
     }
 
     [Fact]
-    public async Task ExpenseFlags_CanBeToggledByTheUser()
+    public async Task Expenses_OnlyVaryingOnesOfferEstimatedAndOnlyThosePaidLittleByLittleOfferPartialPayment()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.SelectHasChildrenCommand.Execute(true);
+        _vm.SelectHasCarCommand.Execute(true);
+        SetupExpenseItem[] all = [.. _vm.Expenses, .. _vm.HealthExpenses, .. _vm.SchoolExpenses, .. _vm.CarExpenses, .. _vm.LeisureExpenses];
+
+        all.Where(e => e.CanBeEstimated).Select(e => e.Description).Should().Equal(
+            "Condomínio", "Energia", "Água", "Mercado", "Plano de saúde", "Farmácia", "Combustível", "Restaurantes e delivery");
+        all.Where(e => e.CanBePartiallyPaid).Select(e => e.Description).Should().Equal(
+            "Mercado", "Farmácia", "Combustível", "Restaurantes e delivery");
+        all.Should().OnlyContain(e => (!e.IsEstimated || e.CanBeEstimated) && (!e.AllowsPartialPayment || e.CanBePartiallyPaid));
+    }
+
+    [Fact]
+    public async Task ExpenseFlags_OfferedOnes_CanBeToggledByTheUser()
     {
         await _vm.PrepareAsync(isRerun: false);
         var supermarket = _vm.Expenses.Single(e => e.Description == "Mercado");
-        var internet = _vm.Expenses.Single(e => e.Description == "Internet");
+        var condo = _vm.Expenses.Single(e => e.Description == "Condomínio");
 
         supermarket.ToggleEstimatedCommand.Execute(null);
-        internet.TogglePartialPaymentCommand.Execute(null);
+        condo.ToggleEstimatedCommand.Execute(null);
 
         supermarket.IsEstimated.Should().BeFalse();
         supermarket.AllowsPartialPayment.Should().BeTrue();
-        internet.AllowsPartialPayment.Should().BeTrue();
-        internet.IsEstimated.Should().BeFalse();
+        condo.IsEstimated.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExpenseFlags_NotOffered_CannotBeTurnedOn()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        var rent = _vm.Expenses.Single(e => e.Description == "Aluguel");
+        var energy = _vm.Expenses.Single(e => e.Description == "Energia");
+
+        rent.ToggleEstimatedCommand.Execute(null);
+        rent.TogglePartialPaymentCommand.Execute(null);
+        energy.TogglePartialPaymentCommand.Execute(null);
+
+        (rent.IsEstimated, rent.AllowsPartialPayment, energy.AllowsPartialPayment).Should().Be((false, false, false));
+    }
+
+    [Fact]
+    public async Task ExpenseOptions_ShowOnlyOnceSelectedAndOnlyWhenOffered()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        var rent = _vm.Expenses.Single(e => e.Description == "Aluguel");
+        var energy = _vm.Expenses.Single(e => e.Description == "Energia");
+        (energy.ShowsEstimatedOption, energy.ShowsPartialPaymentOption).Should().Be((false, false));
+
+        _vm.ToggleExpenseCommand.Execute(rent);
+        _vm.ToggleExpenseCommand.Execute(energy);
+
+        (rent.ShowsEstimatedOption, rent.ShowsPartialPaymentOption).Should().Be((false, false));
+        (energy.ShowsEstimatedOption, energy.ShowsPartialPaymentOption).Should().Be((true, false));
     }
 
     // --- Summary ---
@@ -705,14 +752,114 @@ public class SetupViewModelTests
     }
 
     [Fact]
-    public async Task CarExpenses_FuelIsEstimatedAndInsuranceIsFixed()
+    public async Task CarExpenses_FuelIsEstimatedAndInsuranceIsFixedAndMonthlyFromTheCurrentMonth()
     {
         await _vm.PrepareAsync(isRerun: false);
 
         _vm.HasCar.Should().BeFalse();
-        _vm.CarExpenses.Select(e => (e.Description, e.CategoryName, e.IsEstimated, e.AllowsPartialPayment)).Should().Equal(
-            ("Combustível", "Transporte", true, false),
-            ("Seguro do carro", "Transporte", false, false));
+        _vm.CarExpenses.Select(e => (e.Description, e.CategoryName, e.IsEstimated, e.AllowsPartialPayment, e.OffersYearlyPayment)).Should().Equal(
+            ("Combustível", "Transporte", true, false, false),
+            ("Seguro do carro", "Transporte", false, false, true));
+        var insurance = _vm.CarExpenses.Single(e => e.Description == SetupViewModel.CarInsuranceDescription);
+        (insurance.YearlyInstallments, insurance.YearlyStartMonth, insurance.IsPaidYearly).Should().Be((SetupExpenseItem.MonthlyPayment, 4, false));
+        _vm.YearlyPaymentOptions.Should().Equal(Enumerable.Range(0, 13));
+    }
+
+    [Theory]
+    [InlineData(SetupExpenseItem.MonthlyPayment, "Valor mensal", false)]
+    [InlineData(1, "Valor", true)]
+    [InlineData(10, "Valor de cada parcela", true)]
+    public async Task CarInsurance_PaymentChoice_ChangesAmountCaptionAndShowsFirstMonth(int installments, string caption, bool isPaidYearly)
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        var insurance = _vm.CarInsurance!;
+
+        insurance.YearlyInstallments = installments;
+
+        (insurance.AmountCaption, insurance.IsPaidYearly).Should().Be((caption, isPaidYearly));
+    }
+
+    [Fact]
+    public async Task CarInsurancePayment_ShowsOnlyWithACarAndTheInsuranceTicked()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.CarInsurance!.Description.Should().Be(SetupViewModel.CarInsuranceDescription);
+        _vm.SelectHasCarCommand.Execute(true);
+        _vm.IsCarInsurancePaymentVisible.Should().BeFalse();
+
+        _vm.ToggleExpenseCommand.Execute(_vm.CarInsurance);
+        _vm.IsCarInsurancePaymentVisible.Should().BeTrue();
+
+        _vm.SelectHasCarCommand.Execute(false);
+        _vm.IsCarInsurancePaymentVisible.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SkipStep_OtherExpenses_ResetsTheCarInsurancePayment()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        await GoToStepAsync(SetupStep.OtherExpenses);
+        _vm.SelectHasCarCommand.Execute(true);
+        _vm.ToggleExpenseCommand.Execute(_vm.CarInsurance);
+        _vm.CarInsurance!.YearlyInstallments = 10;
+
+        _vm.SkipStepCommand.Execute(null);
+
+        (_vm.CarInsurance!.IsSelected, _vm.CarInsurance.YearlyInstallments, _vm.IsCarInsurancePaymentVisible)
+            .Should().Be((false, SetupExpenseItem.MonthlyPayment, false));
+    }
+
+    [Theory]
+    [InlineData(1, "Todo ano em março · dia 15")]
+    [InlineData(10, "Todo ano, março a dezembro (10x) · dia 15")]
+    public async Task Summary_CarInsurancePaidYearly_IsAnnualFromItsFirstMonth(int installments, string detail)
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.SelectHasCarCommand.Execute(true);
+        Select(_vm.CarExpenses, SetupViewModel.CarInsuranceDescription, 300, dueDay: 15);
+        var insurance = _vm.CarExpenses.Single(e => e.Description == SetupViewModel.CarInsuranceDescription);
+        insurance.YearlyInstallments = installments;
+        insurance.YearlyStartMonth = 3;
+
+        await GoToSummaryAsync();
+
+        _vm.SummaryRows.Select(r => (r.Description, r.Detail, r.Amount)).Should().Equal(
+            (SetupViewModel.CarInsuranceDescription, detail, 300m));
+    }
+
+    [Fact]
+    public async Task Finish_CarInsuranceInInstallments_SavesAnAnnualEntry()
+    {
+        NewUserSetup? saved = null;
+        await _setupService.CompleteAsync(Arg.Do<NewUserSetup>(s => saved = s));
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.SelectHasCarCommand.Execute(true);
+        Select(_vm.CarExpenses, SetupViewModel.CarInsuranceDescription, 300);
+        var insurance = _vm.CarExpenses.Single(e => e.Description == SetupViewModel.CarInsuranceDescription);
+        insurance.YearlyInstallments = 10;
+        insurance.YearlyStartMonth = 3;
+        await GoToSummaryAsync();
+
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        saved!.Entries.Select(e => (e.Description, e.Amount, e.Recurrence, e.TotalInstallments, e.AnnualStartMonth, e.CategoryName))
+            .Should().Equal((SetupViewModel.CarInsuranceDescription, 300m, RecurrenceType.Annual, (int?)10, (int?)3, "Transporte"));
+    }
+
+    [Fact]
+    public async Task Finish_CarInsurancePaidMonthly_SavesARecurrentEntry()
+    {
+        NewUserSetup? saved = null;
+        await _setupService.CompleteAsync(Arg.Do<NewUserSetup>(s => saved = s));
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.SelectHasCarCommand.Execute(true);
+        Select(_vm.CarExpenses, SetupViewModel.CarInsuranceDescription, 250);
+        await GoToSummaryAsync();
+
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        saved!.Entries.Select(e => (e.Recurrence, e.TotalInstallments, e.AnnualStartMonth))
+            .Should().Equal((RecurrenceType.Recurrent, (int?)null, (int?)null));
     }
 
     [Fact]

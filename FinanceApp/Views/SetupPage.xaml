@@ -43,7 +43,7 @@
                     </Grid>
                     <Grid ColumnDefinitions="*, *" ColumnSpacing="10" IsVisible="{Binding IsSelected}">
                         <VerticalStackLayout Grid.Column="0" Spacing="2">
-                            <Label Text="Valor mensal" Style="{StaticResource FieldCaption}" />
+                            <Label AutomationId="SetupExpenseAmountCaption" Text="{Binding AmountCaption}" Style="{StaticResource FieldCaption}" />
                             <Entry AutomationId="SetupExpenseAmountEntry" Keyboard="Numeric">
                                 <Entry.Behaviors>
                                     <behaviors:CurrencyMaskBehavior Value="{Binding Amount}" />
@@ -64,7 +64,7 @@
                     <Grid AutomationId="SetupExpenseEstimatedOption"
                           ColumnDefinitions="Auto, *"
                           ColumnSpacing="6"
-                          IsVisible="{Binding IsSelected}">
+                          IsVisible="{Binding ShowsEstimatedOption}">
                         <Grid.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding ToggleEstimatedCommand}" />
                         </Grid.GestureRecognizers>
@@ -84,7 +84,7 @@
                     <Grid AutomationId="SetupExpensePartialPaymentOption"
                           ColumnDefinitions="Auto, *"
                           ColumnSpacing="6"
-                          IsVisible="{Binding IsSelected}">
+                          IsVisible="{Binding ShowsPartialPaymentOption}">
                         <Grid.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding TogglePartialPaymentCommand}" />
                         </Grid.GestureRecognizers>
@@ -932,6 +932,37 @@
                                          BindableLayout.ItemTemplate="{StaticResource SetupExpenseTemplate}"
                                          Spacing="8"
                                          IsVisible="{Binding HasCar}" />
+                    <!-- How the car insurance (the last row above) is paid: every month, at once or in installments.
+                         Kept out of the shared row template so the other rows don't build its pickers. -->
+                    <Border AutomationId="SetupCarInsurancePayment"
+                            Style="{StaticResource Card}"
+                            Padding="14"
+                            IsVisible="{Binding IsCarInsurancePaymentVisible}">
+                        <VerticalStackLayout Spacing="8">
+                            <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
+                                <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                    <Label Text="Pagamento do seguro" Style="{StaticResource FieldCaption}" />
+                                    <Picker AutomationId="SetupCarInsurancePaymentPicker"
+                                            Title="Pagamento do seguro"
+                                            ItemsSource="{Binding YearlyPaymentOptions}"
+                                            ItemDisplayBinding="{Binding ., Converter={x:Static converters:YearlyPaymentToLabelConverter.Instance}, x:DataType=x:Int32}"
+                                            SelectedItem="{Binding CarInsurance.YearlyInstallments}" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="2" IsVisible="{Binding CarInsurance.IsPaidYearly}">
+                                    <Label Text="Primeiro mês" Style="{StaticResource FieldCaption}" />
+                                    <Picker AutomationId="SetupCarInsuranceMonthPicker"
+                                            Title="Primeiro mês"
+                                            ItemsSource="{Binding Months}"
+                                            ItemDisplayBinding="{Binding ., Converter={x:Static converters:MonthNumberToNameConverter.Instance}, x:DataType=x:Int32}"
+                                            SelectedItem="{Binding CarInsurance.YearlyStartMonth}" />
+                                </VerticalStackLayout>
+                            </Grid>
+                            <Label Text="O seguro vale por um ano: à vista ou parcelado, ele entra todo ano a partir do mês da renovação."
+                                   FontSize="11"
+                                   TextColor="{StaticResource Muted}"
+                                   IsVisible="{Binding CarInsurance.IsPaidYearly}" />
+                        </VerticalStackLayout>
+                    </Border>
                     <VerticalStackLayout AutomationId="SetupCarsSection" Spacing="12" IsVisible="{Binding HasCar}">
                         <Label Text="IPVA e licenciamento" FontSize="14" FontAttributes="Bold" />
                         <VerticalStackLayout BindableLayout.ItemsSource="{Binding Cars}" Spacing="4">

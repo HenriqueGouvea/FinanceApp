@@ -28,6 +28,7 @@ public partial class SetupViewModel : ObservableObject
     public const int DefaultLicensingMonth = 7;
     public const string DefaultHomeName = "Casa";
     public const string DefaultCarName = "Carro";
+    public const string CarInsuranceDescription = "Seguro do carro";
 
     private const string SalaryIcon = "💼";
 
@@ -37,6 +38,7 @@ public partial class SetupViewModel : ObservableObject
     private readonly IMediaPicker _mediaPicker;
     private readonly IMessenger _messenger;
     private readonly IWriteGuard _writeGuard;
+    private readonly TimeProvider _timeProvider;
     private readonly HashSet<SetupStep> _skippedSteps = [];
     private Func<bool, Task>? _onClosed;
 
@@ -124,7 +126,16 @@ public partial class SetupViewModel : ObservableObject
     PaymentSource? otherExpensesSource;
 
     [ObservableProperty] bool hasChildren;
-    [ObservableProperty] bool hasCar;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsCarInsurancePaymentVisible))]
+    bool hasCar;
+
+    /// <summary>
+    /// The car insurance row of <see cref="CarExpenses"/>, whose payment is chosen below the list.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsCarInsurancePaymentVisible))]
+    SetupExpenseItem? carInsurance;
     [ObservableProperty] bool hasOwnHome;
 
     [ObservableProperty]
@@ -197,6 +208,7 @@ public partial class SetupViewModel : ObservableObject
     public bool HasPurchases => Purchases.Count > 0;
     public bool HasSummaryRows => SummaryRows.Count > 0;
     public bool IsNewPurchaseInstallments => NewPurchaseRecurrence == RecurrenceType.Installments;
+    public bool IsCarInsurancePaymentVisible => HasCar && CarInsurance is { IsSelected: true };
 
     /// <summary>
     /// Split in two, the salary field holds what is left once the advance is paid.
@@ -250,6 +262,12 @@ public partial class SetupViewModel : ObservableObject
     /// Installments of a yearly tax: 1 is a single payment ("cota única").
     /// </summary>
     public List<int> AnnualInstallmentCounts { get; } = [.. Enumerable.Range(1, 12)];
+
+    /// <summary>
+    /// How an expense that offers it (the car insurance) is paid: every month, once a year ("À vista") or in 2 to 12
+    /// installments a year.
+    /// </summary>
+    public List<int> YearlyPaymentOptions { get; } = [SetupExpenseItem.MonthlyPayment, .. Enumerable.Range(1, 12)];
     public ObservableCollection<SetupSummaryRow> SummaryRows { get; } = [];
     public List<int> DueDays { get; } = [NoDueDay, .. Enumerable.Range(1, 31)];
     public List<RecurrenceType> PurchaseRecurrences { get; } = [RecurrenceType.OneTime, RecurrenceType.Installments, RecurrenceType.Recurrent];
@@ -260,7 +278,8 @@ public partial class SetupViewModel : ObservableObject
         IUserProfileService profileService,
         IMediaPicker mediaPicker,
         IMessenger messenger,
-        IWriteGuard writeGuard)
+        IWriteGuard writeGuard,
+        TimeProvider timeProvider)
     {
         _setupService = setupService;
         _paymentSourceService = paymentSourceService;
@@ -268,6 +287,7 @@ public partial class SetupViewModel : ObservableObject
         _mediaPicker = mediaPicker;
         _messenger = messenger;
         _writeGuard = writeGuard;
+        _timeProvider = timeProvider;
         NewSources.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasNewSources));
         NewCards.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasNewCards));
         AvailableSources.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasAvailableSources));
@@ -325,7 +345,7 @@ public partial class SetupViewModel : ObservableObject
         Reset(HealthExpenses, CreateHealthExpenses());
         Reset(SchoolExpenses, CreateSchoolExpenses());
         Reset(LeisureExpenses, CreateLeisureExpenses());
-        Reset(CarExpenses, CreateCarExpenses());
+        ResetCarExpenses();
 
         SummaryRows.Clear();
         TotalIncome = 0;
@@ -596,7 +616,7 @@ public partial class SetupViewModel : ObservableObject
                 ResetNewCarForm();
                 Reset(HealthExpenses, CreateHealthExpenses());
                 Reset(SchoolExpenses, CreateSchoolExpenses());
-                Reset(CarExpenses, CreateCarExpenses());
+                ResetCarExpenses();
                 Reset(LeisureExpenses, CreateLeisureExpenses());
                 break;
         }
@@ -756,6 +776,9 @@ public partial class SetupViewModel : ObservableObject
         {
             Description = expense.Description,
             Amount = expense.Amount,
+            Recurrence = expense.IsPaidYearly ? RecurrenceType.Annual : RecurrenceType.Recurrent,
+            TotalInstallments = expense.IsPaidYearly ? expense.YearlyInstallments : null,
+            AnnualStartMonth = expense.IsPaidYearly ? expense.YearlyStartMonth : null,
             DueDay = expense.DueDay == NoDueDay ? null : expense.DueDay,
             IsEstimated = expense.IsEstimated && !isOnCardBill,
             AllowsPartialPayment = expense.AllowsPartialPayment && !isOnCardBill,
@@ -891,6 +914,26 @@ public partial class SetupViewModel : ObservableObject
         NewPurchaseTotalInstallments = null;
     }
 
+    private void ResetCarExpenses()
+    {
+        Reset(CarExpenses, CreateCarExpenses());
+        CarInsurance = CarExpenses.Single(e => e.OffersYearlyPayment);
+    }
+
+    partial void OnCarInsuranceChanged(SetupExpenseItem? oldValue, SetupExpenseItem? newValue)
+    {
+        if (oldValue is not null)
+            oldValue.PropertyChanged -= OnCarInsurancePropertyChanged;
+        if (newValue is not null)
+            newValue.PropertyChanged += OnCarInsurancePropertyChanged;
+    }
+
+    private void OnCarInsurancePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SetupExpenseItem.IsSelected))
+            OnPropertyChanged(nameof(IsCarInsurancePaymentVisible));
+    }
+
     private static void Reset(ObservableCollection<SetupExpenseItem> list, IEnumerable<SetupExpenseItem> items)
     {
         list.Clear();
@@ -901,25 +944,26 @@ public partial class SetupViewModel : ObservableObject
     private static IEnumerable<SetupExpenseItem> CreateHouseExpenses() =>
     [
         new() { Icon = "🏠", Description = "Aluguel", CategoryName = "Moradia" },
-        new() { Icon = "🏢", Description = "Condomínio", CategoryName = "Moradia" },
-        new() { Icon = "💡", Description = "Energia", CategoryName = "Moradia", IsEstimated = true },
-        new() { Icon = "🚿", Description = "Água", CategoryName = "Moradia", IsEstimated = true },
+        new() { Icon = "🏢", Description = "Condomínio", CategoryName = "Moradia", CanBeEstimated = true },
+        new() { Icon = "💡", Description = "Energia", CategoryName = "Moradia", CanBeEstimated = true, IsEstimated = true },
+        new() { Icon = "🚿", Description = "Água", CategoryName = "Moradia", CanBeEstimated = true, IsEstimated = true },
         new() { Icon = "🌐", Description = "Internet", CategoryName = "Moradia" },
         new() { Icon = "📱", Description = "Celular", CategoryName = "Moradia" },
         new()
         {
             Icon = "🛒", Description = "Mercado", CategoryName = "Mercado",
-            IsEstimated = true, AllowsPartialPayment = true
+            CanBeEstimated = true, IsEstimated = true, CanBePartiallyPaid = true, AllowsPartialPayment = true
         }
     ];
 
+    // A health plan with copayment ("coparticipação") varies with the month's appointments.
     private static IEnumerable<SetupExpenseItem> CreateHealthExpenses() =>
     [
-        new() { Icon = "🩺", Description = "Plano de saúde", CategoryName = "Saúde" },
+        new() { Icon = "🩺", Description = "Plano de saúde", CategoryName = "Saúde", CanBeEstimated = true },
         new()
         {
             Icon = "💊", Description = "Farmácia", CategoryName = "Saúde",
-            IsEstimated = true, AllowsPartialPayment = true
+            CanBeEstimated = true, IsEstimated = true, CanBePartiallyPaid = true, AllowsPartialPayment = true
         }
     ];
 
@@ -935,13 +979,23 @@ public partial class SetupViewModel : ObservableObject
         new()
         {
             Icon = "🍽️", Description = "Restaurantes e delivery", CategoryName = "Lazer",
-            IsEstimated = true, AllowsPartialPayment = true
+            CanBeEstimated = true, IsEstimated = true, CanBePartiallyPaid = true, AllowsPartialPayment = true
         }
     ];
 
-    private static IEnumerable<SetupExpenseItem> CreateCarExpenses() =>
+    // The insurance policy lasts a year: paid every month, or at once or in installments from the month it renews
+    // (the current month until the user picks another).
+    private IEnumerable<SetupExpenseItem> CreateCarExpenses() =>
     [
-        new() { Icon = "⛽", Description = "Combustível", CategoryName = "Transporte", IsEstimated = true },
-        new() { Icon = "🛡️", Description = "Seguro do carro", CategoryName = "Transporte" }
+        new()
+        {
+            Icon = "⛽", Description = "Combustível", CategoryName = "Transporte",
+            CanBeEstimated = true, IsEstimated = true, CanBePartiallyPaid = true
+        },
+        new()
+        {
+            Icon = "🛡️", Description = CarInsuranceDescription, CategoryName = "Transporte",
+            OffersYearlyPayment = true, YearlyStartMonth = _timeProvider.GetLocalNow().Month
+        }
     ];
 }

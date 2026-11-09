@@ -320,6 +320,32 @@ public class SetupPageObject
         _session.ScrollDownUntil(() => IsAboveFooter(option, footerTop), $"the option of \"{description}\" to be on screen");
     }
 
+    /// <summary>
+    /// Which of "Valor estimado" and "Pagamento parcial" the selected expense offers. The whole row is scrolled above
+    /// the footer first, so an option missing from the screen is one the row doesn't have.
+    /// </summary>
+    public (bool Estimated, bool PartialPayment) ExpenseOptions(string description)
+    {
+        _session.HideKeyboardIfShown();
+        var row = By.XPath($"//*[@resource-id='{E2ESettings.AppPackage}:id/SetupExpenseRow'][.//*[@text='{description}']]");
+        var footerTop = _session.WaitForVisible(NextButton).Location.Y;
+        _session.ScrollDownUntil(() => IsAboveFooter(row, footerTop), $"the row of \"{description}\" to be on screen");
+        return (_session.IsVisible(ExpenseRowElement(description, "SetupExpenseEstimatedOption")),
+                _session.IsVisible(ExpenseRowElement(description, "SetupExpensePartialPaymentOption")));
+    }
+
+    /// <summary>
+    /// Picks how the ticked car insurance is paid: once a year or in <paramref name="installments"/> a year, from
+    /// <paramref name="firstMonth"/>.
+    /// </summary>
+    public SetupPageObject PayCarInsuranceYearly(int installments, int firstMonth)
+    {
+        _session.HideKeyboardIfShown();
+        SelectOption("SetupCarInsurancePaymentPicker", AppLabels.YearlyPayment(installments));
+        SelectOption("SetupCarInsuranceMonthPicker", AppLabels.MonthName(firstMonth));
+        return this;
+    }
+
     private bool IsOptionChecked(string description, string checkBoxId) =>
         _session.WaitForVisible(ExpenseRowElement(description, checkBoxId)).GetAttribute("checked") == "true";
 
