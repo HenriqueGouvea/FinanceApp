@@ -28,6 +28,7 @@ public sealed class SetupTests : E2ETestBase
     private const string School = "Mensalidade escolar";
     private const string EatingOut = "Restaurantes e delivery";
     private const string Fuel = "Combustível";
+    private const string CarInsurance = "Seguro do carro";
 
     private readonly SetupPageObject _setup;
 
@@ -106,11 +107,22 @@ public sealed class SetupTests : E2ETestBase
             .EnterSalary(5000)
             .SelectSalaryDay(6)
             .Next()
-            .SelectExpense(Rent, 1500, dueDay: 10)
-            .SelectExpense(Energy, 200, dueDay: 15)
-            .SelectExpense(Supermarket, 1000)
-            .Next()
-            .Next();
+            .SelectExpense(Rent, 1500, dueDay: 10);
+        var rentOptions = _setup.ExpenseOptions(Rent);
+        _setup.SelectExpense(Energy, 200, dueDay: 15);
+        var energyOptions = _setup.ExpenseOptions(Energy);
+        _setup.SelectExpense(Supermarket, 1000);
+        var supermarketOptions = _setup.ExpenseOptions(Supermarket);
+
+        // Only a bill that varies offers "Valor estimado", and only one paid little by little "Pagamento parcial".
+        using (new AssertionScope())
+        {
+            rentOptions.Should().Be((false, false));
+            energyOptions.Should().Be((true, false));
+            supermarketOptions.Should().Be((true, true));
+        }
+
+        _setup.Next().Next();
 
         using (new AssertionScope())
         {
@@ -213,7 +225,7 @@ public sealed class SetupTests : E2ETestBase
     }
 
     [Fact]
-    public async Task OwnHomeAndCar_Finish_CreatesTheirAnnualTaxes()
+    public async Task OwnHomeAndCar_Finish_CreatesTheirAnnualTaxesAndInsurance()
     {
         _setup.Next().Next().Next().Next()
             .SelectHasOwnHome()
@@ -222,12 +234,15 @@ public sealed class SetupTests : E2ETestBase
 
         _setup.Next()
             .SelectHasCar()
+            .SelectExpense(CarInsurance, 300)
+            .PayCarInsuranceYearly(installments: 10, firstMonth: 3)
             .AddCar("Onix", ipva: 800, ipvaInstallments: 3, licensing: 160);
         _setup.CarDetails.Should().Equal("IPVA todo ano, janeiro a março (3x) · Licenciamento todo ano em julho");
 
         _setup.Next();
         _setup.SummaryRows.Should().Equal(
             ("IPTU (Apartamento)", "Todo ano, fevereiro a novembro (10x)", AppFormat.Money(150)),
+            (CarInsurance, "Todo ano, março a dezembro (10x)", AppFormat.Money(300)),
             ("IPVA (Onix)", "Todo ano, janeiro a março (3x)", AppFormat.Money(800)),
             ("Licenciamento (Onix)", "Todo ano em julho", AppFormat.Money(160)));
 
@@ -240,6 +255,7 @@ public sealed class SetupTests : E2ETestBase
             .Should().BeEquivalentTo(
             [
                 ("IPTU (Apartamento)", AppFormat.Annual, AppFormat.AnnualStart(2, 10), (int?)10, 150m, CategoryId("Moradia")),
+                (CarInsurance, AppFormat.Annual, AppFormat.AnnualStart(3, 10), (int?)10, 300m, CategoryId("Transporte")),
                 ("IPVA (Onix)", AppFormat.Annual, AppFormat.AnnualStart(1, 3), (int?)3, 800m, CategoryId("Transporte")),
                 ("Licenciamento (Onix)", AppFormat.Annual, AppFormat.AnnualStart(7, 1), (int?)null, 160m, CategoryId("Transporte"))
             ]);

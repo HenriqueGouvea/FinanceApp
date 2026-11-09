@@ -25,4 +25,13 @@ public class AnnualTaxConverterTests
     {
         AnnualInstallmentsToLabelConverter.Instance.Convert(count, typeof(string), null, CultureInfo.InvariantCulture).Should().Be(expected);
     }
+
+    [Theory]
+    [InlineData(0, "Todo mês")]
+    [InlineData(1, "À vista")]
+    [InlineData(10, "10x")]
+    public void YearlyPaymentToLabel_LabelsMonthlySinglePaymentAndInstallments(int installments, string expected)
+    {
+        YearlyPaymentToLabelConverter.Instance.Convert(installments, typeof(string), null, CultureInfo.InvariantCulture).Should().Be(expected);
+    }
 }

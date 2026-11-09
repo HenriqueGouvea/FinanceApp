@@ -10,6 +10,16 @@ public static class AppLabels
     public const string Installments = "Parcelada";
     public const string Annual = "Todo ano (anual)";
     public static string AnnualInstallments(int count) => count > 1 ? $"{count} parcelas" : "Cota única";
+    public static string YearlyPayment(int installments) => installments switch { 0 => "Todo mês", 1 => "À vista", _ => $"{installments}x" };
+
+    /// <summary>
+    /// "Março": a month as the month pickers name it.
+    /// </summary>
+    public static string MonthName(int month)
+    {
+        var name = new System.Globalization.CultureInfo("pt-BR").DateTimeFormat.GetMonthName(month);
+        return char.ToUpperInvariant(name[0]) + name[1..];
+    }
 
     public const string NewEntryTitle = "Novo Lançamento";
     public const string EditEntryTitle = "Editar Lançamento";
