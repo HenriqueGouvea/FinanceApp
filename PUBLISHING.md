@@ -22,6 +22,9 @@ network traffic, the PIN is stored properly, and the code has good test coverage
    **Fixed in "Release pipeline":** `release.yml`, see [RELEASING.md](RELEASING.md) (the upload key, secrets
    and Play Console steps are the owner's).
 4. **There is no privacy policy, store listing or "Sobre" screen.** Play requires the policy for every app.
+   **Fixed in "Store presence":** the policy and terms in `docs/` (GitHub Pages), "Sobre o Mensal" in
+   "Configurações" and the listing in `fastlane/` (the Play Console forms and the closed test are the owner's,
+   in [RELEASING.md](RELEASING.md)).
 5. **A new personal Play developer account must run a closed test** with at least 12 testers for 14 days in a
    row before it can publish to production. This takes the longest, so start it as soon as an AAB exists.
 
@@ -236,6 +239,8 @@ big enough to show all 8, so it only failed in the full post-merge run.
 
 1. **Package id** (section 6). **Decided:** `io.github.henriquegouvea.mensal`.
 2. **v1.0 with or without ads** (recommended: without, section 9). Decides whether `INTERNET` goes (S8).
+   **For now: without.** The privacy policy, terms and the Data safety answers say so; the owner wants to
+   monetize later, and the AdMob task updates them before ads ship.
 3. **Individual or company** for the Play account and the income (section 7, ask an accountant).
 4. **Public repository?** It's public with no license, which means "all rights reserved", but anyone can read
    and copy the code, including how premium is unlocked. Making it private costs GitHub Actions minutes (free

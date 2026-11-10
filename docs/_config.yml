@@ -1,0 +1,7 @@
+# GitHub Pages site of Mensal (served from /docs on master): the privacy policy and terms of use that Google Play
+# and the app's "Sobre o Mensal" page link to. Their URLs are fixed by the permalinks; don't change them.
+title: Mensal
+description: Todas as contas, um só rumo.
+lang: pt-BR
+baseurl: /FinanceApp
+markdown: kramdown
