@@ -42,6 +42,11 @@ public partial class SetupViewModel : ObservableObject
     private readonly HashSet<SetupStep> _skippedSteps = [];
     private Func<bool, Task>? _onClosed;
 
+    /// <summary>
+    /// The first bank account added in this run, which pays every expense until the user picks another for it.
+    /// </summary>
+    private PaymentSource? _defaultExpenseSource;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StepNumber), nameof(Progress), nameof(IsFirstStep), nameof(IsLastStep), nameof(NextButtonText),
         nameof(IsWelcomeStep), nameof(IsPaymentSourcesStep), nameof(IsCreditCardsStep), nameof(IsIncomeStep),
@@ -117,14 +122,6 @@ public partial class SetupViewModel : ObservableObject
     [ObservableProperty] int advanceDay = DefaultAdvanceDay;
     [ObservableProperty] PaymentSource? salarySource;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsExpensesSourceCreditCard))]
-    PaymentSource? expensesSource;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsOtherExpensesSourceCreditCard))]
-    PaymentSource? otherExpensesSource;
-
     [ObservableProperty] bool hasChildren;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsCarInsurancePaymentVisible))]
@@ -150,6 +147,7 @@ public partial class SetupViewModel : ObservableObject
     [ObservableProperty] int newHomeFinancingDueDay = NoDueDay;
     [ObservableProperty] int newHomeIptuStartMonth = DefaultIptuStartMonth;
     [ObservableProperty] int newHomeIptuInstallments = 1;
+    [ObservableProperty] PaymentSource? newHomeSource;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddCarCommand))]
@@ -163,6 +161,7 @@ public partial class SetupViewModel : ObservableObject
     [ObservableProperty] int newCarIpvaStartMonth = DefaultIpvaStartMonth;
     [ObservableProperty] int newCarIpvaInstallments = 1;
     [ObservableProperty] int newCarLicensingMonth = DefaultLicensingMonth;
+    [ObservableProperty] PaymentSource? newCarSource;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSkippedSteps))]
@@ -217,10 +216,6 @@ public partial class SetupViewModel : ObservableObject
 
     public decimal MonthlySalary => Salary + (IsSalarySplit ? Advance : 0);
 
-    // Expenses paid with a credit card go to its bill, which is never estimated nor paid little by little.
-    public bool IsExpensesSourceCreditCard => ExpensesSource?.Type == PaymentSourceType.CreditCard;
-    public bool IsOtherExpensesSourceCreditCard => OtherExpensesSource?.Type == PaymentSourceType.CreditCard;
-
     /// <summary>
     /// Accounts and vouchers added in this run, created only when the wizard finishes.
     /// </summary>
@@ -252,6 +247,8 @@ public partial class SetupViewModel : ObservableObject
     public ObservableCollection<SetupExpenseItem> SchoolExpenses { get; } = [];
     public ObservableCollection<SetupExpenseItem> LeisureExpenses { get; } = [];
     public ObservableCollection<SetupExpenseItem> CarExpenses { get; } = [];
+
+    private IEnumerable<SetupExpenseItem> AllExpenses => [.. Expenses, .. HealthExpenses, .. SchoolExpenses, .. CarExpenses, .. LeisureExpenses];
     public ObservableCollection<SetupHomeItem> Homes { get; } = [];
     public ObservableCollection<SetupCarItem> Cars { get; } = [];
     public bool HasHomes => Homes.Count > 0;
@@ -329,8 +326,9 @@ public partial class SetupViewModel : ObservableObject
         Advance = 0;
         AdvanceDay = DefaultAdvanceDay;
         SalarySource = null;
-        ExpensesSource = null;
-        OtherExpensesSource = null;
+        _defaultExpenseSource = null;
+        NewHomeSource = null;
+        NewCarSource = null;
         HasChildren = false;
         HasCar = false;
         HasOwnHome = false;
@@ -378,8 +376,8 @@ public partial class SetupViewModel : ObservableObject
     private bool CanAddSource() => !string.IsNullOrWhiteSpace(NewSourceName);
 
     /// <summary>
-    /// The first bank account added becomes where the salary is received, the expenses are paid and the new cards'
-    /// bills are debited.
+    /// The first bank account added becomes where the salary is received, the expenses are paid (each one can pick
+    /// another) and the new cards' bills are debited.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanAddSource))]
     void AddSource()
@@ -391,12 +389,23 @@ public partial class SetupViewModel : ObservableObject
         if (source.Type == PaymentSourceType.BankAccount)
         {
             SalarySource ??= source;
-            ExpensesSource ??= source;
-            OtherExpensesSource ??= source;
             NewCardBillAccount ??= source;
+            if (_defaultExpenseSource is null)
+                SetDefaultExpenseSource(source);
         }
 
         ResetNewSourceForm();
+    }
+
+    private void SetDefaultExpenseSource(PaymentSource source)
+    {
+        _defaultExpenseSource = source;
+        foreach (var expense in AllExpenses.Where(e => e.PaymentSource is null))
+            expense.PaymentSource = source;
+        NewHomeSource ??= source;
+        NewCarSource ??= source;
+        ReplaceSource(Homes, null, source, (home, s) => home with { PaymentSource = s }, home => home.PaymentSource);
+        ReplaceSource(Cars, null, source, (car, s) => car with { PaymentSource = s }, car => car.PaymentSource);
     }
 
     [RelayCommand]
@@ -405,8 +414,6 @@ public partial class SetupViewModel : ObservableObject
         NewSources.Remove(source);
         RemoveFromPickers(source);
 
-        if (NewCardBillAccount == source)
-            NewCardBillAccount = null;
         foreach (var card in NewCards.Where(c => c.BillAccount == source))
             card.BillAccount = null;
     }
@@ -440,8 +447,7 @@ public partial class SetupViewModel : ObservableObject
 
         foreach (var purchase in Purchases.Where(p => p.Card == item.Card).ToList())
             Purchases.Remove(purchase);
-        if (NewPurchaseCard == item.Card)
-            NewPurchaseCard = CreditCards.FirstOrDefault();
+        NewPurchaseCard ??= CreditCards.FirstOrDefault();
     }
 
     [RelayCommand]
@@ -500,7 +506,8 @@ public partial class SetupViewModel : ObservableObject
             NewHomeFinancingDueDay,
             NewHomeIptu,
             NewHomeIptuStartMonth,
-            NewHomeIptuInstallments));
+            NewHomeIptuInstallments,
+            NewHomeSource));
         ResetNewHomeForm();
     }
 
@@ -521,7 +528,8 @@ public partial class SetupViewModel : ObservableObject
             NewCarIpvaStartMonth,
             NewCarIpvaInstallments,
             NewCarLicensing,
-            NewCarLicensingMonth));
+            NewCarLicensingMonth,
+            NewCarSource));
         ResetNewCarForm();
     }
 
@@ -692,7 +700,7 @@ public partial class SetupViewModel : ObservableObject
                 PaymentSource = purchase.Card
             });
 
-        foreach (var entry in BuildExpenses(Expenses, ExpensesSource))
+        foreach (var entry in BuildExpenses(Expenses))
             yield return entry;
 
         if (HasOwnHome)
@@ -705,14 +713,14 @@ public partial class SetupViewModel : ObservableObject
             .. HasChildren ? SchoolExpenses : Enumerable.Empty<SetupExpenseItem>(),
             .. HasCar ? CarExpenses : Enumerable.Empty<SetupExpenseItem>()
         ];
-        foreach (var entry in BuildExpenses(otherExpenses, OtherExpensesSource))
+        foreach (var entry in BuildExpenses(otherExpenses))
             yield return entry;
 
         if (HasCar)
             foreach (var entry in BuildCarEntries())
                 yield return entry;
 
-        foreach (var entry in BuildExpenses(LeisureExpenses, OtherExpensesSource))
+        foreach (var entry in BuildExpenses(LeisureExpenses))
             yield return entry;
     }
 
@@ -727,11 +735,11 @@ public partial class SetupViewModel : ObservableObject
                     Amount = home.Financing,
                     DueDay = home.FinancingDueDay == NoDueDay ? null : home.FinancingDueDay,
                     CategoryName = "Moradia",
-                    PaymentSource = ExpensesSource
+                    PaymentSource = home.PaymentSource
                 });
 
             if (home.Iptu > 0)
-                yield return ("🧾", CreateAnnualTax($"IPTU ({home.Name})", home.Iptu, home.IptuStartMonth, home.IptuInstallments, "Moradia", ExpensesSource));
+                yield return ("🧾", CreateAnnualTax($"IPTU ({home.Name})", home.Iptu, home.IptuStartMonth, home.IptuInstallments, "Moradia", home.PaymentSource));
         }
     }
 
@@ -740,10 +748,10 @@ public partial class SetupViewModel : ObservableObject
         foreach (var car in Cars)
         {
             if (car.Ipva > 0)
-                yield return ("🚗", CreateAnnualTax($"IPVA ({car.Name})", car.Ipva, car.IpvaStartMonth, car.IpvaInstallments, "Transporte", OtherExpensesSource));
+                yield return ("🚗", CreateAnnualTax($"IPVA ({car.Name})", car.Ipva, car.IpvaStartMonth, car.IpvaInstallments, "Transporte", car.PaymentSource));
 
             if (car.Licensing > 0)
-                yield return ("📄", CreateAnnualTax($"Licenciamento ({car.Name})", car.Licensing, car.LicensingMonth, 1, "Transporte", OtherExpensesSource));
+                yield return ("📄", CreateAnnualTax($"Licenciamento ({car.Name})", car.Licensing, car.LicensingMonth, 1, "Transporte", car.PaymentSource));
         }
     }
 
@@ -768,24 +776,21 @@ public partial class SetupViewModel : ObservableObject
         PaymentSource = SalarySource
     };
 
-    private static IEnumerable<(string Icon, SetupEntry Entry)> BuildExpenses(IEnumerable<SetupExpenseItem> expenses, PaymentSource? source)
-    {
-        var isOnCardBill = source?.Type == PaymentSourceType.CreditCard;
-
-        return expenses.Where(e => e.IsSelected && e.Amount > 0).Select(expense => (expense.Icon, new SetupEntry
+    // An expense on a credit card bill falls due with the bill, so its own due day is dropped.
+    private static IEnumerable<(string Icon, SetupEntry Entry)> BuildExpenses(IEnumerable<SetupExpenseItem> expenses) =>
+        expenses.Where(e => e.IsSelected && e.Amount > 0).Select(expense => (expense.Icon, new SetupEntry
         {
             Description = expense.Description,
             Amount = expense.Amount,
             Recurrence = expense.IsPaidYearly ? RecurrenceType.Annual : RecurrenceType.Recurrent,
             TotalInstallments = expense.IsPaidYearly ? expense.YearlyInstallments : null,
             AnnualStartMonth = expense.IsPaidYearly ? expense.YearlyStartMonth : null,
-            DueDay = expense.DueDay == NoDueDay ? null : expense.DueDay,
-            IsEstimated = expense.IsEstimated && !isOnCardBill,
-            AllowsPartialPayment = expense.AllowsPartialPayment && !isOnCardBill,
+            DueDay = expense.DueDay == NoDueDay || expense.IsOnCreditCardBill ? null : expense.DueDay,
+            IsEstimated = expense.IsEstimated && !expense.IsOnCreditCardBill,
+            AllowsPartialPayment = expense.AllowsPartialPayment && !expense.IsOnCreditCardBill,
             CategoryName = expense.CategoryName,
-            PaymentSource = source
+            PaymentSource = expense.PaymentSource
         }));
-    }
 
     private void BuildSummary()
     {
@@ -855,18 +860,45 @@ public partial class SetupViewModel : ObservableObject
             CreditCards.Add(source);
     }
 
+    /// <summary>
+    /// Takes a removed source out of the pickers and of everything that was paid with it.
+    /// </summary>
     private void RemoveFromPickers(PaymentSource source)
     {
+        // A picker keeps its selected index when an item above it is removed, so it would slide to the next source:
+        // what each picker held is set again once the lists have changed.
+        PaymentSource? Keep(PaymentSource? held) => held == source ? null : held;
+        var salarySource = Keep(SalarySource);
+        var billAccount = Keep(NewCardBillAccount);
+        var purchaseCard = Keep(NewPurchaseCard);
+        var homeSource = Keep(NewHomeSource);
+        var carSource = Keep(NewCarSource);
+        var expenseSources = AllExpenses.Select(e => (Expense: e, Source: Keep(e.PaymentSource))).ToList();
+
         AvailableSources.Remove(source);
         BillAccounts.Remove(source);
         CreditCards.Remove(source);
 
-        if (SalarySource == source)
-            SalarySource = null;
-        if (ExpensesSource == source)
-            ExpensesSource = null;
-        if (OtherExpensesSource == source)
-            OtherExpensesSource = null;
+        SalarySource = salarySource;
+        NewCardBillAccount = billAccount;
+        NewPurchaseCard = purchaseCard;
+        NewHomeSource = homeSource;
+        NewCarSource = carSource;
+        foreach (var (expense, held) in expenseSources)
+            expense.PaymentSource = held;
+        ReplaceSource(Homes, source, null, (home, s) => home with { PaymentSource = s }, home => home.PaymentSource);
+        ReplaceSource(Cars, source, null, (car, s) => car with { PaymentSource = s }, car => car.PaymentSource);
+
+        if (_defaultExpenseSource == source)
+            _defaultExpenseSource = null;
+    }
+
+    private static void ReplaceSource<T>(
+        ObservableCollection<T> items, PaymentSource? from, PaymentSource? to, Func<T, PaymentSource?, T> with, Func<T, PaymentSource?> sourceOf)
+    {
+        for (var i = 0; i < items.Count; i++)
+            if (sourceOf(items[i]) == from)
+                items[i] = with(items[i], to);
     }
 
     private void ResetNewSourceForm()
@@ -934,11 +966,15 @@ public partial class SetupViewModel : ObservableObject
             OnPropertyChanged(nameof(IsCarInsurancePaymentVisible));
     }
 
-    private static void Reset(ObservableCollection<SetupExpenseItem> list, IEnumerable<SetupExpenseItem> items)
+    private void Reset(ObservableCollection<SetupExpenseItem> list, IEnumerable<SetupExpenseItem> items)
     {
         list.Clear();
         foreach (var item in items)
+        {
+            item.Sources = AvailableSources;
+            item.PaymentSource = _defaultExpenseSource;
             list.Add(item);
+        }
     }
 
     private static IEnumerable<SetupExpenseItem> CreateHouseExpenses() =>

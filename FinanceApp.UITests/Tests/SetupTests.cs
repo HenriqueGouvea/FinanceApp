@@ -109,17 +109,23 @@ public sealed class SetupTests : E2ETestBase
             .Next()
             .SelectExpense(Rent, 1500, dueDay: 10);
         var rentOptions = _setup.ExpenseOptions(Rent);
+        var rentSource = _setup.ExpenseSource(Rent);
         _setup.SelectExpense(Energy, 200, dueDay: 15);
         var energyOptions = _setup.ExpenseOptions(Energy);
         _setup.SelectExpense(Supermarket, 1000);
         var supermarketOptions = _setup.ExpenseOptions(Supermarket);
+        _setup.SelectExpenseSource(Supermarket, Card);
+        var supermarketOnCardOptions = _setup.ExpenseOptions(Supermarket);
 
         // Only a bill that varies offers "Valor estimado", and only one paid little by little "Pagamento parcial".
+        // On a credit card, the expense goes to the bill, which offers neither. Expenses start on the first account.
         using (new AssertionScope())
         {
+            rentSource.Should().Be(Account);
             rentOptions.Should().Be((false, false));
             energyOptions.Should().Be((true, false));
             supermarketOptions.Should().Be((true, true));
+            supermarketOnCardOptions.Should().Be((false, false));
         }
 
         _setup.Next().Next();
@@ -133,7 +139,7 @@ public sealed class SetupTests : E2ETestBase
                 (Phone, AppLabels.SetupInstallmentSchedule(3, 10, Card), AppFormat.Money(250)),
                 (Rent, AppLabels.SetupSchedule("dia 10", Account), AppFormat.Money(1500)),
                 (Energy, AppLabels.SetupSchedule("dia 15", AppLabels.EstimatedValue, Account), AppFormat.Money(200)),
-                (Supermarket, AppLabels.SetupSchedule(AppLabels.EstimatedValue, AppLabels.PartialPaymentValue, Account), AppFormat.Money(1000)));
+                (Supermarket, AppLabels.SetupSchedule(Card), AppFormat.Money(1000)));
             _setup.SummaryIncomeText.Should().Be(AppFormat.Money(5000));
             _setup.SummaryOutcomeText.Should().Be(AppFormat.Money(2950));
             _setup.SummaryBalanceText.Should().Be(AppFormat.Money(2050));
@@ -174,7 +180,7 @@ public sealed class SetupTests : E2ETestBase
                 (Salary, 5000m, AppFormat.Income, (int?)6, false, false, (int?)CategoryId("Salário"), (int?)accountId),
                 (Rent, 1500m, AppFormat.Outcome, (int?)10, false, false, (int?)CategoryId("Moradia"), (int?)accountId),
                 (Energy, 200m, AppFormat.Outcome, (int?)15, true, false, (int?)CategoryId("Moradia"), (int?)accountId),
-                (Supermarket, 1000m, AppFormat.Outcome, (int?)null, true, true, (int?)CategoryId("Mercado"), (int?)accountId)
+                (Supermarket, 1000m, AppFormat.Outcome, (int?)null, false, false, (int?)CategoryId("Mercado"), (int?)cardId)
             ]);
     }
 

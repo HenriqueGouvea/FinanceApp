@@ -1,3 +1,5 @@
+using FinanceApp.Models;
+
 namespace FinanceApp.ViewModels;
 
 /// <summary>
@@ -12,10 +14,11 @@ public record SetupCarItem(
     int IpvaStartMonth,
     int IpvaInstallments,
     decimal Licensing,
-    int LicensingMonth)
+    int LicensingMonth,
+    PaymentSource? PaymentSource = null)
 {
     /// <summary>
-    /// "IPVA todo ano, janeiro a março (3x) · Licenciamento todo ano em julho".
+    /// "IPVA todo ano, janeiro a março (3x) · Licenciamento todo ano em julho · Nubank".
     /// </summary>
     public string Detail
     {
@@ -26,6 +29,8 @@ public record SetupCarItem(
                 parts.Add($"IPVA {SetupViewModel.DescribeAnnual(IpvaStartMonth, IpvaInstallments).ToLowerInvariant()}");
             if (Licensing > 0)
                 parts.Add($"Licenciamento {SetupViewModel.DescribeAnnual(LicensingMonth, 1).ToLowerInvariant()}");
+            if (PaymentSource is { } source)
+                parts.Add(source.Name);
             return string.Join(" · ", parts);
         }
     }

@@ -1,3 +1,5 @@
+using FinanceApp.Models;
+
 namespace FinanceApp.ViewModels;
 
 /// <summary>
@@ -10,10 +12,11 @@ public record SetupHomeItem(
     int FinancingDueDay,
     decimal Iptu,
     int IptuStartMonth,
-    int IptuInstallments)
+    int IptuInstallments,
+    PaymentSource? PaymentSource = null)
 {
     /// <summary>
-    /// "Financiamento · IPTU todo ano, fevereiro a novembro (10x)".
+    /// "Financiamento · IPTU todo ano, fevereiro a novembro (10x) · Nubank".
     /// </summary>
     public string Detail
     {
@@ -24,6 +27,8 @@ public record SetupHomeItem(
                 parts.Add("Financiamento");
             if (Iptu > 0)
                 parts.Add($"IPTU {SetupViewModel.DescribeAnnual(IptuStartMonth, IptuInstallments).ToLowerInvariant()}");
+            if (PaymentSource is { } source)
+                parts.Add(source.Name);
             return string.Join(" · ", parts);
         }
     }

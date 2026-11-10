@@ -12,7 +12,6 @@ public class SetupPageObject
 {
     private const string SalaryEntryId = "SetupSalaryEntry";
     private const string SalaryDayPickerId = "SetupSalaryDayPicker";
-    private const string ExpensesSourcePickerId = "SetupExpensesSourcePicker";
 
     private static readonly By StepLabel = AppSession.AutomationId("SetupStepLabel");
     private static readonly By SkipButton = AppSession.AutomationId("SetupSkipButton");
@@ -328,8 +327,7 @@ public class SetupPageObject
     {
         _session.HideKeyboardIfShown();
         var row = By.XPath($"//*[@resource-id='{E2ESettings.AppPackage}:id/SetupExpenseRow'][.//*[@text='{description}']]");
-        var footerTop = _session.WaitForVisible(NextButton).Location.Y;
-        _session.ScrollDownUntil(() => IsAboveFooter(row, footerTop), $"the row of \"{description}\" to be on screen");
+        _session.ScrollDownUntil(() => IsWhollyOnScreen(row), $"the whole row of \"{description}\" to be on screen");
         return (_session.IsVisible(ExpenseRowElement(description, "SetupExpenseEstimatedOption")),
                 _session.IsVisible(ExpenseRowElement(description, "SetupExpensePartialPaymentOption")));
     }
@@ -349,12 +347,25 @@ public class SetupPageObject
     private bool IsOptionChecked(string description, string checkBoxId) =>
         _session.WaitForVisible(ExpenseRowElement(description, checkBoxId)).GetAttribute("checked") == "true";
 
-    public SetupPageObject SelectExpensesSource(string sourceName)
+    /// <summary>
+    /// The account or credit card the selected expense's "Pago com" shows.
+    /// </summary>
+    public string ExpenseSource(string description)
     {
-        _session.HideKeyboardIfShown();
-        _session.ScrollToAndTap(ExpensesSourcePickerId);
-        _session.Tap(AppSession.Text(sourceName));
-        _session.WaitForText(AppSession.AutomationId(ExpensesSourcePickerId), sourceName);
+        ShowOption(description, "SetupExpenseSourcePicker");
+        return _session.WaitForVisible(ExpenseRowElement(description, "SetupExpenseSourcePicker")).Text;
+    }
+
+    /// <summary>
+    /// Picks the account or credit card that pays the selected expense ("Pago com" in its row).
+    /// </summary>
+    public SetupPageObject SelectExpenseSource(string description, string sourceName)
+    {
+        ShowOption(description, "SetupExpenseSourcePicker");
+        var picker = ExpenseRowElement(description, "SetupExpenseSourcePicker");
+        _session.Tap(picker);
+        _session.ScrollDialogListToAndTap(sourceName);
+        _session.WaitForText(picker, sourceName);
         return this;
     }
 
@@ -521,6 +532,16 @@ public class SetupPageObject
         _session.ScrollDialogListToAndTap(AppLabels.DueDay(day));
         _session.WaitForText(AppSession.AutomationId(pickerId), AppLabels.DueDay(day));
         return this;
+    }
+
+    // A partly hidden element reports its bounds clipped to the scroll view, so its bottom edge then sits on the
+    // scroll view's: only one ending above it is shown whole.
+    private bool IsWhollyOnScreen(By locator)
+    {
+        var scrollView = _session.Driver.FindElements(By.XPath("//android.widget.ScrollView[@scrollable='true']")).First(e => e.Displayed);
+        var top = scrollView.Location.Y;
+        var bottom = top + scrollView.Size.Height;
+        return _session.Driver.FindElements(locator).Any(e => e.Displayed && e.Location.Y > top && e.Location.Y + e.Size.Height < bottom);
     }
 
     private bool IsAboveFooter(By locator, int footerTop) =>
