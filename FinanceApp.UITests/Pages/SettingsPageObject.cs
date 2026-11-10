@@ -5,7 +5,8 @@ using OpenQA.Selenium.Appium;
 namespace FinanceApp.UITests.Pages;
 
 /// <summary>
-/// "Configurações": the user's name and photo, the app lock, the setup wizard and the user's data (export, import, wipe).
+/// "Configurações": the user's name and photo, the app lock, the setup wizard, the user's data (export, import, wipe)
+/// and "Sobre o Mensal".
 /// </summary>
 public class SettingsPageObject
 {
@@ -37,7 +38,7 @@ public class SettingsPageObject
     /// The section headers, top to bottom.
     /// </summary>
     public IReadOnlyList<string> SectionHeaders =>
-        new[] { "SettingsUserHeader", "SettingsSecurityHeader", "SettingsGuideHeader", "SettingsDataHeader" }
+        new[] { "SettingsUserHeader", "SettingsSecurityHeader", "SettingsGuideHeader", "SettingsDataHeader", "SettingsAboutHeader" }
             .Select(id => _session.ScrollTo(id).Text)
             .ToList();
 
@@ -63,6 +64,12 @@ public class SettingsPageObject
     {
         _session.Tap(SecurityRow);
         return new SecurityPageObject(_session).WaitUntilLoaded();
+    }
+
+    public AboutPageObject OpenAbout()
+    {
+        _session.ScrollToAndTap("SettingsAboutRow");
+        return new AboutPageObject(_session).WaitUntilLoaded();
     }
 
     public SetupPageObject RedoSetup()

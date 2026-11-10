@@ -4,8 +4,8 @@ using FinanceApp.ViewModels;
 namespace FinanceApp.Views;
 
 /// <summary>
-/// "Configurações": the user's name and photo, the app lock, the setup wizard and their data (export, import, wipe),
-/// grouped by subject.
+/// "Configurações": the user's name and photo, the app lock, the setup wizard, their data (export, import, wipe) and
+/// "Sobre o Mensal", grouped by subject.
 /// </summary>
 public partial class SettingsPage : ContentPage
 {
@@ -48,6 +48,9 @@ public partial class SettingsPage : ContentPage
 
     private async void OnSecurityTapped(object? sender, TappedEventArgs e) =>
         await Navigation.PushAsync(Resolve<SecurityPage>());
+
+    private async void OnAboutTapped(object? sender, TappedEventArgs e) =>
+        await Navigation.PushAsync(Resolve<AboutPage>());
 
     private async void OnRedoSetupTapped(object? sender, TappedEventArgs e)
     {

@@ -39,6 +39,8 @@ public static class AppLabels
     public const string SettingsSecuritySection = "Segurança";
     public const string SettingsGuideSection = "Guia inicial";
     public const string SettingsDataSection = "Seus dados";
+    public const string SettingsAboutSection = "Sobre";
+    public const string DeveloperContact = "Henrique Gouvêa · henriquegouvea90@gmail.com";
     public const string DeleteAllDataConfirm = "Apagar tudo";
     public const string ImportBackupConfirm = "Importar";
     public const string AddNameAndPhoto = "Adicionar nome e foto";

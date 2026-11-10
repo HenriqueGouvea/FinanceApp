@@ -1,0 +1,33 @@
+Mensal organiza as contas do mês: tudo o que entra, tudo o que sai e o que já foi pago, mês a mês.
+
+Você cadastra uma vez e o Mensal distribui pelos meses: o salário e o aluguel que se repetem todo mês, a compra parcelada em 10x, o IPVA e o IPTU que caem nos mesmos meses todo ano. Assim você vê hoje como vai ficar o mês que vem.
+
+★ FEITO PARA AS CONTAS DE VERDADE
+• Lançamentos únicos, parcelados, recorrentes (todo mês) e anuais (IPVA, IPTU, licenciamento, seguro)
+• Valor estimado (±) para contas que mudam todo mês, como luz e água: ajuste quando a conta chegar
+• Pagamento parcial para gastos pagos aos poucos, como o mercado e a farmácia
+• O vencimento de cada conta na lista do mês, e o que vence hoje
+• Categorias que você pode criar e editar
+
+★ CARTÃO DE CRÉDITO SEM SUSTO
+• As compras de cada cartão ficam juntas na fatura dele, com o vencimento da fatura
+• Pague a fatura inteira com um toque
+• Veja o limite disponível, já descontando as parcelas que ainda vão chegar
+
+★ CONTAS, VALES E SALDOS
+• Cadastre contas bancárias, vale-refeição e cartões de crédito
+• Diga com o que cada conta foi paga e onde cada receita caiu
+
+★ COMEÇA EM MINUTOS
+• Um guia inicial pergunta sua renda, seus gastos fixos da casa, o carro e o cartão e já monta seus meses
+• Tudo é opcional: pule o que quiser e complete depois
+
+★ SEUS DADOS SÃO SEUS
+• Sem conta, sem cadastro e sem anúncios
+• Seus dados ficam só no seu celular: o Mensal não envia nada para servidor nenhum
+• Proteja o app com PIN e biometria, e esconda o conteúdo na tela de apps recentes
+• Exporte um backup para levar a outro celular e uma planilha dos lançamentos (CSV)
+
+O Mensal é um app de organização financeira pessoal. Ele não é banco, não faz pagamentos e não se conecta à sua conta bancária: você registra suas contas e ele organiza.
+
+Dúvidas e sugestões: henriquegouvea90@gmail.com

@@ -111,6 +111,20 @@
                     </Grid>
                 </VerticalStackLayout>
             </Border>
+
+            <Label AutomationId="SettingsAboutHeader" Text="Sobre" Style="{StaticResource GroupHeader}" Margin="0,8,0,0" />
+            <Border Style="{StaticResource Card}">
+                <Grid AutomationId="SettingsAboutRow" ColumnDefinitions="*, Auto" Style="{StaticResource CardRow}">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnAboutTapped" />
+                    </Grid.GestureRecognizers>
+                    <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
+                        <Label Text="Sobre o Mensal" Style="{StaticResource RowTitle}" />
+                        <Label Text="Versão, privacidade, termos de uso e contato" Style="{StaticResource Hint}" />
+                    </VerticalStackLayout>
+                    <Label Grid.Column="1" Text="›" FontSize="22" TextColor="{StaticResource Muted}" VerticalOptions="Center" />
+                </Grid>
+            </Border>
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

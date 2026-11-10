@@ -59,6 +59,42 @@ gh secret set ANDROID_KEY_PASSWORD       # same as the keystore password unless 
 4. Save the JSON key as the `PLAY_SERVICE_ACCOUNT_JSON` secret: `gh secret set PLAY_SERVICE_ACCOUNT_JSON < key.json`,
    then delete the local file.
 
+### 5. Store listing and "App content"
+
+The texts and images are in [`fastlane/metadata/android/pt-BR/`](fastlane/README.md); paste and upload them by hand
+in Play Console (the folder follows `fastlane supply`'s layout, should it ever upload them). v1.0 has **no ads**
+and collects no data; the answers below assume that, and change with the AdMob task.
+
+- **Main store listing** (pt-BR): name from `title.txt`, short and full descriptions, `images/icon.png` (512×512),
+  `images/featureGraphic.png` (1024×500) and the phone screenshots in `images/phoneScreenshots/`, in order.
+- **Store settings:** category **Finanças**; contact e-mail henriquegouvea90@gmail.com; website
+  https://henriquegouvea.github.io/FinanceApp/.
+- **Privacy policy:** https://henriquegouvea.github.io/FinanceApp/privacidade/ (the page is in `docs/`, served by
+  GitHub Pages from `master`).
+- **App access:** all functionality is available without special access (no login; the PIN is the user's own).
+- **Ads:** "No, my app does not contain ads".
+- **Content rating** (IARC questionnaire): no violence, sexuality, language, controlled substances or gambling;
+  users don't interact or share content, no location sharing, no digital purchases. Expect "Livre".
+- **Target audience:** 18 and over only. The app isn't aimed at children (not in the "Designed for Families" program).
+- **Data safety:** "Does your app collect or share any of the required user data types?" → **No**. Everything
+  stays on the device, and Android's own device backup isn't collection by the developer. No account, so no
+  account deletion question.
+- **Financial features:** Mensal only organizes what the user types (personal budgeting): it doesn't lend, pay,
+  hold money, trade or connect to banks. Pick the budgeting/money management option if the form lists one,
+  otherwise "My app doesn't provide any of these financial features". No license is needed.
+- **Government apps, health, news:** No.
+
+### 6. Closed test (new personal accounts)
+
+Personal developer accounts created after November 2023 must run a **closed test with at least 12 testers opted
+in for 14 days in a row** before applying for production.
+
+1. Play Console → Testing → Closed testing → create a track, add a Google Group or an e-mail list with the testers
+   (aim for 15–20: some never opt in), and promote the internal testing release to it.
+2. Send the testers the opt-in link; each one must accept and install from Play. Count 14 days from the day the
+   12th tester opted in, and ask them to really use it (Play asks how the test went when you apply).
+3. Then: Dashboard → "Apply for production".
+
 ## Releasing a version
 
 1. Bump `ApplicationDisplayVersion` in the csproj if you want local builds to show it (the tag wins in CI).

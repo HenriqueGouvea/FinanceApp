@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:FinanceApp.ViewModels"
+             x:Class="FinanceApp.Views.AboutPage"
+             x:DataType="vm:AboutViewModel"
+             Title="Sobre o Mensal">
+    <ScrollView>
+        <VerticalStackLayout Padding="12,20,12,24" Spacing="14">
+            <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
+                <Image Source="brand_logo.png" WidthRequest="88" HeightRequest="88" HorizontalOptions="Center" />
+                <Label Text="Mensal" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center" />
+                <Label Text="Todas as contas, um só rumo." FontSize="14" TextColor="{StaticResource Muted}" HorizontalOptions="Center" />
+                <Label AutomationId="AboutVersionLabel" Text="{Binding VersionText}" Style="{StaticResource Hint}" HorizontalOptions="Center" />
+            </VerticalStackLayout>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+                    <Grid AutomationId="AboutPrivacyRow" ColumnDefinitions="*, Auto" Style="{StaticResource CardRow}">
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding OpenPrivacyPolicyCommand}" />
+                        </Grid.GestureRecognizers>
+                        <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
+                            <Label Text="Política de privacidade" Style="{StaticResource RowTitle}" />
+                            <Label Text="Seus dados ficam só neste aparelho" Style="{StaticResource Hint}" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="1" Text="›" FontSize="22" TextColor="{StaticResource Muted}" VerticalOptions="Center" />
+                    </Grid>
+                    <BoxView HeightRequest="1" Margin="16,0" />
+                    <Grid AutomationId="AboutTermsRow" ColumnDefinitions="*, Auto" Style="{StaticResource CardRow}">
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding OpenTermsOfUseCommand}" />
+                        </Grid.GestureRecognizers>
+                        <Label Grid.Column="0" Text="Termos de uso" Style="{StaticResource RowTitle}" VerticalOptions="Center" />
+                        <Label Grid.Column="1" Text="›" FontSize="22" TextColor="{StaticResource Muted}" VerticalOptions="Center" />
+                    </Grid>
+                    <BoxView HeightRequest="1" Margin="16,0" />
+                    <Grid AutomationId="AboutNoticesRow" ColumnDefinitions="*, Auto" Style="{StaticResource CardRow}">
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnNoticesTapped" />
+                        </Grid.GestureRecognizers>
+                        <Label Grid.Column="0" Text="Licenças de código aberto" Style="{StaticResource RowTitle}" VerticalOptions="Center" />
+                        <Label Grid.Column="1" Text="›" FontSize="22" TextColor="{StaticResource Muted}" VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Label Text="Contato" Style="{StaticResource GroupHeader}" Margin="0,8,0,0" />
+            <Border Style="{StaticResource Card}">
+                <Grid AutomationId="AboutContactRow" ColumnDefinitions="*, Auto" Style="{StaticResource CardRow}">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding WriteToDeveloperCommand}" />
+                    </Grid.GestureRecognizers>
+                    <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
+                        <Label Text="Fale com o desenvolvedor" Style="{StaticResource RowTitle}" />
+                        <Label AutomationId="AboutContactLabel" Style="{StaticResource Hint}">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="{Binding Developer}" />
+                                    <Span Text=" · " />
+                                    <Span Text="{Binding Contact}" />
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </VerticalStackLayout>
+                    <Label Grid.Column="1" Text="›" FontSize="22" TextColor="{StaticResource Muted}" VerticalOptions="Center" />
+                </Grid>
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
