@@ -153,12 +153,20 @@ public sealed class AppSession : IDisposable
     /// Taps once the element stops moving (a menu sliding in, a list gliding after a scroll, a popup re-centering
     /// after the keyboard hides). UiAutomator2's idle wait is off, so a tap could otherwise land mid-animation.
     /// </summary>
-    public void Tap(By locator)
+    public void Tap(By locator) =>
+        TapWhenSettled(d => d.FindElements(locator).FirstOrDefault(e => e.Displayed), locator.ToString());
+
+    /// <summary>
+    /// Like <see cref="Tap(By)"/>, for an element found earlier (e.g. inside a row whose locator no longer matches).
+    /// </summary>
+    public void Tap(IWebElement element) => TapWhenSettled(_ => element.Displayed ? element : null, "the element");
+
+    private void TapWhenSettled(Func<IWebDriver, IWebElement?> find, string what)
     {
         var last = Rectangle.Empty;
         var element = WaitUntil(d =>
         {
-            var current = d.FindElements(locator).FirstOrDefault(e => e.Displayed);
+            var current = find(d);
             if (current is null)
                 return null;
 
@@ -166,7 +174,7 @@ public sealed class AppSession : IDisposable
             var settled = bounds == last;
             last = bounds;
             return settled ? current : null;
-        }, $"{locator} to stop moving", null)!;
+        }, $"{what} to stop moving", null)!;
         element.Click();
     }
 
@@ -256,20 +264,25 @@ public sealed class AppSession : IDisposable
     /// <summary>
     /// Scrolls the page content up, half a screen at a time, until the condition holds (e.g. an element that just
     /// appeared below the fold is fully on screen).
+    /// The default swipe is fast, so the page flings on past it. Pass <paramref name="slowly"/> when the condition
+    /// only holds in a narrow window (e.g. a row's bottom edge inside a small scroll view), which a fling skips.
     /// </summary>
-    public void ScrollDownUntil(Func<bool> condition, string description, int maxScrolls = 5)
+    public void ScrollDownUntil(Func<bool> condition, string description, int maxScrolls = 5, bool slowly = false)
     {
         var size = Driver.Manage().Window.Size;
+        var gesture = new Dictionary<string, object>
+        {
+            ["left"] = size.Width / 10,
+            ["top"] = size.Height / 4,
+            ["width"] = size.Width * 8 / 10,
+            ["height"] = size.Height / 2,
+            ["direction"] = "down",
+            ["percent"] = 0.5
+        };
+        if (slowly)
+            gesture["speed"] = 500;
         for (var i = 0; i < maxScrolls && !condition(); i++)
-            Driver.ExecuteScript("mobile: scrollGesture", new Dictionary<string, object>
-            {
-                ["left"] = size.Width / 10,
-                ["top"] = size.Height / 4,
-                ["width"] = size.Width * 8 / 10,
-                ["height"] = size.Height / 2,
-                ["direction"] = "down",
-                ["percent"] = 0.5
-            });
+            Driver.ExecuteScript("mobile: scrollGesture", gesture);
         WaitFor(condition, description);
     }
 

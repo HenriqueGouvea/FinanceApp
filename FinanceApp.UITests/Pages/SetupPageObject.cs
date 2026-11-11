@@ -309,27 +309,39 @@ public class SetupPageObject
     public bool IsExpenseChecked(string description) =>
         _session.WaitForVisible(ExpenseRowElement(description, "SetupExpenseCheckBox")).GetAttribute("checked") == "true";
 
-    // The options sit at the bottom of the row, below the fold once the keyboard closes, so they are scrolled clear
-    // of the footer buttons first. Expenses are handled top to bottom, so scrolling down is enough.
-    private void ShowOption(string description, string optionId)
+    // A selected row can be taller than the scroll view on a small screen (CI's 320×640), and its name, which finds
+    // it, scrolls off the top before its bottom shows. So the row is found while its name is on screen, and the
+    // fields below are looked up inside that element. It is scrolled slowly: a fling would skip past the field.
+    private IWebElement ExpenseRow(string description)
     {
         _session.HideKeyboardIfShown();
-        var option = ExpenseRowElement(description, optionId);
-        var footerTop = _session.WaitForVisible(NextButton).Location.Y;
-        _session.ScrollDownUntil(() => IsAboveFooter(option, footerTop), $"the option of \"{description}\" to be on screen");
+        ScrollToText(description);
+        return _session.WaitForVisible(
+            By.XPath($"//*[@resource-id='{E2ESettings.AppPackage}:id/SetupExpenseRow'][.//*[@text='{description}']]"));
+    }
+
+    private static IWebElement? DisplayedIn(IWebElement row, string automationId) =>
+        row.FindElements(AppSession.AutomationId(automationId)).FirstOrDefault(e => e.Displayed);
+
+    private IWebElement ShowSourcePicker(string description)
+    {
+        var row = ExpenseRow(description);
+        _session.ScrollDownUntil(() => DisplayedIn(row, "SetupExpenseSourcePicker") is { } picker && IsBottomOnScreen(picker),
+            $"the \"Pago com\" of \"{description}\" to be on screen", maxScrolls: 10, slowly: true);
+        return DisplayedIn(row, "SetupExpenseSourcePicker")!;
     }
 
     /// <summary>
-    /// Which of "Valor estimado" and "Pagamento parcial" the selected expense offers. The whole row is scrolled above
-    /// the footer first, so an option missing from the screen is one the row doesn't have.
+    /// Which of "Valor estimado" and "Pagamento parcial" the selected expense offers. They are the last items of the
+    /// row, so its bottom is scrolled on screen first, and an option missing from the screen is one the row doesn't have.
     /// </summary>
     public (bool Estimated, bool PartialPayment) ExpenseOptions(string description)
     {
-        _session.HideKeyboardIfShown();
-        var row = By.XPath($"//*[@resource-id='{E2ESettings.AppPackage}:id/SetupExpenseRow'][.//*[@text='{description}']]");
-        _session.ScrollDownUntil(() => IsWhollyOnScreen(row), $"the whole row of \"{description}\" to be on screen");
-        return (_session.IsVisible(ExpenseRowElement(description, "SetupExpenseEstimatedOption")),
-                _session.IsVisible(ExpenseRowElement(description, "SetupExpensePartialPaymentOption")));
+        var row = ExpenseRow(description);
+        _session.ScrollDownUntil(() => IsBottomOnScreen(row), $"the bottom of the row of \"{description}\" to be on screen",
+            maxScrolls: 10, slowly: true);
+        return (DisplayedIn(row, "SetupExpenseEstimatedOption") is not null,
+                DisplayedIn(row, "SetupExpensePartialPaymentOption") is not null);
     }
 
     /// <summary>
@@ -344,28 +356,20 @@ public class SetupPageObject
         return this;
     }
 
-    private bool IsOptionChecked(string description, string checkBoxId) =>
-        _session.WaitForVisible(ExpenseRowElement(description, checkBoxId)).GetAttribute("checked") == "true";
-
     /// <summary>
     /// The account or credit card the selected expense's "Pago com" shows.
     /// </summary>
-    public string ExpenseSource(string description)
-    {
-        ShowOption(description, "SetupExpenseSourcePicker");
-        return _session.WaitForVisible(ExpenseRowElement(description, "SetupExpenseSourcePicker")).Text;
-    }
+    public string ExpenseSource(string description) => ShowSourcePicker(description).Text;
 
     /// <summary>
     /// Picks the account or credit card that pays the selected expense ("Pago com" in its row).
     /// </summary>
     public SetupPageObject SelectExpenseSource(string description, string sourceName)
     {
-        ShowOption(description, "SetupExpenseSourcePicker");
-        var picker = ExpenseRowElement(description, "SetupExpenseSourcePicker");
+        var picker = ShowSourcePicker(description);
         _session.Tap(picker);
         _session.ScrollDialogListToAndTap(sourceName);
-        _session.WaitForText(picker, sourceName);
+        _session.WaitFor(() => picker.Text == sourceName, $"the \"Pago com\" of \"{description}\" to show \"{sourceName}\"");
         return this;
     }
 
@@ -535,13 +539,13 @@ public class SetupPageObject
     }
 
     // A partly hidden element reports its bounds clipped to the scroll view, so its bottom edge then sits on the
-    // scroll view's: only one ending above it is shown whole.
-    private bool IsWhollyOnScreen(By locator)
+    // scroll view's: only one ending above it shows its bottom. Its top may be scrolled off: on a small screen (CI's
+    // 320×640) a row with "Pago com" and both options is taller than the scroll view.
+    private bool IsBottomOnScreen(IWebElement element)
     {
         var scrollView = _session.Driver.FindElements(By.XPath("//android.widget.ScrollView[@scrollable='true']")).First(e => e.Displayed);
-        var top = scrollView.Location.Y;
-        var bottom = top + scrollView.Size.Height;
-        return _session.Driver.FindElements(locator).Any(e => e.Displayed && e.Location.Y > top && e.Location.Y + e.Size.Height < bottom);
+        var bottom = scrollView.Location.Y + scrollView.Size.Height;
+        return element.Displayed && element.Location.Y + element.Size.Height < bottom;
     }
 
     private bool IsAboveFooter(By locator, int footerTop) =>
