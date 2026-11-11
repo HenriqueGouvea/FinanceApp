@@ -233,8 +233,9 @@ public class SetupViewModelTests
         AddSource("Itaú", PaymentSourceType.BankAccount);
 
         _vm.SalarySource!.Name.Should().Be("Nubank");
-        _vm.ExpensesSource!.Name.Should().Be("Nubank");
-        _vm.OtherExpensesSource!.Name.Should().Be("Nubank");
+        AllExpenses().Should().OnlyContain(e => e.PaymentSource!.Name == "Nubank");
+        _vm.NewHomeSource!.Name.Should().Be("Nubank");
+        _vm.NewCarSource!.Name.Should().Be("Nubank");
         _vm.NewCardBillAccount!.Name.Should().Be("Nubank");
         _vm.BillAccounts.Select(a => a.Name).Should().Equal("Nubank", "Itaú");
     }
@@ -251,7 +252,8 @@ public class SetupViewModelTests
         _vm.NewSources.Should().BeEmpty();
         _vm.AvailableSources.Should().BeEmpty();
         _vm.SalarySource.Should().BeNull();
-        _vm.ExpensesSource.Should().BeNull();
+        AllExpenses().Should().OnlyContain(e => e.PaymentSource == null);
+        _vm.NewHomeSource.Should().BeNull();
     }
 
     [Fact]
@@ -346,7 +348,7 @@ public class SetupViewModelTests
         _vm.NewCards.Single().BillAccount.Should().BeNull();
         _vm.NewCardBillAccount.Should().BeNull();
         _vm.BillAccounts.Should().BeEmpty();
-        _vm.OtherExpensesSource.Should().BeNull();
+        _vm.HealthExpenses.Should().OnlyContain(e => e.PaymentSource == null);
     }
 
     [Fact]
@@ -359,7 +361,7 @@ public class SetupViewModelTests
         AddPurchase("Celular", 250, RecurrenceType.Installments, total: 10, current: 3);
         _vm.NewPurchaseCard = _vm.NewCards[1].Card;
         AddPurchase("Streaming", 40, RecurrenceType.Recurrent);
-        _vm.ExpensesSource = nubank.Card;
+        _vm.Expenses[0].PaymentSource = nubank.Card;
         _vm.NewPurchaseCard = nubank.Card;
 
         _vm.RemoveCardCommand.Execute(nubank);
@@ -368,7 +370,7 @@ public class SetupViewModelTests
         _vm.CreditCards.Select(c => c.Name).Should().Equal("Visa");
         _vm.AvailableSources.Should().NotContain(nubank.Card);
         _vm.Purchases.Select(p => p.Description).Should().Equal("Streaming");
-        _vm.ExpensesSource.Should().BeNull();
+        _vm.Expenses[0].PaymentSource.Should().BeNull();
         _vm.NewPurchaseCard!.Name.Should().Be("Visa");
     }
 
@@ -690,17 +692,120 @@ public class SetupViewModelTests
     }
 
     [Fact]
-    public async Task Summary_ExpensesPaidWithCard_DropDueDayAndFlags()
+    public async Task Summary_ExpensePaidWithCard_DropsDueDayAndFlags()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        AddSource("Itaú", PaymentSourceType.BankAccount);
+        AddCard("Nubank");
+        SelectExpense("Mercado", 1000, dueDay: 15);
+        SelectExpense("Aluguel", 1500, dueDay: 10);
+        var supermarket = _vm.Expenses.Single(e => e.Description == "Mercado");
+
+        supermarket.PaymentSource = _vm.CreditCards.Single();
+        await GoToSummaryAsync();
+
+        (supermarket.IsOnCreditCardBill, supermarket.ShowsDueDay, supermarket.ShowsEstimatedOption, supermarket.ShowsPartialPaymentOption)
+            .Should().Be((true, false, false, false));
+        _vm.SummaryRows.Select(r => (r.Description, r.Detail)).Should().Equal(
+            ("Aluguel", "Todo mês · dia 10 · Itaú"),
+            ("Mercado", "Todo mês · Nubank"));
+    }
+
+    [Fact]
+    public async Task Finish_ExpensePaidWithCard_SavesItOnTheCardWithoutDueDayNorFlags()
+    {
+        NewUserSetup? saved = null;
+        await _setupService.CompleteAsync(Arg.Do<NewUserSetup>(s => saved = s));
+        await _vm.PrepareAsync(isRerun: false);
+        AddCard("Nubank");
+        SelectExpense("Mercado", 1000, dueDay: 15);
+        _vm.Expenses.Single(e => e.Description == "Mercado").PaymentSource = _vm.CreditCards.Single();
+        await GoToSummaryAsync();
+
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        var supermarket = saved!.Entries.Single();
+        (supermarket.DueDay, supermarket.IsEstimated, supermarket.AllowsPartialPayment, supermarket.PaymentSource!.Name)
+            .Should().Be(((int?)null, false, false, "Nubank"));
+    }
+
+    [Fact]
+    public async Task ToggleExpense_BuildsItsFieldsOnlyWhileTicked()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        AddSource("Itaú", PaymentSourceType.BankAccount);
+        var rent = _vm.Expenses.Single(e => e.Description == "Aluguel");
+
+        _vm.ToggleExpenseCommand.Execute(rent);
+        var whileTicked = rent.Fields.ToList();
+        _vm.ToggleExpenseCommand.Execute(rent);
+
+        whileTicked.Should().Equal(rent);
+        rent.Fields.Should().BeEmpty();
+        rent.Sources.Should().BeSameAs(_vm.AvailableSources);
+    }
+
+    [Fact]
+    public async Task ExpenseSource_BackToAccount_ShowsDueDayAndFlagsAgain()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        AddSource("Itaú", PaymentSourceType.BankAccount);
+        AddCard("Nubank");
+        SelectExpense("Mercado", 1000);
+        var supermarket = _vm.Expenses.Single(e => e.Description == "Mercado");
+        supermarket.PaymentSource = _vm.CreditCards.Single();
+
+        supermarket.PaymentSource = _vm.BillAccounts.Single();
+
+        (supermarket.IsOnCreditCardBill, supermarket.ShowsDueDay, supermarket.ShowsEstimatedOption, supermarket.ShowsPartialPaymentOption)
+            .Should().Be((false, true, true, true));
+    }
+
+    [Fact]
+    public async Task AddSource_AfterExpensesPicked_KeepsTheirSourcesAndFillsOnlyTheEmptyOnes()
     {
         await _vm.PrepareAsync(isRerun: false);
         AddCard("Nubank");
-        _vm.ExpensesSource = _vm.CreditCards.Single();
-        SelectExpense("Mercado", 1000, dueDay: 15);
+        var rent = _vm.Expenses.Single(e => e.Description == "Aluguel");
+        rent.PaymentSource = _vm.CreditCards.Single();
 
-        await GoToSummaryAsync();
+        AddSource("Itaú", PaymentSourceType.BankAccount);
 
-        _vm.IsExpensesSourceCreditCard.Should().BeTrue();
-        _vm.SummaryRows.Select(r => r.Detail).Should().Equal("Todo mês · Nubank");
+        rent.PaymentSource!.Name.Should().Be("Nubank");
+        AllExpenses().Where(e => e != rent).Should().OnlyContain(e => e.PaymentSource!.Name == "Itaú");
+    }
+
+    [Fact]
+    public async Task RemoveSource_AboveAnotherPicked_KeepsTheOtherPicks()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        AddSource("Itaú", PaymentSourceType.BankAccount);
+        AddSource("Nubank", PaymentSourceType.BankAccount);
+        AddSource("VR", PaymentSourceType.MealVoucher);
+        var nubank = _vm.NewSources.Single(s => s.Name == "Nubank");
+        var rent = _vm.Expenses.Single(e => e.Description == "Aluguel");
+        rent.PaymentSource = nubank;
+        _vm.SalarySource = nubank;
+
+        _vm.RemoveSourceCommand.Execute(_vm.NewSources.Single(s => s.Name == "Itaú"));
+
+        rent.PaymentSource.Should().BeSameAs(nubank);
+        _vm.SalarySource.Should().BeSameAs(nubank);
+        _vm.Expenses.Where(e => e != rent).Should().OnlyContain(e => e.PaymentSource == null);
+    }
+
+    [Fact]
+    public async Task SkipStep_Expenses_ComeBackPaidWithTheFirstAccount()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        AddSource("Itaú", PaymentSourceType.BankAccount);
+        AddCard("Nubank");
+        await GoToStepAsync(SetupStep.HouseExpenses);
+        _vm.Expenses[0].PaymentSource = _vm.CreditCards.Single();
+
+        _vm.SkipStepCommand.Execute(null);
+
+        _vm.Expenses.Should().OnlyContain(e => e.PaymentSource!.Name == "Itaú");
     }
 
     // --- Other expenses ---
@@ -722,20 +827,20 @@ public class SetupViewModelTests
     }
 
     [Fact]
-    public async Task Summary_OtherExpenses_UseTheirOwnSourceAndLeaveSchoolOutWithoutChildren()
+    public async Task Summary_OtherExpenses_UseEachOnesSourceAndLeaveSchoolOutWithoutChildren()
     {
         await _vm.PrepareAsync(isRerun: false);
         AddSource("Itaú", PaymentSourceType.BankAccount);
         AddSource("VR", PaymentSourceType.MealVoucher);
-        _vm.OtherExpensesSource = _vm.NewSources.Single(s => s.Name == "VR");
         Select(_vm.HealthExpenses, "Plano de saúde", 600, dueDay: 10);
         Select(_vm.SchoolExpenses, "Mensalidade escolar", 1200);
         Select(_vm.LeisureExpenses, "Restaurantes e delivery", 400);
+        _vm.LeisureExpenses.Single().PaymentSource = _vm.NewSources.Single(s => s.Name == "VR");
 
         await GoToSummaryAsync();
 
         _vm.SummaryRows.Select(r => (r.Description, r.Detail)).Should().Equal(
-            ("Plano de saúde", "Todo mês · dia 10 · VR"),
+            ("Plano de saúde", "Todo mês · dia 10 · Itaú"),
             ("Restaurantes e delivery", "Todo mês · valor estimado · pagamento parcial · VR"));
     }
 
@@ -1056,6 +1161,35 @@ public class SetupViewModelTests
     }
 
     [Fact]
+    public async Task Finish_HomeAndCar_ArePaidWithTheSourcePickedForEach()
+    {
+        NewUserSetup? saved = null;
+        await _setupService.CompleteAsync(Arg.Do<NewUserSetup>(s => saved = s));
+        await _vm.PrepareAsync(isRerun: false);
+        AddSource("Itaú", PaymentSourceType.BankAccount);
+        AddCard("Nubank");
+        _vm.SelectHasOwnHomeCommand.Execute(true);
+        _vm.NewHomeFinancing = 2000;
+        _vm.NewHomeIptu = 150;
+        _vm.AddHomeCommand.Execute(null);
+        _vm.SelectHasCarCommand.Execute(true);
+        _vm.NewCarIpva = 800;
+        _vm.NewCarSource = _vm.CreditCards.Single();
+        _vm.AddCarCommand.Execute(null);
+        await GoToSummaryAsync();
+
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        _vm.Homes.Single().Detail.Should().EndWith("· Itaú");
+        _vm.Cars.Single().Detail.Should().EndWith("· Nubank");
+        _vm.NewCarSource!.Name.Should().Be("Nubank", "the next car is usually paid the same way");
+        saved!.Entries.Select(e => (e.Description, e.PaymentSource!.Name)).Should().Equal(
+            ("Financiamento (Casa)", "Itaú"),
+            ("IPTU (Casa)", "Itaú"),
+            ("IPVA (Carro)", "Nubank"));
+    }
+
+    [Fact]
     public async Task SkipStep_HouseAndOther_DiscardHomesAndCars()
     {
         await _vm.PrepareAsync(isRerun: false);
@@ -1249,8 +1383,8 @@ public class SetupViewModelTests
         _vm.SalaryDay = SetupViewModel.NoDueDay;
         SelectExpense("Mercado", 1200, dueDay: 15);
         _vm.Expenses.Single(e => e.Description == "Mercado").ToggleEstimatedCommand.Execute(null);
-        _vm.OtherExpensesSource = _vm.CreditCards.Single();
         Select(_vm.LeisureExpenses, "Restaurantes e delivery", 400);
+        _vm.LeisureExpenses.Single().PaymentSource = _vm.CreditCards.Single();
         await GoToSummaryAsync();
 
         await _vm.NextCommand.ExecuteAsync(null);
@@ -1325,6 +1459,9 @@ public class SetupViewModelTests
         _vm.NewPurchaseCurrentInstallment = current;
         _vm.AddPurchaseCommand.Execute(null);
     }
+
+    private IEnumerable<SetupExpenseItem> AllExpenses() =>
+        [.. _vm.Expenses, .. _vm.HealthExpenses, .. _vm.SchoolExpenses, .. _vm.CarExpenses, .. _vm.LeisureExpenses];
 
     private void SelectExpense(string description, decimal amount, int dueDay = SetupViewModel.NoDueDay) =>
         Select(_vm.Expenses, description, amount, dueDay);

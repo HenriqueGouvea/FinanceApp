@@ -42,13 +42,15 @@ public class SettingsPageObject
             .Select(id => _session.ScrollTo(id).Text)
             .ToList();
 
-    public string ProfileNameText => _session.WaitForVisible(ProfileName).Text;
+    // The profile row is the first one: on a small screen, reading the lower sections scrolls it out of sight.
+    public string ProfileNameText => _session.ScrollTo("SettingsProfileNameLabel").Text;
 
     /// <summary>
     /// Opens "Nome e foto", types the name and saves it.
     /// </summary>
     public SettingsPageObject EditName(string name)
     {
+        _session.ScrollTo("SettingsProfileRow");
         _session.Tap(ProfileRow);
         var entry = _session.WaitForVisible(ProfileNameEntry);
         entry.Clear();

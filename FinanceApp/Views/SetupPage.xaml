@@ -41,24 +41,47 @@
                                   Color="{StaticResource Primary}"
                                   VerticalOptions="Center" />
                     </Grid>
-                    <Grid ColumnDefinitions="*, *" ColumnSpacing="10" IsVisible="{Binding IsSelected}">
-                        <VerticalStackLayout Grid.Column="0" Spacing="2">
-                            <Label AutomationId="SetupExpenseAmountCaption" Text="{Binding AmountCaption}" Style="{StaticResource FieldCaption}" />
-                            <Entry AutomationId="SetupExpenseAmountEntry" Keyboard="Numeric">
-                                <Entry.Behaviors>
-                                    <behaviors:CurrencyMaskBehavior Value="{Binding Amount}" />
-                                </Entry.Behaviors>
-                            </Entry>
-                        </VerticalStackLayout>
-                        <VerticalStackLayout Grid.Column="1" Spacing="2">
-                            <Label Text="Vencimento" Style="{StaticResource FieldCaption}" />
-                            <Picker AutomationId="SetupExpenseDueDayPicker"
-                                    Title="Vencimento"
-                                    ItemsSource="{Binding DueDays, Source={RelativeSource AncestorType={x:Type vm:SetupViewModel}}, x:DataType=vm:SetupViewModel}"
-                                    ItemDisplayBinding="{Binding ., Converter={x:Static converters:DueDayToLabelConverter.Instance}, x:DataType=x:Int32}"
-                                    SelectedItem="{Binding DueDay}" />
-                        </VerticalStackLayout>
-                    </Grid>
+                    <!-- Built only while the row is ticked (Fields holds the row itself then), so the unticked
+                         rows don't build their pickers -->
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Fields}" IsVisible="{Binding IsSelected}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SetupExpenseItem">
+                                <VerticalStackLayout Spacing="8">
+                                    <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
+                                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                            <Label AutomationId="SetupExpenseAmountCaption" Text="{Binding AmountCaption}" Style="{StaticResource FieldCaption}" />
+                                            <Entry AutomationId="SetupExpenseAmountEntry" Keyboard="Numeric">
+                                                <Entry.Behaviors>
+                                                    <behaviors:CurrencyMaskBehavior Value="{Binding Amount}" />
+                                                </Entry.Behaviors>
+                                            </Entry>
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="1" Spacing="2" IsVisible="{Binding ShowsDueDay}">
+                                            <Label Text="Vencimento" Style="{StaticResource FieldCaption}" />
+                                            <Picker AutomationId="SetupExpenseDueDayPicker"
+                                                    Title="Vencimento"
+                                                    ItemsSource="{Binding DueDays, Source={RelativeSource AncestorType={x:Type vm:SetupViewModel}}, x:DataType=vm:SetupViewModel}"
+                                                    ItemDisplayBinding="{Binding ., Converter={x:Static converters:DueDayToLabelConverter.Instance}, x:DataType=x:Int32}"
+                                                    SelectedItem="{Binding DueDay}" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                    <VerticalStackLayout Spacing="2" IsVisible="{Binding HasAvailableSources, Source={RelativeSource AncestorType={x:Type vm:SetupViewModel}}, x:DataType=vm:SetupViewModel}">
+                                        <Label Text="Pago com" Style="{StaticResource FieldCaption}" />
+                                        <Picker AutomationId="SetupExpenseSourcePicker"
+                                                Title="Pago com"
+                                                ItemsSource="{Binding Sources}"
+                                                ItemDisplayBinding="{Binding Name, x:DataType=models:PaymentSource}"
+                                                SelectedItem="{Binding PaymentSource}" />
+                                    </VerticalStackLayout>
+                                    <Label AutomationId="SetupExpenseCardHint"
+                                           Text="Entra na fatura do cartão de crédito: vence com ela e não usa valor estimado nem pagamento parcial."
+                                           FontSize="11"
+                                           TextColor="{StaticResource Muted}"
+                                           IsVisible="{Binding IsOnCreditCardBill}" />
+                                </VerticalStackLayout>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
 
                     <!-- The two kinds of varying bills, explained right where the user first meets them -->
                     <Grid AutomationId="SetupExpenseEstimatedOption"
@@ -779,25 +802,19 @@
                                 <Label FontSize="12"
                                        TextColor="{StaticResource Muted}"
                                        Text="Confira no carnê do IPTU (ou no site da prefeitura) o valor e os meses. Ele entra todo ano nesses meses, para não te pegar de surpresa." />
+                                <VerticalStackLayout Spacing="2" IsVisible="{Binding HasAvailableSources}">
+                                    <Label Text="Pago com" Style="{StaticResource FieldCaption}" />
+                                    <Picker AutomationId="SetupHomeSourcePicker"
+                                            Title="Pago com"
+                                            ItemsSource="{Binding AvailableSources}"
+                                            ItemDisplayBinding="{Binding Name, x:DataType=models:PaymentSource}"
+                                            SelectedItem="{Binding NewHomeSource}" />
+                                </VerticalStackLayout>
                                 <Button AutomationId="SetupAddHomeButton"
                                         Text="Adicionar imóvel"
                                         Command="{Binding AddHomeCommand}" />
                             </VerticalStackLayout>
                         </Border>
-                    </VerticalStackLayout>
-
-                    <VerticalStackLayout Spacing="2" IsVisible="{Binding HasAvailableSources}">
-                        <Label Text="Pago com" Style="{StaticResource FieldCaption}" />
-                        <Picker AutomationId="SetupExpensesSourcePicker"
-                                Title="Pago com"
-                                ItemsSource="{Binding AvailableSources}"
-                                ItemDisplayBinding="{Binding Name, x:DataType=models:PaymentSource}"
-                                SelectedItem="{Binding ExpensesSource}" />
-                        <Label AutomationId="SetupExpensesCardHint"
-                               Text="Pagas com cartão de crédito, elas entram na fatura: vencem com ela e não usam valor estimado nem pagamento parcial."
-                               FontSize="12"
-                               TextColor="{StaticResource Muted}"
-                               IsVisible="{Binding IsExpensesSourceCreditCard}" />
                     </VerticalStackLayout>
                 </VerticalStackLayout>
 
@@ -1042,6 +1059,14 @@
                                 <Label FontSize="12"
                                        TextColor="{StaticResource Muted}"
                                        Text="Os meses do IPVA e do licenciamento dependem do final da placa e mudam de estado para estado: confira no site da Sefaz ou do Detran. Eles entram todo ano nesses meses, para não te pegar de surpresa." />
+                                <VerticalStackLayout Spacing="2" IsVisible="{Binding HasAvailableSources}">
+                                    <Label Text="Pago com" Style="{StaticResource FieldCaption}" />
+                                    <Picker AutomationId="SetupCarSourcePicker"
+                                            Title="Pago com"
+                                            ItemsSource="{Binding AvailableSources}"
+                                            ItemDisplayBinding="{Binding Name, x:DataType=models:PaymentSource}"
+                                            SelectedItem="{Binding NewCarSource}" />
+                                </VerticalStackLayout>
                                 <Button AutomationId="SetupAddCarButton"
                                         Text="Adicionar carro"
                                         Command="{Binding AddCarCommand}" />
@@ -1056,20 +1081,6 @@
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding LeisureExpenses}"
                                          BindableLayout.ItemTemplate="{StaticResource SetupExpenseTemplate}"
                                          Spacing="8" />
-
-                    <VerticalStackLayout Spacing="2" IsVisible="{Binding HasAvailableSources}">
-                        <Label Text="Pago com" Style="{StaticResource FieldCaption}" />
-                        <Picker AutomationId="SetupOtherExpensesSourcePicker"
-                                Title="Pago com"
-                                ItemsSource="{Binding AvailableSources}"
-                                ItemDisplayBinding="{Binding Name, x:DataType=models:PaymentSource}"
-                                SelectedItem="{Binding OtherExpensesSource}" />
-                        <Label AutomationId="SetupOtherExpensesCardHint"
-                               Text="Pagas com cartão de crédito, elas entram na fatura: vencem com ela e não usam valor estimado nem pagamento parcial."
-                               FontSize="12"
-                               TextColor="{StaticResource Muted}"
-                               IsVisible="{Binding IsOtherExpensesSourceCreditCard}" />
-                    </VerticalStackLayout>
                 </VerticalStackLayout>
 
                 <!-- 7. Summary, and how entries work -->
