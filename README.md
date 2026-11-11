@@ -36,6 +36,8 @@ The development follows strict guidelines documented in our `CLAUDE.md` to ensur
 
 The roadmap (done and planned features, by phase) lives in [ROADMAP.md](ROADMAP.md).
 
+What an iOS version needs (code, Mac, Apple account, App Store) is in [IOS.md](IOS.md).
+
 ## ⚠️ Architectural Constraint: Template vs. Monthly Edits
 
 The current edit flow modifies the `FinancialEntry` **template** — the parent record that drives all month projections. This is safe for display fields (`Description`, `Amount`, `Category`) because the projection engine already handles per-month overrides via `FinancialMonthlyEntry`.
