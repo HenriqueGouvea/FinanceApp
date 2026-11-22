@@ -17,6 +17,8 @@ public class PaymentSourcesPageObject
     private static readonly By NameEntry = AppSession.AutomationId("PaymentSourceNameEntry");
     private static readonly By BalanceEntry = AppSession.AutomationId("PaymentSourceBalanceEntry");
     private static readonly By BalanceFieldLabel = AppSession.AutomationId("PaymentSourceBalanceFieldLabel");
+    private static readonly By TypeLabel = AppSession.AutomationId("PaymentSourceTypeLabel");
+    private static readonly By TypePicker = AppSession.AutomationId("PaymentSourceTypePicker");
     private const string SaveButtonId = "SavePaymentSourceButton";
     private const string BillDueDayPickerId = "BillDueDayPicker";
     private const string BillPaymentAccountPickerId = "BillPaymentAccountPicker";
@@ -117,11 +119,28 @@ public class PaymentSourcesPageObject
     /// <summary>
     /// Taps the row to open its popup, replaces every field and saves.
     /// </summary>
-    public PaymentSourcesPageObject EditPaymentSource(string name, string newName, int type, decimal balance)
+    /// <summary>
+    /// Opens the source's edit popup, where its type is shown instead of the picker.
+    /// </summary>
+    public PaymentSourcesPageObject OpenEdit(string name)
     {
-        FindRow(name).FindElement(SourceName).Click();
-        _session.WaitForText(NameEntry, name);
-        FillAndSave(newName, type, balance);
+        OpenEditPopup(name);
+        return this;
+    }
+
+    /// <summary>
+    /// The type line of the open edit popup, e.g. "Conta bancária".
+    /// </summary>
+    public string EditPopupType => _session.WaitForVisible(TypeLabel).Text;
+
+    public bool EditPopupShowsTypePicker => _session.Driver.FindElements(TypePicker).Any(e => e.Displayed);
+
+    /// <summary>
+    /// Renames the source and sets its balance in the open edit popup, then saves.
+    /// </summary>
+    public PaymentSourcesPageObject SaveEdit(string newName, decimal balance)
+    {
+        FillAndSave(newName, type: null, balance);
         return this;
     }
 
@@ -144,15 +163,19 @@ public class PaymentSourcesPageObject
         return new MainPageObject(_session).WaitUntilLoaded();
     }
 
-    private void FillAndSave(string name, int type, decimal balance, Action? fillMore = null)
+    /// <param name="type">The type to pick, or null to keep it (an existing source's popup has no picker).</param>
+    private void FillAndSave(string name, int? type, decimal balance, Action? fillMore = null)
     {
         var entry = _session.WaitForVisible(NameEntry);
         entry.Clear();
         entry.SendKeys(name);
         _session.HideKeyboardIfShown();
 
-        _session.Tap(AppSession.AutomationId(TypeButtonId(type)));
-        _session.WaitForText(BalanceFieldLabel, type == AppFormat.CreditCard ? AppLabels.Limit : AppLabels.Balance);
+        if (type is { } picked)
+        {
+            _session.Tap(AppSession.AutomationId(TypeButtonId(picked)));
+            _session.WaitForText(BalanceFieldLabel, picked == AppFormat.CreditCard ? AppLabels.Limit : AppLabels.Balance);
+        }
 
         var balanceEntry = _session.WaitForVisible(BalanceEntry);
         balanceEntry.Clear();

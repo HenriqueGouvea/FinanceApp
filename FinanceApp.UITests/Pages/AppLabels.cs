@@ -82,6 +82,7 @@ public static class AppLabels
     public const string MealVouchersHeader = "Vales";
     public const string Balance = "Saldo";
     public const string Limit = "Limite";
+    public const string BankAccountType = "Conta bancária";
 
     public const string Paid = "Pago";
     public const string Received = "Recebido";
