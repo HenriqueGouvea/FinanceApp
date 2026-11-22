@@ -29,6 +29,7 @@ public partial class SetupViewModel : ObservableObject
     public const string DefaultHomeName = "Casa";
     public const string DefaultCarName = "Carro";
     public const string CarInsuranceDescription = "Seguro do carro";
+    public const string ActivityDescription = "Cursos e atividades";
 
     private const string SalaryIcon = "💼";
 
@@ -145,6 +146,15 @@ public partial class SetupViewModel : ObservableObject
 
     [ObservableProperty] string newHomeName = string.Empty;
     [ObservableProperty] int newHomeFinancingDueDay = NoDueDay;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddHomeCommand))]
+    int? newHomeFinancingCurrentInstallment;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddHomeCommand))]
+    int? newHomeFinancingTotalInstallments;
+
     [ObservableProperty] int newHomeIptuStartMonth = DefaultIptuStartMonth;
     [ObservableProperty] int newHomeIptuInstallments = 1;
     [ObservableProperty] PaymentSource? newHomeSource;
@@ -290,7 +300,12 @@ public partial class SetupViewModel : ObservableObject
         AvailableSources.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasAvailableSources));
         BillAccounts.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasBillAccounts));
         CreditCards.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasCreditCards));
-        Purchases.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasPurchases));
+        Purchases.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasPurchases));
+            foreach (var expense in AllExpenses)
+                expense.RefreshMatchingPurchase();
+        };
         SummaryRows.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasSummaryRows));
         Homes.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasHomes));
         Cars.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasCars));
@@ -486,20 +501,47 @@ public partial class SetupViewModel : ObservableObject
     [RelayCommand]
     void SelectHasChildren(bool value) => HasChildren = value;
 
+    /// <summary>
+    /// One more child activity, already ticked, for a child with several courses (or several children).
+    /// </summary>
+    [RelayCommand]
+    void AddActivity()
+    {
+        var activity = Prepare(CreateActivity(isRemovable: true));
+        activity.IsSelected = true;
+        SchoolExpenses.Add(activity);
+    }
+
+    [RelayCommand]
+    void RemoveActivity(SetupExpenseItem activity)
+    {
+        if (activity.IsRemovable)
+            SchoolExpenses.Remove(activity);
+    }
+
     [RelayCommand]
     void SelectHasCar(bool value) => HasCar = value;
 
     [RelayCommand]
     void SelectHasOwnHome(bool value) => HasOwnHome = value;
 
-    private bool CanAddHome() => NewHomeFinancing > 0 || NewHomeIptu > 0;
+    private bool HasNewHomeFinancingInstallments => NewHomeFinancingTotalInstallments is not null || NewHomeFinancingCurrentInstallment is not null;
+
+    // The installments are optional, but once one of them is typed both must make sense ("9 de 120").
+    private bool CanAddHome() =>
+        (NewHomeFinancing > 0 || NewHomeIptu > 0)
+        && (NewHomeFinancing == 0 || !HasNewHomeFinancingInstallments
+            || NewHomeFinancingTotalInstallments is > 0 && NewHomeFinancingCurrentInstallment is > 0
+            && NewHomeFinancingCurrentInstallment <= NewHomeFinancingTotalInstallments);
 
     /// <summary>
-    /// Adds a home the user owns, with its monthly financing and its IPTU. An unnamed one is called "Casa".
+    /// Adds a home the user owns, with its monthly financing (in installments when they were typed) and its IPTU.
+    /// An unnamed one is called "Casa".
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanAddHome))]
     void AddHome()
     {
+        var hasInstallments = NewHomeFinancing > 0 && HasNewHomeFinancingInstallments;
         Homes.Add(new SetupHomeItem(
             string.IsNullOrWhiteSpace(NewHomeName) ? DefaultHomeName : NewHomeName.Trim(),
             NewHomeFinancing,
@@ -507,7 +549,9 @@ public partial class SetupViewModel : ObservableObject
             NewHomeIptu,
             NewHomeIptuStartMonth,
             NewHomeIptuInstallments,
-            NewHomeSource));
+            NewHomeSource,
+            hasInstallments ? NewHomeFinancingTotalInstallments : null,
+            hasInstallments ? NewHomeFinancingCurrentInstallment : null));
         ResetNewHomeForm();
     }
 
@@ -733,6 +777,9 @@ public partial class SetupViewModel : ObservableObject
                 {
                     Description = $"Financiamento ({home.Name})",
                     Amount = home.Financing,
+                    Recurrence = home.HasFinancingInstallments ? RecurrenceType.Installments : RecurrenceType.Recurrent,
+                    TotalInstallments = home.FinancingTotalInstallments,
+                    CurrentInstallment = home.FinancingCurrentInstallment,
                     DueDay = home.FinancingDueDay == NoDueDay ? null : home.FinancingDueDay,
                     CategoryName = "Moradia",
                     PaymentSource = home.PaymentSource
@@ -780,7 +827,7 @@ public partial class SetupViewModel : ObservableObject
     private static IEnumerable<(string Icon, SetupEntry Entry)> BuildExpenses(IEnumerable<SetupExpenseItem> expenses) =>
         expenses.Where(e => e.IsSelected && e.Amount > 0).Select(expense => (expense.Icon, new SetupEntry
         {
-            Description = expense.Description,
+            Description = expense.EntryDescription,
             Amount = expense.Amount,
             Recurrence = expense.IsPaidYearly ? RecurrenceType.Annual : RecurrenceType.Recurrent,
             TotalInstallments = expense.IsPaidYearly ? expense.YearlyInstallments : null,
@@ -921,6 +968,8 @@ public partial class SetupViewModel : ObservableObject
         NewHomeName = string.Empty;
         NewHomeFinancing = 0;
         NewHomeFinancingDueDay = NoDueDay;
+        NewHomeFinancingCurrentInstallment = null;
+        NewHomeFinancingTotalInstallments = null;
         NewHomeIptu = 0;
         NewHomeIptuStartMonth = DefaultIptuStartMonth;
         NewHomeIptuInstallments = 1;
@@ -970,11 +1019,16 @@ public partial class SetupViewModel : ObservableObject
     {
         list.Clear();
         foreach (var item in items)
-        {
-            item.Sources = AvailableSources;
-            item.PaymentSource = _defaultExpenseSource;
-            list.Add(item);
-        }
+            list.Add(Prepare(item));
+    }
+
+    private SetupExpenseItem Prepare(SetupExpenseItem item)
+    {
+        item.Sources = AvailableSources;
+        item.PaymentSource = _defaultExpenseSource;
+        item.Purchases = Purchases;
+        item.RefreshMatchingPurchase();
+        return item;
     }
 
     private static IEnumerable<SetupExpenseItem> CreateHouseExpenses() =>
@@ -1007,8 +1061,14 @@ public partial class SetupViewModel : ObservableObject
     [
         new() { Icon = "🎒", Description = "Mensalidade escolar", CategoryName = "Educação" },
         new() { Icon = "🚌", Description = "Transporte escolar", CategoryName = "Educação" },
-        new() { Icon = "⚽", Description = "Cursos e atividades", CategoryName = "Educação" }
+        CreateActivity()
     ];
+
+    // "Cursos e atividades" is too generic to tell the entries apart, so the user names each one (e.g. "Inglês").
+    private static SetupExpenseItem CreateActivity(bool isRemovable = false) => new()
+    {
+        Icon = "⚽", Description = ActivityDescription, CategoryName = "Educação", IsDescriptionEditable = true, IsRemovable = isRemovable
+    };
 
     private static IEnumerable<SetupExpenseItem> CreateLeisureExpenses() =>
     [

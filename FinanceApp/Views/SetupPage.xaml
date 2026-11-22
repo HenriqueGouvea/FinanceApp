@@ -27,26 +27,51 @@
                 </Border.Triggers>
                 <VerticalStackLayout Spacing="8">
                     <!-- Tapping the row (re)selects it; the check box only mirrors the state -->
-                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10">
+                    <Grid ColumnDefinitions="Auto, *, Auto, Auto" ColumnSpacing="10">
                         <Grid.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding ToggleExpenseCommand, Source={RelativeSource AncestorType={x:Type vm:SetupViewModel}}, x:DataType=vm:SetupViewModel}"
                                                   CommandParameter="{Binding .}" />
                         </Grid.GestureRecognizers>
                         <Label Grid.Column="0" Text="{Binding Icon}" FontSize="20" VerticalOptions="Center" />
-                        <Label Grid.Column="1" AutomationId="SetupExpenseNameLabel" Text="{Binding Description}" FontSize="15" VerticalOptions="Center" />
+                        <Label Grid.Column="1" AutomationId="SetupExpenseNameLabel" Text="{Binding EntryDescription}" FontSize="15" VerticalOptions="Center" />
                         <CheckBox Grid.Column="2"
                                   AutomationId="SetupExpenseCheckBox"
                                   IsChecked="{Binding IsSelected, Mode=OneWay}"
                                   InputTransparent="True"
                                   Color="{StaticResource Primary}"
                                   VerticalOptions="Center" />
+                        <Button Grid.Column="3"
+                                AutomationId="SetupRemoveExpenseButton"
+                                Text="✕"
+                                FontSize="14"
+                                Padding="0"
+                                WidthRequest="36"
+                                HeightRequest="36"
+                                BackgroundColor="Transparent"
+                                TextColor="{StaticResource Outcome}"
+                                IsVisible="{Binding IsRemovable}"
+                                Command="{Binding RemoveActivityCommand, Source={RelativeSource AncestorType={x:Type vm:SetupViewModel}}, x:DataType=vm:SetupViewModel}"
+                                CommandParameter="{Binding .}" />
                     </Grid>
+                    <!-- The same expense may already be among the card purchases of step 3 -->
+                    <Label AutomationId="SetupExpensePurchaseHint"
+                           Text="{Binding PurchaseHint}"
+                           FontSize="12"
+                           TextColor="{StaticResource Partial}"
+                           IsVisible="{Binding ShowsPurchaseHint}" />
                     <!-- Built only while the row is ticked (Fields holds the row itself then), so the unticked
                          rows don't build their pickers -->
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding Fields}" IsVisible="{Binding IsSelected}">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="vm:SetupExpenseItem">
                                 <VerticalStackLayout Spacing="8">
+                                    <VerticalStackLayout Spacing="2" IsVisible="{Binding IsDescriptionEditable}">
+                                        <Label Text="Qual?" Style="{StaticResource FieldCaption}" />
+                                        <Entry AutomationId="SetupExpenseDescriptionEntry"
+                                               Placeholder="ex.: Inglês, natação"
+                                               Text="{Binding CustomDescription}"
+                                               MaxLength="40" />
+                                    </VerticalStackLayout>
                                     <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
                                         <VerticalStackLayout Grid.Column="0" Spacing="2">
                                             <Label AutomationId="SetupExpenseAmountCaption" Text="{Binding AmountCaption}" Style="{StaticResource FieldCaption}" />
@@ -424,7 +449,12 @@
                         <Label Text="Compras no cartão de crédito" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
                         <Label FontSize="13"
                                TextColor="{StaticResource Ink}"
-                               Text="Inclua as parcelas que ainda faltam, as assinaturas (como streaming) e as compras deste mês. Elas entram na fatura do cartão de crédito." />
+                               Text="Inclua as parcelas que ainda faltam, as assinaturas (como streaming) e as compras avulsas deste mês. Elas entram na fatura do cartão de crédito." />
+                        <!-- The later steps offer these expenses with their own "Pago com", so they aren't added twice -->
+                        <Label AutomationId="SetupPurchasesLaterHint"
+                               FontSize="12"
+                               TextColor="{StaticResource Muted}"
+                               Text="Contas da casa, saúde, escola, seguro do carro e combustível vêm nos próximos passos: marque-as lá e escolha o cartão de crédito em &quot;Pago com&quot;." />
 
                         <VerticalStackLayout BindableLayout.ItemsSource="{Binding Purchases}" Spacing="4" IsVisible="{Binding HasPurchases}">
                             <BindableLayout.ItemTemplate>
@@ -770,6 +800,25 @@
                                                 SelectedItem="{Binding NewHomeFinancingDueDay}" />
                                     </VerticalStackLayout>
                                 </Grid>
+                                <!-- A financing already in progress: "9 de 120" falls this month and it ends on the last one -->
+                                <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                        <Label Text="Parcela atual" Style="{StaticResource FieldCaption}" />
+                                        <Entry AutomationId="SetupHomeFinancingCurrentInstallmentEntry"
+                                               Placeholder="ex.: 9"
+                                               Text="{Binding NewHomeFinancingCurrentInstallment}"
+                                               Keyboard="Numeric" />
+                                    </VerticalStackLayout>
+                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                        <Label Text="Nº de parcelas" Style="{StaticResource FieldCaption}" />
+                                        <Entry AutomationId="SetupHomeFinancingTotalInstallmentsEntry"
+                                               Placeholder="ex.: 120"
+                                               Text="{Binding NewHomeFinancingTotalInstallments}"
+                                               Keyboard="Numeric" />
+                                    </VerticalStackLayout>
+                                </Grid>
+                                <Label Style="{StaticResource Hint}"
+                                       Text="Com as parcelas, o financiamento mostra &quot;9/120&quot; e termina na última. Sem elas, ele entra todo mês." />
                                 <Label Text="IPTU (imposto anual)" FontSize="14" FontAttributes="Bold" />
                                 <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
                                     <VerticalStackLayout Grid.Column="0" Spacing="2">
@@ -889,6 +938,12 @@
                                          BindableLayout.ItemTemplate="{StaticResource SetupExpenseTemplate}"
                                          Spacing="8"
                                          IsVisible="{Binding HasChildren}" />
+                    <Button AutomationId="SetupAddActivityButton"
+                            Text="+ Adicionar outra atividade"
+                            Style="{StaticResource TextButton}"
+                            HorizontalOptions="Start"
+                            IsVisible="{Binding HasChildren}"
+                            Command="{Binding AddActivityCommand}" />
 
                     <Label Text="Transporte" Style="{StaticResource GroupHeader}" />
                     <Label Text="Você tem carro?" FontSize="15" />

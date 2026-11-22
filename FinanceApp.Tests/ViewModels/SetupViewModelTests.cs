@@ -995,6 +995,150 @@ public class SetupViewModelTests
         _vm.HasSummaryRows.Should().BeFalse();
     }
 
+    // --- Child activities ---
+
+    [Fact]
+    public async Task Activity_TypedDescription_NamesTheEntry()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.SelectHasChildrenCommand.Execute(true);
+        var activity = _vm.SchoolExpenses.Single(e => e.IsDescriptionEditable);
+        Select(_vm.SchoolExpenses, SetupViewModel.ActivityDescription, 250);
+
+        activity.CustomDescription = " Inglês ";
+
+        activity.EntryDescription.Should().Be("Inglês");
+        await GoToSummaryAsync();
+        _vm.SummaryRows.Single().Description.Should().Be("Inglês");
+    }
+
+    [Fact]
+    public async Task Activity_NoDescriptionTyped_KeepsTheGenericOne()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.SelectHasChildrenCommand.Execute(true);
+        Select(_vm.SchoolExpenses, SetupViewModel.ActivityDescription, 250);
+        _vm.SchoolExpenses.Single(e => e.IsDescriptionEditable).CustomDescription = "   ";
+
+        await GoToSummaryAsync();
+
+        _vm.SummaryRows.Single().Description.Should().Be(SetupViewModel.ActivityDescription);
+    }
+
+    [Fact]
+    public void Expense_NotEditable_IgnoresTypedDescription()
+    {
+        var expense = new SetupExpenseItem { Description = "Aluguel", CustomDescription = "Casa" };
+
+        expense.EntryDescription.Should().Be("Aluguel");
+    }
+
+    [Fact]
+    public async Task AddActivity_AddsATickedRemovableOnePaidWithTheFirstAccount()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        AddSource("Itaú", PaymentSourceType.BankAccount);
+        _vm.SelectHasChildrenCommand.Execute(true);
+
+        _vm.AddActivityCommand.Execute(null);
+
+        var added = _vm.SchoolExpenses.Last();
+        (added.Description, added.IsSelected, added.IsRemovable, added.IsDescriptionEditable, added.CategoryName)
+            .Should().Be((SetupViewModel.ActivityDescription, true, true, true, "Educação"));
+        added.PaymentSource!.Name.Should().Be("Itaú");
+        _vm.SchoolExpenses.Take(3).Should().OnlyContain(e => !e.IsRemovable);
+    }
+
+    [Fact]
+    public async Task AddActivity_SeveralNamed_EachBecomesAnEntry()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.SelectHasChildrenCommand.Execute(true);
+        Select(_vm.SchoolExpenses, SetupViewModel.ActivityDescription, 250);
+        _vm.SchoolExpenses.Single(e => e.IsDescriptionEditable).CustomDescription = "Inglês";
+        _vm.AddActivityCommand.Execute(null);
+        _vm.SchoolExpenses.Last().CustomDescription = "Natação";
+        _vm.SchoolExpenses.Last().Amount = 180;
+
+        await GoToSummaryAsync();
+
+        _vm.SummaryRows.Select(r => (r.Description, r.Amount)).Should().Equal(("Inglês", 250m), ("Natação", 180m));
+    }
+
+    [Fact]
+    public async Task RemoveActivity_TakesOutOnlyTheAddedOnes()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.AddActivityCommand.Execute(null);
+        var added = _vm.SchoolExpenses.Last();
+        var original = _vm.SchoolExpenses.First(e => e.IsDescriptionEditable);
+
+        _vm.RemoveActivityCommand.Execute(added);
+        _vm.RemoveActivityCommand.Execute(original);
+
+        _vm.SchoolExpenses.Should().HaveCount(3).And.Contain(original);
+    }
+
+    [Fact]
+    public async Task SkipStep_OtherExpenses_DiscardsAddedActivities()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        await GoToStepAsync(SetupStep.OtherExpenses);
+        _vm.AddActivityCommand.Execute(null);
+
+        _vm.SkipStepCommand.Execute(null);
+
+        _vm.SchoolExpenses.Should().HaveCount(3).And.OnlyContain(e => !e.IsRemovable);
+    }
+
+    // --- Expenses already among the card purchases ---
+
+    [Fact]
+    public async Task Expense_LikeACardPurchase_SaysSoOnceTicked()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        AddCard("Nubank");
+        AddPurchase("Seguro", 200, RecurrenceType.Recurrent);
+        var insurance = _vm.CarExpenses.Single(e => e.Description == SetupViewModel.CarInsuranceDescription);
+
+        insurance.ShowsPurchaseHint.Should().BeFalse();
+        _vm.ToggleExpenseCommand.Execute(insurance);
+
+        insurance.ShowsPurchaseHint.Should().BeTrue();
+        insurance.PurchaseHint.Should().Be("Você já incluiu \"Seguro\" nas compras do cartão.");
+        _vm.CarExpenses.Single(e => e.Description == "Combustível").MatchingPurchase.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Expense_PurchaseRemoved_DropsTheHint()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        AddCard("Nubank");
+        AddPurchase("Internet", 100, RecurrenceType.Recurrent);
+        var internet = _vm.Expenses.Single(e => e.Description == "Internet");
+        _vm.ToggleExpenseCommand.Execute(internet);
+        internet.ShowsPurchaseHint.Should().BeTrue();
+
+        _vm.RemovePurchaseCommand.Execute(_vm.Purchases.Single());
+
+        internet.ShowsPurchaseHint.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Activity_TypedLikeACardPurchase_SaysSo()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        AddCard("Nubank");
+        AddPurchase("Inglês", 300, RecurrenceType.Recurrent);
+        var activity = _vm.SchoolExpenses.Single(e => e.IsDescriptionEditable);
+        _vm.ToggleExpenseCommand.Execute(activity);
+        activity.ShowsPurchaseHint.Should().BeFalse();
+
+        activity.CustomDescription = "Curso de inglês";
+
+        activity.MatchingPurchase.Should().Be("Inglês");
+    }
+
     // --- Homes and cars ---
 
     [Fact]
@@ -1037,6 +1181,76 @@ public class SetupViewModelTests
 
         _vm.Homes.Single().Name.Should().Be("Casa");
         _vm.Homes.Single().Detail.Should().Be("IPTU todo ano em fevereiro");
+    }
+
+    [Fact]
+    public async Task AddHome_FinancingInstallments_ShowsThemAndResetsForm()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.NewHomeName = "Apartamento";
+        _vm.NewHomeFinancing = 2000;
+        _vm.NewHomeFinancingCurrentInstallment = 9;
+        _vm.NewHomeFinancingTotalInstallments = 120;
+
+        _vm.AddHomeCommand.Execute(null);
+
+        var home = _vm.Homes.Single();
+        (home.FinancingCurrentInstallment, home.FinancingTotalInstallments).Should().Be(((int?)9, (int?)120));
+        home.Detail.Should().Be("Financiamento 9/120");
+        (_vm.NewHomeFinancingCurrentInstallment, _vm.NewHomeFinancingTotalInstallments).Should().Be(((int?)null, (int?)null));
+    }
+
+    [Theory]
+    [InlineData(null, null, true)]
+    [InlineData(9, 120, true)]
+    [InlineData(120, 120, true)]
+    [InlineData(9, null, false)]
+    [InlineData(null, 120, false)]
+    [InlineData(121, 120, false)]
+    [InlineData(0, 120, false)]
+    public async Task AddHome_CanExecute_NeedsBothFinancingInstallmentsOrNone(int? current, int? total, bool expected)
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.NewHomeFinancing = 2000;
+        _vm.NewHomeFinancingCurrentInstallment = current;
+        _vm.NewHomeFinancingTotalInstallments = total;
+
+        _vm.AddHomeCommand.CanExecute(null).Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task AddHome_InstallmentsWithoutFinancing_IgnoresThem()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.NewHomeIptu = 1200;
+        _vm.NewHomeFinancingCurrentInstallment = 9;
+
+        _vm.AddHomeCommand.Execute(null);
+
+        _vm.Homes.Single().HasFinancingInstallments.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Finish_FinancingInstallments_SavesAnInstallmentsEntryFromTheCurrentOne()
+    {
+        NewUserSetup? saved = null;
+        await _setupService.CompleteAsync(Arg.Do<NewUserSetup>(s => saved = s));
+        await _vm.PrepareAsync(isRerun: false);
+        _vm.SelectHasOwnHomeCommand.Execute(true);
+        _vm.NewHomeFinancing = 2000;
+        _vm.NewHomeFinancingDueDay = 10;
+        _vm.NewHomeFinancingCurrentInstallment = 9;
+        _vm.NewHomeFinancingTotalInstallments = 120;
+        _vm.AddHomeCommand.Execute(null);
+        await GoToSummaryAsync();
+
+        _vm.SummaryRows.Single().Detail.Should().Be("Parcela 9 de 120 · dia 10");
+
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        var financing = saved!.Entries.Single();
+        (financing.Description, financing.Recurrence, financing.CurrentInstallment, financing.TotalInstallments, financing.DueDay)
+            .Should().Be(("Financiamento (Casa)", RecurrenceType.Installments, (int?)9, (int?)120, (int?)10));
     }
 
     [Fact]

@@ -276,11 +276,7 @@ public class SetupPageObject
         if (!IsExpenseChecked(description))
             throw new InvalidOperationException($"\"{description}\" was already selected.");
 
-        // Ticking the row reveals its amount and due day fields, which may open below the fold.
-        var amountEntry = ExpenseRowElement(description, "SetupExpenseAmountEntry");
-        var footerTop = _session.WaitForVisible(NextButton).Location.Y;
-        _session.ScrollDownUntil(() => IsAboveFooter(amountEntry, footerTop), $"the amount of \"{description}\" to be on screen");
-        TypeAmount(_session.WaitForVisible(amountEntry), amountEntry, amount);
+        EnterExpenseAmount(description, amount);
 
         if (dueDay is { } day)
         {
@@ -291,6 +287,55 @@ public class SetupPageObject
         }
 
         return this;
+    }
+
+    /// <summary>
+    /// Fills the amount of an expense already ticked.
+    /// </summary>
+    public SetupPageObject EnterExpenseAmount(string description, decimal amount)
+    {
+        // Ticking the row reveals its amount and due day fields, which may open below the fold.
+        var amountEntry = ExpenseRowElement(description, "SetupExpenseAmountEntry");
+        ScrollAboveFooter(amountEntry, $"the amount of \"{description}\"");
+        TypeAmount(_session.WaitForVisible(amountEntry), amountEntry, amount);
+        return this;
+    }
+
+    /// <summary>
+    /// Types what a ticked child activity is ("Piano"), which then names its row and its entry.
+    /// </summary>
+    public SetupPageObject NameExpense(string description, string name)
+    {
+        var descriptionEntry = ExpenseRowElement(description, "SetupExpenseDescriptionEntry");
+        ScrollAboveFooter(descriptionEntry, $"the description of \"{description}\"");
+        var entry = _session.WaitForVisible(descriptionEntry);
+        entry.Clear();
+        entry.SendKeys(name);
+        _session.HideKeyboardIfShown();
+        _session.WaitForVisible(ExpenseRowElement(name, "SetupExpenseNameLabel"));
+        return this;
+    }
+
+    /// <summary>
+    /// Taps "+ Adicionar outra atividade", which adds one more ticked "Cursos e atividades" row.
+    /// </summary>
+    public SetupPageObject AddActivity()
+    {
+        _session.HideKeyboardIfShown();
+        _session.ScrollToAndTap("SetupAddActivityButton");
+        ScrollToText(AppLabels.SetupActivityDescription);
+        return this;
+    }
+
+    /// <summary>
+    /// "Você já incluiu "Seguro" nas compras do cartão." under a ticked expense like a card purchase, or null.
+    /// </summary>
+    public string? ExpensePurchaseHint(string description) => DisplayedIn(ExpenseRow(description), "SetupExpensePurchaseHint")?.Text;
+
+    private void ScrollAboveFooter(By locator, string what)
+    {
+        var footerTop = _session.WaitForVisible(NextButton).Location.Y;
+        _session.ScrollDownUntil(() => IsAboveFooter(locator, footerTop), $"{what} to be on screen");
     }
 
     /// <summary>
@@ -408,12 +453,20 @@ public class SetupPageObject
     }
 
     /// <summary>
-    /// Adds a home with its IPTU (the amount of each installment), which keeps its default first month (February).
+    /// Adds a home with its IPTU (the amount of each installment), which keeps its default first month (February),
+    /// and, when given, its financing in installments (<paramref name="currentInstallment"/> falls this month).
     /// </summary>
-    public SetupPageObject AddHome(string name, decimal iptu, int iptuInstallments)
+    public SetupPageObject AddHome(string name, decimal iptu, int iptuInstallments,
+        decimal financing = 0, int? currentInstallment = null, int? totalInstallments = null)
     {
         var count = ScrolledTexts("SetupHomeNameLabel", AppSession.AutomationId("SetupHomeNameLabel")).Count;
         TypeText("SetupHomeNameEntry", name);
+        if (financing > 0)
+            TypeAmount(_session.ScrollTo("SetupHomeFinancingEntry"), AppSession.AutomationId("SetupHomeFinancingEntry"), financing);
+        if (currentInstallment is { } current)
+            TypeNumber("SetupHomeFinancingCurrentInstallmentEntry", current);
+        if (totalInstallments is { } total)
+            TypeNumber("SetupHomeFinancingTotalInstallmentsEntry", total);
         TypeAmount(_session.ScrollTo("SetupHomeIptuEntry"), AppSession.AutomationId("SetupHomeIptuEntry"), iptu);
         SelectOption("SetupHomeIptuInstallmentsPicker", AppLabels.AnnualInstallments(iptuInstallments));
         _session.ScrollToAndTap("SetupAddHomeButton");
