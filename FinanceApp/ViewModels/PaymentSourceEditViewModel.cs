@@ -15,6 +15,14 @@ public partial class PaymentSourceEditViewModel : ObservableObject
 
     [ObservableProperty] string popupTitle = "Nova Conta ou Cartão de Crédito";
 
+    /// <summary>
+    /// An existing source shows its type instead of the picker: changing it is rare, and deleting and re-adding the source does the same.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanPickType))]
+    [NotifyCanExecuteChangedFor(nameof(SelectTypeCommand))]
+    bool isEditing;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     string name = string.Empty;
@@ -35,6 +43,7 @@ public partial class PaymentSourceEditViewModel : ObservableObject
     PaymentSource? billPaymentAccount;
 
     public bool IsCreditCard => Type == PaymentSourceType.CreditCard;
+    public bool CanPickType => !IsEditing;
     public bool HasBillPaymentAccounts => BillPaymentAccounts.Count > 0;
     public bool HasBillPaymentAccount => BillPaymentAccount is not null;
 
@@ -58,6 +67,7 @@ public partial class PaymentSourceEditViewModel : ObservableObject
     public async Task PrepareAsync()
     {
         _editingSourceId = 0;
+        IsEditing = false;
         PopupTitle = "Nova Conta ou Cartão de Crédito";
         Name = string.Empty;
         Type = PaymentSourceType.BankAccount;
@@ -70,6 +80,7 @@ public partial class PaymentSourceEditViewModel : ObservableObject
     public async Task PrepareForEditAsync(PaymentSource source)
     {
         _editingSourceId = source.Id;
+        IsEditing = true;
         PopupTitle = "Editar Conta ou Cartão de Crédito";
         Name = source.Name;
         Type = source.Type;
@@ -84,7 +95,7 @@ public partial class PaymentSourceEditViewModel : ObservableObject
         _onSaved = onSaved;
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanPickType))]
     void SelectType(PaymentSourceType value) => Type = value;
 
     [RelayCommand]

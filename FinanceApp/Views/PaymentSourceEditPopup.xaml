@@ -20,8 +20,22 @@
 
                 <Entry x:Name="NameEntry" AutomationId="PaymentSourceNameEntry" Placeholder="Nome (ex.: Nubank)" Text="{Binding Name}" MaxLength="30" />
 
+                <!-- An existing source's type, shown instead of the picker -->
+                <HorizontalStackLayout Spacing="6" IsVisible="{Binding IsEditing}">
+                    <Label Text="{Binding Type, Converter={x:Static converters:PaymentSourceTypeToIconConverter.Instance}}"
+                           FontSize="16"
+                           VerticalOptions="Center" />
+                    <Label AutomationId="PaymentSourceTypeLabel"
+                           Text="{Binding Type, Converter={x:Static converters:PaymentSourceTypeToLabelConverter.Instance}}"
+                           FontSize="15"
+                           TextColor="{StaticResource Ink}"
+                           VerticalOptions="Center" />
+                </HorizontalStackLayout>
+
                 <!-- Source type: decides whether the amount below is a balance or a credit limit -->
-                <Border Style="{StaticResource SegmentedControl}">
+                <Border AutomationId="PaymentSourceTypePicker"
+                        Style="{StaticResource SegmentedControl}"
+                        IsVisible="{Binding CanPickType}">
                     <Grid ColumnDefinitions="*, *, *" ColumnSpacing="3">
                         <Border Grid.Column="0"
                                 AutomationId="PaymentSourceBankAccountTypeButton"

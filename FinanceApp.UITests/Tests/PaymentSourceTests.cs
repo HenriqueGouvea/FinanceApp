@@ -57,7 +57,13 @@ public sealed class PaymentSourceTests : E2ETestBase
     {
         MainPage.VisibleEntryPaymentSources.Should().ContainSingle().Which.Should().Be(Itau);
 
-        var sources = MainPage.OpenPaymentSources().EditPaymentSource(Itau, "Bradesco E2E", AppFormat.BankAccount, 3000m);
+        var sources = MainPage.OpenPaymentSources().OpenEdit(Itau);
+        using (new AssertionScope())
+        {
+            sources.EditPopupType.Should().Be(AppLabels.BankAccountType);
+            sources.EditPopupShowsTypePicker.Should().BeFalse();
+        }
+        sources.SaveEdit("Bradesco E2E", 3000m);
 
         sources.VisibleNames.Should().Equal("Bradesco E2E", Inter);
         sources.BalanceOf("Bradesco E2E").Should().Be(AppFormat.SourceBalance(AppLabels.Balance, 3000m));

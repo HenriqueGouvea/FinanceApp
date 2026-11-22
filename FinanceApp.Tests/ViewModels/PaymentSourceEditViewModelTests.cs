@@ -67,6 +67,28 @@ public class PaymentSourceEditViewModelTests
     }
 
     [Fact]
+    public async Task PrepareForEdit_ShowsTypeInsteadOfPicker()
+    {
+        await _vm.PrepareForEditAsync(Checking);
+
+        _vm.IsEditing.Should().BeTrue();
+        _vm.CanPickType.Should().BeFalse();
+        _vm.SelectTypeCommand.CanExecute(PaymentSourceType.CreditCard).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Prepare_AfterEdit_OffersTypePickerAgain()
+    {
+        await _vm.PrepareForEditAsync(Checking);
+
+        await _vm.PrepareAsync();
+
+        _vm.IsEditing.Should().BeFalse();
+        _vm.CanPickType.Should().BeTrue();
+        _vm.SelectTypeCommand.CanExecute(PaymentSourceType.CreditCard).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task PrepareForEdit_SaveKeepsSourceId()
     {
         await _vm.PrepareForEditAsync(MakeSource());
@@ -231,14 +253,14 @@ public class PaymentSourceEditViewModelTests
     }
 
     [Fact]
-    public async Task SaveCommand_ChangedFromCreditCardToBankAccount_DropsBillFields()
+    public async Task SaveCommand_EditingCreditCard_KeepsTypeAndBillFields()
     {
         await _vm.PrepareForEditAsync(MakeSource(billDueDay: 10, billPaymentSourceId: Checking.Id));
-        _vm.SelectTypeCommand.Execute(PaymentSourceType.BankAccount);
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveAsync(Arg.Is<PaymentSource>(s => s.BillDueDay == null && s.BillPaymentSourceId == null));
+        await _service.Received(1).SaveAsync(Arg.Is<PaymentSource>(s =>
+            s.Type == PaymentSourceType.CreditCard && s.BillDueDay == 10 && s.BillPaymentSourceId == Checking.Id));
     }
 
     [Fact]
