@@ -10,6 +10,15 @@
              x:DataType="vm:MainViewModel"
              Title="Início">
     <ContentPage.Resources>
+        <!-- "Despesas" and "Receitas" headers: ▾ while expanded, ▸ collapsed. A bit larger than the title so it reads
+             as "tap to collapse", with a fixed width so the title doesn't shift when the glyph changes -->
+        <Style x:Key="SectionArrow" TargetType="Label">
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="WidthRequest" Value="16" />
+            <Setter Property="HorizontalTextAlignment" Value="Center" />
+            <Setter Property="VerticalOptions" Value="Center" />
+        </Style>
+
         <!-- Month arrows on the plum header: light chevrons beside the month pill, with a 44dp touch area -->
         <Style x:Key="MonthArrowButton" TargetType="Button">
             <Setter Property="FontSize" Value="24" />
@@ -654,7 +663,7 @@
                                         <Grid.GestureRecognizers>
                                             <TapGestureRecognizer Command="{Binding ToggleOutcomesCommand}" />
                                         </Grid.GestureRecognizers>
-                                        <Label Text="▾" FontSize="12" TextColor="{StaticResource Outcome}" VerticalOptions="Center">
+                                        <Label Text="▾" Style="{StaticResource SectionArrow}" TextColor="{StaticResource Outcome}">
                                             <Label.Triggers>
                                                 <DataTrigger TargetType="Label" Binding="{Binding IsOutcomesExpanded}" Value="False">
                                                     <Setter Property="Text" Value="▸" />
@@ -700,7 +709,7 @@
                                         <Grid.GestureRecognizers>
                                             <TapGestureRecognizer Command="{Binding ToggleIncomesCommand}" />
                                         </Grid.GestureRecognizers>
-                                        <Label Text="▾" FontSize="12" TextColor="{StaticResource Income}" VerticalOptions="Center">
+                                        <Label Text="▾" Style="{StaticResource SectionArrow}" TextColor="{StaticResource Income}">
                                             <Label.Triggers>
                                                 <DataTrigger TargetType="Label" Binding="{Binding IsIncomesExpanded}" Value="False">
                                                     <Setter Property="Text" Value="▸" />

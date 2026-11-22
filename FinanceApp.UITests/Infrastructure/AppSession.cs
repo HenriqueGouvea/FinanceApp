@@ -223,6 +223,30 @@ public sealed class AppSession : IDisposable
         });
     }
 
+    /// <summary>
+    /// Taps just inside the element's left edge, where a text field would put the cursor before its first character.
+    /// </summary>
+    public void TapNearStart(IWebElement element)
+    {
+        Driver.ExecuteScript("mobile: clickGesture", new Dictionary<string, object>
+        {
+            ["x"] = element.Location.X + Math.Max(element.Size.Width / 20, 4),
+            ["y"] = element.Location.Y + element.Size.Height / 2
+        });
+    }
+
+    /// <summary>
+    /// Types the digits as key presses on the focused field, where the cursor is, unlike SendKeys, which replaces
+    /// the whole text.
+    /// </summary>
+    public void PressDigits(string digits)
+    {
+        foreach (var digit in digits)
+            Driver.ExecuteScript("mobile: pressKey", new Dictionary<string, object> { ["keycode"] = AndroidKeyCodeZero + (digit - '0') });
+    }
+
+    private const int AndroidKeyCodeZero = 7;
+
     public void LongPress(IWebElement element, int durationMs = 1500)
     {
         var center = Center(element.Location, element.Size);
@@ -291,10 +315,22 @@ public sealed class AppSession : IDisposable
     /// emulator): collects the displayed ones, scrolling down half a screen at a time until the page can't
     /// scroll further. Leaves the page scrolled to the bottom.
     /// </summary>
-    public IReadOnlyList<string> TextsWhileScrollingDown(By locator, int maxScrolls = 10)
+    public IReadOnlyList<string> TextsWhileScrollingDown(By locator, int maxScrolls = 10) =>
+        ItemsWhileScrollingDown(locator, e => e.Text, maxScrolls);
+
+    /// <summary>
+    /// Like <see cref="TextsWhileScrollingDown"/>, reading each displayed element with <paramref name="read"/>
+    /// (e.g. a row's labels). An element cut by the screen edge, whose parts aren't all on screen, is read
+    /// (<paramref name="read"/> returns null) once a scroll brings it in.
+    /// </summary>
+    public IReadOnlyList<T> ItemsWhileScrollingDown<T>(By locator, Func<IWebElement, T?> read, int maxScrolls = 10)
+        where T : class
     {
+        List<T> Visible() =>
+            [.. Driver.FindElements(locator).Where(e => e.Displayed).Select(read).OfType<T>().Distinct()];
+
         var size = Driver.Manage().Window.Size;
-        var texts = VisibleTexts(locator).Distinct().ToList();
+        var texts = Visible();
         for (var i = 0; i < maxScrolls; i++)
         {
             var canScrollMore = Driver.ExecuteScript("mobile: scrollGesture", new Dictionary<string, object>
@@ -306,7 +342,7 @@ public sealed class AppSession : IDisposable
                 ["direction"] = "down",
                 ["percent"] = 0.5
             });
-            texts.AddRange(VisibleTexts(locator).Distinct().Except(texts).ToList());
+            texts.AddRange(Visible().Except(texts).ToList());
             if (canScrollMore is false)
                 break;
         }

@@ -72,9 +72,18 @@ public class CurrencyMaskBehavior : Behavior<Entry>
         });
     }
 
+    // Digits fill in from the cents, so they must be typed at the end. A tap focuses the field before Android places
+    // the cursor where the finger landed, in the same touch event, so the move waits until that event is handled.
+    // Only the tap that focuses the field moves it: once focused, a tap puts the cursor where it lands, to fix a digit.
     private static void OnFocused(object? sender, FocusEventArgs e)
     {
-        if (sender is Entry entry)
-            entry.CursorPosition = entry.Text?.Length ?? 0;
+        if (sender is not Entry entry)
+            return;
+
+        entry.Dispatcher.Dispatch(() =>
+        {
+            if (entry.IsFocused)
+                entry.CursorPosition = entry.Text?.Length ?? 0;
+        });
     }
 }

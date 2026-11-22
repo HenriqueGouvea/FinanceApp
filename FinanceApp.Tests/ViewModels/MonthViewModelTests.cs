@@ -190,7 +190,12 @@ public class MonthViewModelTests
         var notified = new List<string>();
         _vm.PropertyChanged += (_, e) => notified.Add(e.PropertyName!);
 
-        _vm.ReplaceEntries(Enumerable.Range(1, 10).Select(i => MakeProjection(i * 10m, FinancialEntryType.Outcome)));
+        _vm.ReplaceEntries(
+        [
+            .. Enumerable.Range(1, 10).Select(i => MakeProjection(i * 10m, FinancialEntryType.Outcome)),
+            .. Enumerable.Range(1, 5).Select(i => MakeProjection(i * 10m, FinancialEntryType.Income)),
+            .. Enumerable.Range(1, 5).Select(i => MakeCardOutcome(i + 20, Nubank, i * 10m))
+        ]);
 
         using (new AssertionScope())
         {
@@ -502,6 +507,63 @@ public class MonthViewModelTests
         _vm.Entries.Add(MakeCardOutcome(1, Nubank, 10m));
 
         changed.Should().Contain(nameof(MonthViewModel.CreditCardBills));
+    }
+
+    // --- ReplaceEntries ---
+
+    [Fact]
+    public void ReplaceEntries_SameEntriesAgain_DoesNotRebuildTheLists()
+    {
+        MonthlyEntryProjection[] entries =
+        [
+            MakeProjection(100m, FinancialEntryType.Outcome),
+            MakeProjection(50m, FinancialEntryType.Income),
+            MakeCardOutcome(2, Nubank, 30m)
+        ];
+        _vm.ReplaceEntries(entries);
+        List<string?> changed = [];
+        _vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        _vm.ReplaceEntries(MonthContent.Build(entries.Select(e => e with { })));
+
+        changed.Should().NotContain([nameof(MonthViewModel.OutcomeEntries), nameof(MonthViewModel.IncomeEntries), nameof(MonthViewModel.CreditCardBills)]);
+        _vm.TotalOutcomes.Should().Be(130m);
+    }
+
+    [Fact]
+    public void ReplaceEntries_OneListChanged_RebuildsOnlyThatList()
+    {
+        _vm.ReplaceEntries([MakeProjection(100m, FinancialEntryType.Outcome), MakeProjection(50m, FinancialEntryType.Income)]);
+        List<string?> changed = [];
+        _vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        _vm.ReplaceEntries([MakeProjection(100m, FinancialEntryType.Outcome), MakeProjection(80m, FinancialEntryType.Income)]);
+
+        changed.Should().Contain(nameof(MonthViewModel.IncomeEntries))
+            .And.NotContain([nameof(MonthViewModel.OutcomeEntries), nameof(MonthViewModel.CreditCardBills)]);
+        _vm.IncomeEntries.Single().EffectiveAmount.Should().Be(80m);
+        _vm.Entries.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void MonthContent_Build_ListsTotalsAndAlternatingRows()
+    {
+        var content = MonthContent.Build(
+        [
+            MakeProjection(100m, FinancialEntryType.Outcome),
+            MakeProjection(40m, FinancialEntryType.Outcome, FinancialMonthlyEntryStatus.Paid, 40m),
+            MakeProjection(50m, FinancialEntryType.Income),
+            MakeCardOutcome(2, Nubank, 30m),
+            MakeCardOutcome(3, Nubank, 20m)
+        ]);
+
+        using (new AssertionScope())
+        {
+            content.OutcomeEntries.Select(e => (e.EffectiveAmount, e.IsAlternateRow)).Should().Equal((100m, false), (40m, true));
+            content.CreditCardBills.Single().Entries.Select(e => e.IsAlternateRow).Should().Equal(false, true);
+            (content.TotalOutcomes, content.PaidOutcomes, content.PendingOutcomes, content.OutcomeCount).Should().Be((190m, 40m, 150m, 4));
+            (content.TotalIncomes, content.PendingIncomes, content.IncomeCount).Should().Be((50m, 50m, 1));
+        }
     }
 
     private static MonthlyEntryProjection MakeCardOutcome(

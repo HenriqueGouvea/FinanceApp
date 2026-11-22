@@ -28,8 +28,9 @@ public sealed class AddEntryTests : E2ETestBase
         page.IsInstallmentsVisible.Should().BeFalse();
         page.AmountText.Should().Be(AppFormat.Money(0));
 
-        page.EnterAmount(1234.56m);
-        page.AmountText.Should().Be("R$ 1.234,56", "typed digits fill the currency mask from the cents");
+        // Tapped at its start, the field still types at the end: digits fill the currency mask from the cents.
+        page.TapAndTypeAmount(1234.56m);
+        page.AmountText.Should().Be("R$ 1.234,56");
         using (new AssertionScope())
         {
             page.IsPaymentSourcePickerVisible.Should().BeFalse("there is no account, card or voucher to pick yet");

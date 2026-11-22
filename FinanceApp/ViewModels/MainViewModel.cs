@@ -66,14 +66,19 @@ public partial class MainViewModel : ObservableObject,
     private readonly IFinanceService _financeService;
     private readonly IPreferencesService _preferencesService;
     private readonly IWriteGuard _writeGuard;
+    private readonly TimeProvider _timeProvider;
+    private CancellationTokenSource? _neighboursLoad;
+    private readonly Dictionary<MonthViewModel, Task> _monthLoads = [];
     private bool _isSyncing;
     private bool _isInitialized;
 
-    public MainViewModel(IFinanceService financeService, IPreferencesService preferencesService, IMessenger messenger, IWriteGuard writeGuard)
+    public MainViewModel(
+        IFinanceService financeService, IPreferencesService preferencesService, IMessenger messenger, IWriteGuard writeGuard, TimeProvider timeProvider)
     {
         _financeService = financeService;
         _preferencesService = preferencesService;
         _writeGuard = writeGuard;
+        _timeProvider = timeProvider;
         ShowSwipeHint = preferencesService.Get(ShowSwipeHintKey, true);
         messenger.RegisterAll(this);
     }
@@ -189,23 +194,75 @@ public partial class MainViewModel : ObservableObject,
             _preferencesService.Set(ShowSwipeHintKey, false);
         }
 
-        _ = LoadNearbyMonthsAsync(value);
+        _ = LoadNearbyMonthsAsync(value, waitForSettle: true);
     }
 
-    private async Task LoadNearbyMonthsAsync(int position)
+    /// <summary>
+    /// How long the month must stay on screen before its neighbours are loaded after a swipe.
+    /// </summary>
+    public static readonly TimeSpan NeighboursLoadDelay = TimeSpan.FromMilliseconds(400);
+
+    /// <summary>
+    /// Loads the month on screen first, then its neighbours, closest first, so the user waits as little as possible.
+    /// After a swipe (<paramref name="waitForSettle"/>), the neighbours wait until the month has stayed on screen for
+    /// <see cref="NeighboursLoadDelay"/>: building their rows takes the UI thread, which would make the next swipe
+    /// stutter. A newer load cancels the neighbours of the previous one.
+    /// </summary>
+    private async Task LoadNearbyMonthsAsync(int position, bool waitForSettle = false)
     {
-        // The month on screen first, then its neighbours, closest first, so the user waits as little as possible.
-        int[] offsets = [0, 1, -1, 2, -2];
-        foreach (var i in offsets.Select(o => position + o).Where(i => i >= 0 && i < Months.Count))
+        _neighboursLoad?.Cancel();
+        var load = _neighboursLoad = new CancellationTokenSource();
+
+        await LoadMonthAsync(position);
+
+        if (waitForSettle)
         {
-            var month = Months[i];
-            if (month.IsLoaded)
-                continue;
+            try
+            {
+                await Task.Delay(NeighboursLoadDelay, _timeProvider, load.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
 
+        foreach (var offset in (int[])[1, -1, 2, -2])
+        {
+            if (load.IsCancellationRequested)
+                return;
+            await LoadMonthAsync(position + offset);
+        }
+    }
+
+    // A month already being loaded (e.g. by the swipe that brought it on screen) is awaited, not fetched again.
+    private Task LoadMonthAsync(int index)
+    {
+        if (index < 0 || index >= Months.Count || Months[index] is not { IsLoaded: false } month)
+            return Task.CompletedTask;
+
+        if (_monthLoads.TryGetValue(month, out var inFlight))
+            return inFlight;
+
+        var load = FetchMonthAsync(month);
+        _monthLoads[month] = load;
+        return load;
+    }
+
+    // The month's lists are built off the UI thread, then swapped in at once.
+    private async Task FetchMonthAsync(MonthViewModel month)
+    {
+        try
+        {
             var entries = await _financeService.GetMergedEntriesForMonthAsync(month.Date.Year, month.Date.Month);
+            var content = await Task.Run(() => MonthContent.Build(entries));
 
-            month.ReplaceEntries(entries);
+            month.ReplaceEntries(content);
             month.IsLoaded = true;
+        }
+        finally
+        {
+            _monthLoads.Remove(month);
         }
     }
 
