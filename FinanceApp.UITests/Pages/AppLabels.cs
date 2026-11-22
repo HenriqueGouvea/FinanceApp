@@ -57,6 +57,8 @@ public static class AppLabels
     public static string SetupSchedule(params string[] parts) => string.Join(" · ", ["Todo mês", .. parts]);
     public static string SetupInstallmentSchedule(int current, int total, string card) => $"Parcela {current} de {total} · {card}";
     public const string SetupAdvanceDescription = "Adiantamento salarial";
+    public const string SetupActivityDescription = "Cursos e atividades";
+    public static string SetupPurchaseHint(string purchase) => $"Você já incluiu \"{purchase}\" nas compras do cartão.";
     public static string SetupSkippedSteps(string steps) => $"Etapas puladas: {steps}";
     public const string EstimatedValue = "valor estimado";
     public const string PartialPaymentValue = "pagamento parcial";

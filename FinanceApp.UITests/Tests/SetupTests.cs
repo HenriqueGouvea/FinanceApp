@@ -29,6 +29,8 @@ public sealed class SetupTests : E2ETestBase
     private const string EatingOut = "Restaurantes e delivery";
     private const string Fuel = "Combustível";
     private const string CarInsurance = "Seguro do carro";
+    private const string Judo = "Judo";
+    private const string Piano = "Piano";
 
     private readonly SetupPageObject _setup;
 
@@ -192,10 +194,16 @@ public sealed class SetupTests : E2ETestBase
             .SplitSalary(2000);
         _setup.MonthlySalaryText.Should().Be(AppFormat.Money(5000));
 
+        // "Cursos e atividades" is named by the user, and a second activity is added for another course.
         _setup.Next().Next()
             .SelectExpense(HealthPlan, 600, dueDay: 10)
             .SelectHasChildren()
             .SelectExpense(School, 1200, dueDay: 5)
+            .SelectExpense(AppLabels.SetupActivityDescription, 250)
+            .NameExpense(AppLabels.SetupActivityDescription, Judo)
+            .AddActivity()
+            .NameExpense(AppLabels.SetupActivityDescription, Piano)
+            .EnterExpenseAmount(Piano, 180)
             .SelectHasCar()
             .SelectExpense(Fuel, 500)
             .SelectExpense(EatingOut, 400)
@@ -206,6 +214,8 @@ public sealed class SetupTests : E2ETestBase
             (AppLabels.SetupAdvanceDescription, AppLabels.SetupSchedule("dia 20"), AppFormat.Money(2000)),
             (HealthPlan, AppLabels.SetupSchedule("dia 10"), AppFormat.Money(600)),
             (School, AppLabels.SetupSchedule("dia 5"), AppFormat.Money(1200)),
+            (Judo, AppLabels.SetupSchedule(), AppFormat.Money(250)),
+            (Piano, AppLabels.SetupSchedule(), AppFormat.Money(180)),
             (Fuel, AppLabels.SetupSchedule(AppLabels.EstimatedValue), AppFormat.Money(500)),
             (EatingOut, AppLabels.SetupSchedule(AppLabels.EstimatedValue, AppLabels.PartialPaymentValue), AppFormat.Money(400)));
 
@@ -213,7 +223,7 @@ public sealed class SetupTests : E2ETestBase
 
         main.WaitForEntry(HealthPlan);
         main.SummaryIncomeText.Should().Be(AppFormat.Money(5000));
-        main.SummaryOutcomeText.Should().Be(AppFormat.Money(2700));
+        main.SummaryOutcomeText.Should().Be(AppFormat.Money(3130));
 
         var categories = await GetCategoryRowsAsync();
         int? CategoryId(string name) => categories.Single(c => c.Name == name).Id;
@@ -225,6 +235,8 @@ public sealed class SetupTests : E2ETestBase
                 (AppLabels.SetupAdvanceDescription, AppFormat.Income, (int?)20, false, false, CategoryId("Salário")),
                 (HealthPlan, AppFormat.Outcome, (int?)10, false, false, CategoryId("Saúde")),
                 (School, AppFormat.Outcome, (int?)5, false, false, CategoryId("Educação")),
+                (Judo, AppFormat.Outcome, (int?)null, false, false, CategoryId("Educação")),
+                (Piano, AppFormat.Outcome, (int?)null, false, false, CategoryId("Educação")),
                 (Fuel, AppFormat.Outcome, (int?)null, true, false, CategoryId("Transporte")),
                 (EatingOut, AppFormat.Outcome, (int?)null, true, true, CategoryId("Lazer"))
             ]);
@@ -235,8 +247,8 @@ public sealed class SetupTests : E2ETestBase
     {
         _setup.Next().Next().Next().Next()
             .SelectHasOwnHome()
-            .AddHome("Apartamento", iptu: 150, iptuInstallments: 10);
-        _setup.HomeDetails.Should().Equal("IPTU todo ano, fevereiro a novembro (10x)");
+            .AddHome("Apartamento", iptu: 150, iptuInstallments: 10, financing: 2000, currentInstallment: 9, totalInstallments: 120);
+        _setup.HomeDetails.Should().Equal("Financiamento 9/120 · IPTU todo ano, fevereiro a novembro (10x)");
 
         _setup.Next()
             .SelectHasCar()
@@ -247,6 +259,7 @@ public sealed class SetupTests : E2ETestBase
 
         _setup.Next();
         _setup.SummaryRows.Should().Equal(
+            ("Financiamento (Apartamento)", "Parcela 9 de 120", AppFormat.Money(2000)),
             ("IPTU (Apartamento)", "Todo ano, fevereiro a novembro (10x)", AppFormat.Money(150)),
             (CarInsurance, "Todo ano, março a dezembro (10x)", AppFormat.Money(300)),
             ("IPVA (Onix)", "Todo ano, janeiro a março (3x)", AppFormat.Money(800)),
@@ -260,11 +273,31 @@ public sealed class SetupTests : E2ETestBase
             .Select(e => (e.Description, e.Recurrence, e.StartDate.Date, e.TotalInstallments, e.Amount, e.CategoryId))
             .Should().BeEquivalentTo(
             [
+                // The 9th of 120 installments falls this month, so the financing started eight months ago.
+                ("Financiamento (Apartamento)", AppFormat.Installments, AppFormat.CurrentMonth.AddMonths(-8), (int?)120, 2000m, CategoryId("Moradia")),
                 ("IPTU (Apartamento)", AppFormat.Annual, AppFormat.AnnualStart(2, 10), (int?)10, 150m, CategoryId("Moradia")),
                 (CarInsurance, AppFormat.Annual, AppFormat.AnnualStart(3, 10), (int?)10, 300m, CategoryId("Transporte")),
                 ("IPVA (Onix)", AppFormat.Annual, AppFormat.AnnualStart(1, 3), (int?)3, 800m, CategoryId("Transporte")),
                 ("Licenciamento (Onix)", AppFormat.Annual, AppFormat.AnnualStart(7, 1), (int?)null, 160m, CategoryId("Transporte"))
             ]);
+    }
+
+    [Fact]
+    public void CardPurchaseThenLikeExpenseTicked_SaysItWasAlreadyIncluded()
+    {
+        _setup.Next().Next()
+            .AddCard(Card, 8000, billDueDay: 10)
+            .AddInstallmentPurchase("Seguro", 200, current: 2, total: 10)
+            .Next().Next().Next()
+            .SelectHasCar()
+            .SelectExpense(Fuel, 500)
+            .SelectExpense(CarInsurance, 300);
+
+        using (new AssertionScope())
+        {
+            _setup.ExpensePurchaseHint(CarInsurance).Should().Be(AppLabels.SetupPurchaseHint("Seguro"));
+            _setup.ExpensePurchaseHint(Fuel).Should().BeNull();
+        }
     }
 
     [Fact]

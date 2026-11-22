@@ -11,7 +11,8 @@ namespace FinanceApp.ViewModels;
 /// "Pagamento parcial"; some come with them ticked, and the user can change both. An expense that
 /// <see cref="OffersYearlyPayment"/> (the car insurance) can also be paid once a year or in installments every year.
 /// Paid with a credit card, the expense goes to the card's bill: it falls due with it and is never estimated nor paid
-/// little by little, so those fields are hidden.
+/// little by little, so those fields are hidden. A ticked expense that looks like a card purchase already added
+/// says so (<see cref="PurchaseHint"/>), so the user doesn't save it twice.
 /// </summary>
 public partial class SetupExpenseItem : ObservableObject
 {
@@ -21,15 +22,55 @@ public partial class SetupExpenseItem : ObservableObject
     public const int MonthlyPayment = 0;
 
     public string Icon { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The expense's name, and what the entry is called unless the user types another one (<see cref="IsDescriptionEditable"/>).
+    /// </summary>
     public string Description { get; init; } = string.Empty;
+
     public string CategoryName { get; init; } = string.Empty;
     public bool CanBeEstimated { get; init; }
     public bool CanBePartiallyPaid { get; init; }
     public bool OffersYearlyPayment { get; init; }
 
+    /// <summary>
+    /// A generic expense (a child's course) whose entry is better named by the user, e.g. "Inglês".
+    /// </summary>
+    public bool IsDescriptionEditable { get; init; }
+
+    /// <summary>
+    /// A row the user added (one more activity), which can be taken out again.
+    /// </summary>
+    public bool IsRemovable { get; init; }
+
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsEstimatedOption), nameof(ShowsPartialPaymentOption))]
+    [NotifyPropertyChangedFor(nameof(ShowsEstimatedOption), nameof(ShowsPartialPaymentOption), nameof(ShowsPurchaseHint))]
     bool isSelected;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EntryDescription))]
+    string customDescription = string.Empty;
+
+    /// <summary>
+    /// The description of a card purchase already added that looks like this expense, so it could be saved twice.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsPurchaseHint), nameof(PurchaseHint))]
+    string? matchingPurchase;
+
+    /// <summary>
+    /// The purchases added on the credit cards step, shared by every row.
+    /// </summary>
+    public IList<SetupPurchaseItem> Purchases { get; set; } = [];
+
+    /// <summary>
+    /// What the entry is called: the typed description, or the expense's name when none was typed.
+    /// </summary>
+    public string EntryDescription =>
+        IsDescriptionEditable && !string.IsNullOrWhiteSpace(CustomDescription) ? CustomDescription.Trim() : Description;
+
+    public bool ShowsPurchaseHint => IsSelected && MatchingPurchase is not null;
+    public string PurchaseHint => $"Você já incluiu \"{MatchingPurchase}\" nas compras do cartão.";
 
     /// <summary>
     /// The row itself while it is ticked, and empty otherwise: the amount, due day and "Pago com" fields are bound to
@@ -71,6 +112,11 @@ public partial class SetupExpenseItem : ObservableObject
     public bool ShowsPartialPaymentOption => IsSelected && CanBePartiallyPaid && !IsOnCreditCardBill;
 
     public string AmountCaption => !IsPaidYearly ? "Valor mensal" : YearlyInstallments == 1 ? "Valor" : "Valor de cada parcela";
+
+    public void RefreshMatchingPurchase() =>
+        MatchingPurchase = Purchases.FirstOrDefault(p => DescriptionMatcher.IsPartOf(p.Description, EntryDescription))?.Description;
+
+    partial void OnCustomDescriptionChanged(string value) => RefreshMatchingPurchase();
 
     partial void OnIsSelectedChanged(bool value)
     {
