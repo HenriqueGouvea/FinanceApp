@@ -5,6 +5,7 @@ using FinanceApp.Models;
 using FinanceApp.Services;
 using FinanceApp.ViewModels;
 using FluentAssertions;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using System.Globalization;
 using Xunit;
@@ -16,6 +17,7 @@ public class MainViewModelTests
     private readonly IFinanceService _service;
     private readonly IPreferencesService _preferencesService;
     private readonly IMessenger _messenger = new WeakReferenceMessenger();
+    private readonly FakeTimeProvider _timeProvider = new();
     private readonly MainViewModel _vm;
 
     public MainViewModelTests()
@@ -27,7 +29,7 @@ public class MainViewModelTests
         _preferencesService = Substitute.For<IPreferencesService>();
         _preferencesService.Get(Arg.Any<string>(), Arg.Any<bool>()).Returns(true);
 
-        _vm = new MainViewModel(_service, _preferencesService, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
+        _vm = new MainViewModel(_service, _preferencesService, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance), _timeProvider);
     }
 
     // --- Initialization ---
@@ -144,7 +146,7 @@ public class MainViewModelTests
     public async Task InitializeAsync_SetsIsIncomesExpandedFromPreferences()
     {
         _preferencesService.Get("incomes_expanded", true).Returns(false);
-        var vm = new MainViewModel(_service, _preferencesService, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
+        var vm = new MainViewModel(_service, _preferencesService, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance), _timeProvider);
 
         await vm.InitializeAsync();
 
@@ -155,7 +157,7 @@ public class MainViewModelTests
     public async Task InitializeAsync_SetsIsOutcomesExpandedFromPreferences()
     {
         _preferencesService.Get("outcomes_expanded", true).Returns(false);
-        var vm = new MainViewModel(_service, _preferencesService, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
+        var vm = new MainViewModel(_service, _preferencesService, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance), _timeProvider);
 
         await vm.InitializeAsync();
 
@@ -249,6 +251,7 @@ public class MainViewModelTests
         _service.ClearReceivedCalls();
 
         _messenger.Send(new CategoriesChangedMessage());
+        await WaitUntilAsync(() => _service.ReceivedCalls().Count() >= 5);
 
         await _service.Received(5).GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>());
     }
@@ -260,6 +263,7 @@ public class MainViewModelTests
         _service.ClearReceivedCalls();
 
         _messenger.Send(new PaymentSourcesChangedMessage());
+        await WaitUntilAsync(() => _service.ReceivedCalls().Count() >= 5);
 
         await _service.Received(5).GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>());
     }
@@ -490,6 +494,73 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task CurrentPositionChanged_LoadsMonthOnScreenAtOnceAndNeighboursOnceItSettles()
+    {
+        await _vm.InitializeAsync();
+        var loaded = RecordLoadedMonths();
+
+        _vm.CurrentPosition = 30;
+        await WaitUntilAsync(() => _vm.Months[30].IsLoaded);
+        await Task.Delay(50);
+
+        loaded.Should().Equal(_vm.Months[30].Date);
+
+        _timeProvider.Advance(MainViewModel.NeighboursLoadDelay);
+        await WaitUntilAsync(() => _vm.Months[28].IsLoaded);
+
+        loaded.Should().Equal(_vm.Months[30].Date, _vm.Months[31].Date, _vm.Months[29].Date, _vm.Months[32].Date, _vm.Months[28].Date);
+    }
+
+    [Fact]
+    public async Task CurrentPositionChanged_SwipedAgainBeforeSettling_SkipsThePreviousMonthsNeighbours()
+    {
+        await _vm.InitializeAsync();
+        var loaded = RecordLoadedMonths();
+
+        _vm.CurrentPosition = 30;
+        await WaitUntilAsync(() => _vm.Months[30].IsLoaded);
+        _vm.CurrentPosition = 36;
+        await WaitUntilAsync(() => _vm.Months[36].IsLoaded);
+        _timeProvider.Advance(MainViewModel.NeighboursLoadDelay);
+        await WaitUntilAsync(() => _vm.Months[34].IsLoaded);
+
+        _vm.Months[29].IsLoaded.Should().BeFalse();
+        _vm.Months[31].IsLoaded.Should().BeFalse();
+        loaded.Should().Equal(_vm.Months[30].Date, _vm.Months[36].Date,
+            _vm.Months[37].Date, _vm.Months[35].Date, _vm.Months[38].Date, _vm.Months[34].Date);
+    }
+
+    [Fact]
+    public async Task RefreshAllAsync_LoadsNeighboursWithoutWaiting()
+    {
+        await _vm.InitializeAsync();
+
+        await _vm.RefreshAllAsync();
+
+        _vm.Months.Skip(22).Take(5).Should().OnlyContain(m => m.IsLoaded);
+    }
+
+    private List<DateTime> RecordLoadedMonths()
+    {
+        List<DateTime> loaded = [];
+        _service.GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>())
+            .Returns(call =>
+            {
+                lock (loaded)
+                    loaded.Add(new DateTime(call.ArgAt<int>(0), call.ArgAt<int>(1), 1));
+                return Task.FromResult<IEnumerable<MonthlyEntryProjection>>([]);
+            });
+        return loaded;
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        for (var i = 0; i < 200 && !condition(); i++)
+            await Task.Delay(10);
+        condition().Should().BeTrue();
+    }
+
+    [Fact]
     public async Task GoToNextMonthCommand_MovesOneMonthForward()
     {
         await _vm.InitializeAsync();
@@ -607,7 +678,7 @@ public class MainViewModelTests
     {
         _preferencesService.Get("show_month_swipe_hint", Arg.Any<bool>()).Returns(false);
 
-        var vm = new MainViewModel(_service, _preferencesService, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
+        var vm = new MainViewModel(_service, _preferencesService, _messenger, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance), _timeProvider);
 
         vm.ShowSwipeHint.Should().BeFalse();
     }

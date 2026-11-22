@@ -542,13 +542,21 @@ public class SetupPageObject
     public string SummaryTitleText => _session.WaitForVisible(SummaryTitle).Text;
 
     /// <summary>
-    /// The entries listed on the summary: description, detail (e.g. "Todo mês · dia 5 · Nubank") and amount.
+    /// The entries listed on the summary: description, detail (e.g. "Todo mês · dia 5 · Nubank") and amount. The list
+    /// can be longer than CI's 320×640 screen, so it is read while scrolling down, which leaves the page at its bottom.
     /// </summary>
     public IReadOnlyList<(string Description, string Detail, string Amount)> SummaryRows =>
-        _session.Driver.FindElements(SummaryRow)
-            .Where(r => r.Displayed)
-            .Select(r => (r.FindElement(SummaryDescription).Text, r.FindElement(SummaryDetail).Text, r.FindElement(SummaryAmount).Text))
-            .ToList();
+        [.. _session.ItemsWhileScrollingDown(SummaryRow, ReadSummaryRow).Select(r => (r.Description, r.Detail, r.Amount))];
+
+    private sealed record SummaryRowTexts(string Description, string Detail, string Amount);
+
+    // A row cut by the bottom of the screen may be missing its labels until a scroll brings it in.
+    private static SummaryRowTexts? ReadSummaryRow(IWebElement row) =>
+        row.FindElements(SummaryDescription).FirstOrDefault() is { } description
+        && row.FindElements(SummaryDetail).FirstOrDefault() is { } detail
+        && row.FindElements(SummaryAmount).FirstOrDefault() is { } amount
+            ? new SummaryRowTexts(description.Text, detail.Text, amount.Text)
+            : null;
 
     public string SummaryIncomeText => _session.ScrollTo("SetupSummaryIncomeLabel").Text;
     public string SummaryOutcomeText => _session.ScrollTo("SetupSummaryOutcomeLabel").Text;

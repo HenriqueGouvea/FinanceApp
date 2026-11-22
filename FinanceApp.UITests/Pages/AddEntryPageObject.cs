@@ -129,6 +129,22 @@ public class AddEntryPageObject
         return this;
     }
 
+    /// <summary>
+    /// Taps the amount field at its left edge, as a user would, and types the digits key by key where the cursor
+    /// stands. Returns once the field shows <paramref name="amount"/>, or times out showing what was typed instead.
+    /// </summary>
+    public AddEntryPageObject TapAndTypeAmount(decimal amount)
+    {
+        _session.HideKeyboardIfShown();
+        var entry = _session.WaitForVisible(AmountEntry);
+        _session.TapNearStart(entry);
+        _session.WaitFor(() => entry.GetAttribute("focused") == "true", "the amount field to be focused");
+        _session.PressDigits(decimal.ToInt64(amount * 100).ToString(CultureInfo.InvariantCulture));
+        _session.WaitForText(AmountEntry, AppFormat.Money(amount));
+        _session.HideKeyboardIfShown();
+        return this;
+    }
+
     public bool IsEstimated => _session.ScrollTo(EstimatedSwitchId).GetAttribute("checked") == "true";
 
     public AddEntryPageObject SetEstimated(bool isEstimated)
