@@ -9,7 +9,7 @@ namespace FinanceApp.Models;
 /// <param name="Description">The display description of the entry.</param>
 /// <param name="EffectiveAmount">The final value to be displayed (the template amount or the monthly override, raised to the paid amount when more was paid).</param>
 /// <param name="EntryType">Income or Outcome.</param>
-/// <param name="Category">The assigned financial category, or null when uncategorized.</param>
+/// <param name="Categories">The entry's categories in the order they were picked (the first is the main one), empty when uncategorized.</param>
 /// <param name="Status">The current payment status (Pending, Paid, etc.).</param>
 /// <param name="IsProjected">True if this occurrence exists only in memory; False if it has been persisted/modified in the DB.</param>
 /// <param name="InstallmentLabel">Formatted string for installments (e.g., '02/10') or null for other types.</param>
@@ -27,7 +27,7 @@ public record MonthlyEntryProjection(
     string Description,
     decimal EffectiveAmount,
     FinancialEntryType EntryType,
-    FinancialCategory? Category,
+    ValueList<FinancialCategory> Categories,
     FinancialMonthlyEntryStatus Status,
     bool IsProjected,
     string? InstallmentLabel,
@@ -45,6 +45,27 @@ public record MonthlyEntryProjection(
     /// Every other row of its section (the 2nd, 4th...) is tinted, so rows are easier to tell apart.
     /// </summary>
     public bool IsAlternateRow { get; init; }
+
+    /// <summary>
+    /// The main category (the first one picked), shown as the row's icon, or null when uncategorized.
+    /// </summary>
+    public FinancialCategory? Category => Categories.Count > 0 ? Categories[0] : null;
+    public bool HasCategory => Categories.Count > 0;
+    public bool HasSeveralCategories => Categories.Count > 1;
+    public string CategoryNames => string.Join(", ", Categories.Select(c => c.Name));
+    /// <summary>
+    /// The row's icon already shows a single category, so its details line only names them when there are several
+    /// (or says "Sem categoria").
+    /// </summary>
+    public bool ShowsCategoriesInRow => Categories.Count != 1;
+    public bool ShowsInstallmentTotalInRow => InstallmentTotalAmount is not null;
+
+    // The details line joins its parts with " · ": each part brings the one before it, unless it is the first shown.
+    public bool StatusNeedsSeparator => ShowsCategoriesInRow;
+    public bool DueDateNeedsSeparator => ShowsCategoriesInRow;
+    public bool InstallmentTotalNeedsSeparator => ShowsCategoriesInRow || IsPaid || ShowsDueDateInRow;
+    public bool PaymentSourceNeedsSeparator => InstallmentTotalNeedsSeparator || ShowsInstallmentTotalInRow;
+
     public bool HasDueDate => DueDate is not null;
     public bool HasPaymentSource => PaymentSource is not null;
     /// <summary>

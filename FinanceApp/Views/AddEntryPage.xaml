@@ -237,13 +237,56 @@
                        IsVisible="{Binding IsOnCreditCardBill}" />
             </VerticalStackLayout>
 
-            <VerticalStackLayout Spacing="0">
-                <Label Text="Categoria" Style="{StaticResource FieldCaption}" />
-                <Picker AutomationId="CategoryPicker"
-                        Title="Categoria"
-                        ItemsSource="{Binding Categories}"
-                        ItemDisplayBinding="{Binding Name, x:DataType=models:FinancialCategory}"
-                        SelectedItem="{Binding SelectedCategory}" />
+            <!-- Several categories can be picked: the first one picked is the main one (the row's icon) -->
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Categorias" Style="{StaticResource FieldCaption}" />
+                <FlexLayout AutomationId="CategoryChips"
+                            Wrap="Wrap"
+                            BindableLayout.ItemsSource="{Binding Categories}">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CategoryChip">
+                            <Border AutomationId="CategoryChip"
+                                    Margin="0,0,6,6"
+                                    Padding="10,6"
+                                    StrokeShape="RoundRectangle 16"
+                                    StrokeThickness="1"
+                                    Stroke="{StaticResource LineStrongBrush}"
+                                    BackgroundColor="{StaticResource CardBackground}">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding BindingContext.ToggleCategoryCommand, Source={RelativeSource AncestorType={x:Type ContentPage}}, x:DataType=ContentPage}"
+                                                          CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                                        <Setter Property="BackgroundColor" Value="{Binding Category.Color, Converter={x:Static converters:HexToColorConverter.Instance}}" />
+                                        <Setter Property="StrokeThickness" Value="0" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Label AutomationId="CategoryChipLabel"
+                                       FontSize="13"
+                                       TextColor="{StaticResource Ink}">
+                                    <Label.FormattedText>
+                                        <FormattedString>
+                                            <Span Text="{Binding Category.Icon}" />
+                                            <Span Text=" " />
+                                            <Span Text="{Binding Category.Name}" />
+                                        </FormattedString>
+                                    </Label.FormattedText>
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsSelected}" Value="True">
+                                            <Setter Property="TextColor" Value="White" />
+                                            <Setter Property="FontAttributes" Value="Bold" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </FlexLayout>
+                <Label AutomationId="MainCategoryHintLabel"
+                       Text="{Binding MainCategoryHint}"
+                       Style="{StaticResource Hint}"
+                       IsVisible="{Binding ShowsMainCategoryHint}" />
             </VerticalStackLayout>
 
             <!-- Tells upfront what choosing a credit card changes -->

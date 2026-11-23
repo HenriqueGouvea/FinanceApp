@@ -1,6 +1,7 @@
 using FinanceApp.UITests.Infrastructure;
 using FinanceApp.UITests.Pages;
 using FluentAssertions;
+using FluentAssertions.Execution;
 
 namespace FinanceApp.UITests.Tests;
 
@@ -13,7 +14,7 @@ namespace FinanceApp.UITests.Tests;
 public sealed class CategoryTests : E2ETestBase
 {
     public CategoryTests(AppiumServerFixture server) : base(server, data =>
-        data.AddEntry("Aluguel E2E", 1500m, categoryId: data.CategoryId("Moradia")))
+        data.AddEntry("Aluguel E2E", 1500m, categoryIds: [data.CategoryId("Moradia")]))
     {
     }
 
@@ -44,27 +45,65 @@ public sealed class CategoryTests : E2ETestBase
             .GoToEntries()
             .AddEntry("Ração E2E", AppLabels.OneTime, 130m, category: "Pets E2E");
 
-        MainPage.VisibleEntryCategories.Should().Contain("Pets E2E");
-
         var category = (await GetCategoryRowsAsync()).Should().ContainSingle(c => c.Name == "Pets E2E").Subject;
         category.Icon.Should().NotBeEmpty();
         category.Color.Should().StartWith("#");
         category.EntryType.Should().Be(AppFormat.Outcome, "new categories default to outcome");
-        (await GetEntryRowsAsync()).Single(e => e.Description == "Ração E2E").CategoryId.Should().Be(category.Id);
+        var entry = (await GetEntryRowsAsync()).Single(e => e.Description == "Ração E2E");
+        (await GetEntryCategoryIdsAsync(entry.Id)).Should().Equal(category.Id);
+
+        // A single category is the row's icon, so the details line doesn't name it.
+        using (new AssertionScope())
+        {
+            MainPage.EntryCategoryIcon("Ração E2E").Should().Be(category.Icon);
+            MainPage.EntryCategoryNames("Ração E2E").Should().BeNull();
+            MainPage.IsEntryUncategorized("Ração E2E").Should().BeFalse();
+        }
+    }
+
+    [Fact]
+    public async Task AddEntry_TwoCategories_SavesBothWithTheFirstPickedAsTheIcon()
+    {
+        var entryPage = MainPage.OpenAddEntry()
+            .EnterDescription("Farmácia E2E")
+            .SelectRecurrence(AppLabels.OneTime)
+            .EnterAmount(80m)
+            .ToggleCategory("Saúde")
+            .ToggleCategory("Educação");
+
+        entryPage.MainCategoryHint.Should().Contain("🩺 Saúde");
+        entryPage.Save();
+        MainPage.WaitForEntry("Farmácia E2E");
+
+        var categories = await GetCategoryRowsAsync();
+        var entry = (await GetEntryRowsAsync()).Single(e => e.Description == "Farmácia E2E");
+        (await GetEntryCategoryIdsAsync(entry.Id)).Should().Equal(
+            categories.Single(c => c.Name == "Saúde").Id,
+            categories.Single(c => c.Name == "Educação").Id);
+        using (new AssertionScope())
+        {
+            MainPage.EntryCategoryIcon("Farmácia E2E").Should().Be("🩺");
+            MainPage.EntryCategoryNames("Farmácia E2E").Should().Be("Saúde, Educação");
+        }
     }
 
     [Fact]
     public async Task DeleteCategory_UsedByEntry_KeepsEntryUncategorized()
     {
-        MainPage.VisibleEntryCategories.Should().ContainSingle().Which.Should().Be("Moradia");
+        MainPage.EntryCategoryIcon("Aluguel E2E").Should().Be("🏠");
 
         MainPage.OpenCategories()
             .DeleteCategory("Moradia")
             .GoToEntries()
             .WaitForEntry("Aluguel E2E");
 
-        MainPage.VisibleEntryCategories.Should().BeEmpty();
+        using (new AssertionScope())
+        {
+            MainPage.EntryCategoryIcon("Aluguel E2E").Should().Be(AppLabels.UncategorizedIcon);
+            MainPage.IsEntryUncategorized("Aluguel E2E").Should().BeTrue();
+        }
         (await GetCategoryRowsAsync()).Should().NotContain(c => c.Name == "Moradia");
-        (await GetEntryRowsAsync()).Should().ContainSingle().Which.CategoryId.Should().BeNull();
+        var entry = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
+        (await GetEntryCategoryIdsAsync(entry.Id)).Should().BeEmpty();
     }
 }

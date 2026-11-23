@@ -113,6 +113,15 @@
     </ShellContent>
 
     <ShellContent
+        Title="Relatórios"
+        ContentTemplate="{DataTemplate views:ReportsPage}"
+        Route="ReportsPage">
+        <ShellContent.Icon>
+            <FontImageSource Glyph="📊" Size="20" />
+        </ShellContent.Icon>
+    </ShellContent>
+
+    <ShellContent
         Title="Configurações"
         ContentTemplate="{DataTemplate views:SettingsPage}"
         Route="SettingsPage">

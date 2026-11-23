@@ -32,6 +32,7 @@ public sealed class SeedData
 
     /// <summary>
     /// Adds an entry starting in <paramref name="startMonth"/> (the current month by default), recurrent unless told otherwise.
+    /// <paramref name="categoryIds"/> are its categories in the order picked: the first is the main one.
     /// </summary>
     public int AddEntry(
         string description,
@@ -43,17 +44,24 @@ public sealed class SeedData
         int? dueDay = null,
         bool isEstimated = false,
         bool allowsPartialPayment = false,
-        int? categoryId = null,
+        int[]? categoryIds = null,
         int? paymentSourceId = null)
     {
         var month = startMonth ?? AppFormat.CurrentMonth;
         _db.Execute(
-            "INSERT INTO FinancialEntry (Description, Amount, StartDate, Recurrence, EntryType, TotalInstallments, CategoryId, " +
-            "PaymentSourceId, IsEstimated, AllowsPartialPayment, DueDay, Person, IsPJ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', 0)",
+            "INSERT INTO FinancialEntry (Description, Amount, StartDate, Recurrence, EntryType, TotalInstallments, " +
+            "PaymentSourceId, IsEstimated, AllowsPartialPayment, DueDay, Person, IsPJ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', 0)",
             description, amount, new DateTime(month.Year, month.Month, 1, 0, 0, 0, DateTimeKind.Local), recurrence,
-            isIncome ? AppFormat.Income : AppFormat.Outcome, installments, categoryId, paymentSourceId,
+            isIncome ? AppFormat.Income : AppFormat.Outcome, installments, paymentSourceId,
             isEstimated, allowsPartialPayment, dueDay);
-        return LastId();
+        var entryId = LastId();
+
+        foreach (var (categoryId, position) in (categoryIds ?? []).Select((id, i) => (id, i)))
+            _db.Execute(
+                "INSERT INTO FinancialCategoryEntry (FinancialEntryId, FinancialCategoryId, Position) VALUES (?, ?, ?)",
+                entryId, categoryId, position);
+
+        return entryId;
     }
 
     /// <summary>

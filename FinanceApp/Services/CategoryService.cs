@@ -52,7 +52,7 @@ public class CategoryService : ICategoryService
     public async Task<int> CountEntriesAsync(int categoryId)
     {
         var db = await _context.GetConnectionAsync();
-        return await db.Table<FinancialEntry>().Where(e => e.CategoryId == categoryId).CountAsync();
+        return await db.Table<FinancialCategoryEntry>().Where(l => l.FinancialCategoryId == categoryId).CountAsync();
     }
 
     public async Task DeleteAsync(int categoryId)
@@ -61,9 +61,8 @@ public class CategoryService : ICategoryService
 
         await db.RunInTransactionAsync(conn =>
         {
-            conn.Execute(
-                $"UPDATE {nameof(FinancialEntry)} SET {nameof(FinancialEntry.CategoryId)} = NULL WHERE {nameof(FinancialEntry.CategoryId)} = ?",
-                categoryId);
+            // The entry's next category (if any) becomes its main one.
+            conn.Table<FinancialCategoryEntry>().Delete(l => l.FinancialCategoryId == categoryId);
             conn.Delete<FinancialCategory>(categoryId);
         });
 

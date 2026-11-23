@@ -33,6 +33,7 @@ public static class AppLabels
     public const string HomeMenuItem = "Início";
     public const string CategoriesMenuItem = "Categorias";
     public const string PaymentSourcesMenuItem = "Contas e cartões";
+    public const string ReportsMenuItem = "Relatórios";
     public const string SettingsMenuItem = "Configurações";
     public const string IncomesCollapsedHint = "Toque em “Receitas” para mostrar os lançamentos de novo.";
     public const string SettingsUserSection = "Usuário";
@@ -107,6 +108,12 @@ public static class AppLabels
     public static string BillName(string card) => $"💳 Fatura {card}";
     public static string BillAccount(string account) => $"Débito em {account}";
     public static string CreditCardBillDueHintFor(int day) => $"Vence com a fatura do cartão de crédito (dia {day})";
+
+    /// <summary>
+    /// The row icon of an entry with no category, and the name of its line in "Relatórios".
+    /// </summary>
+    public const string UncategorizedIcon = "🏷️";
+    public const string Uncategorized = "Sem categoria";
 
     public const string SwipeHint = "Toque no mês para escolher ou deslize para os lados";
 

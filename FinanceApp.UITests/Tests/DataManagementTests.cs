@@ -19,7 +19,7 @@ public sealed class DataManagementTests : E2ETestBase, IDisposable
     public DataManagementTests(AppiumServerFixture server) : base(server, data =>
     {
         var account = data.AddPaymentSource("Itaú", AppFormat.BankAccount, 1500m);
-        data.AddEntry("Aluguel", 2000m, dueDay: 5, categoryId: data.CategoryId("Moradia"), paymentSourceId: account);
+        data.AddEntry("Aluguel", 2000m, dueDay: 5, categoryIds: [data.CategoryId("Moradia")], paymentSourceId: account);
     })
     {
     }

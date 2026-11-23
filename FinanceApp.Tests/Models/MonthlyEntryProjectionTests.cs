@@ -6,6 +6,10 @@ namespace FinanceApp.Tests.Models;
 
 public class MonthlyEntryProjectionTests
 {
+    private static readonly FinancialCategory Health = new() { Id = 1, Name = "Saúde", Icon = "🩺", Color = "#E53935" };
+    private static readonly FinancialCategory Children = new() { Id = 2, Name = "Filhos", Icon = "🧸", Color = "#8E24AA" };
+    private static readonly DateTime AprilTenth = new(2026, 4, 10, 0, 0, 0, DateTimeKind.Local);
+
     [Fact]
     public void Pending_ShowsNoPaymentProgress()
     {
@@ -163,20 +167,88 @@ public class MonthlyEntryProjectionTests
         Make(FinancialMonthlyEntryStatus.Pending, effectiveAmount: 100m, paidAmount: 0m).ShowsPaymentSourceInRow.Should().BeFalse();
     }
 
+    // --- Categories on the row ---
+
+    [Fact]
+    public void SingleCategory_IsTheIconAndIsNotNamedInTheDetails()
+    {
+        var projection = Make(FinancialMonthlyEntryStatus.Pending, 100m, 0m, categories: [Health]);
+
+        projection.Category.Should().BeSameAs(Health);
+        projection.ShowsCategoriesInRow.Should().BeFalse();
+        projection.HasSeveralCategories.Should().BeFalse();
+    }
+
+    [Fact]
+    public void SeveralCategories_FirstIsTheIconAndAllAreNamed()
+    {
+        var projection = Make(FinancialMonthlyEntryStatus.Pending, 100m, 0m, categories: [Health, Children]);
+
+        projection.Category.Should().BeSameAs(Health);
+        projection.HasSeveralCategories.Should().BeTrue();
+        projection.CategoryNames.Should().Be("Saúde, Filhos");
+    }
+
+    [Fact]
+    public void NoCategory_SaysSemCategoriaInTheDetails()
+    {
+        var projection = Make(FinancialMonthlyEntryStatus.Pending, 100m, 0m);
+
+        projection.Category.Should().BeNull();
+        projection.HasCategory.Should().BeFalse();
+        projection.ShowsCategoriesInRow.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SingleCategory_FirstDetailShownHasNoSeparatorBeforeIt()
+    {
+        var paid = Make(FinancialMonthlyEntryStatus.Paid, 100m, 100m, categories: [Health], installmentTotal: 1000m);
+        var pendingWithDueDate = Make(FinancialMonthlyEntryStatus.Pending, 100m, 0m, dueDate: AprilTenth, categories: [Health], installmentTotal: 1000m);
+        var pendingWithoutDueDate = Make(FinancialMonthlyEntryStatus.Pending, 100m, 0m, categories: [Health], installmentTotal: 1000m);
+
+        paid.StatusNeedsSeparator.Should().BeFalse();
+        paid.InstallmentTotalNeedsSeparator.Should().BeTrue();
+        pendingWithDueDate.DueDateNeedsSeparator.Should().BeFalse();
+        pendingWithDueDate.InstallmentTotalNeedsSeparator.Should().BeTrue();
+        pendingWithoutDueDate.InstallmentTotalNeedsSeparator.Should().BeFalse();
+        pendingWithoutDueDate.PaymentSourceNeedsSeparator.Should().BeTrue();
+    }
+
+    [Fact]
+    public void NoCategory_EveryDetailAfterSemCategoriaHasASeparator()
+    {
+        var projection = Make(FinancialMonthlyEntryStatus.Pending, 100m, 0m, dueDate: AprilTenth);
+
+        projection.DueDateNeedsSeparator.Should().BeTrue();
+        projection.InstallmentTotalNeedsSeparator.Should().BeTrue();
+        projection.PaymentSourceNeedsSeparator.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Equality_SameCategoriesInNewLists_AreEqual()
+    {
+        var first = Make(FinancialMonthlyEntryStatus.Pending, 100m, 0m, categories: [Health, Children]);
+        var second = Make(FinancialMonthlyEntryStatus.Pending, 100m, 0m, categories: [Health, Children]);
+        var reordered = Make(FinancialMonthlyEntryStatus.Pending, 100m, 0m, categories: [Children, Health]);
+
+        second.Should().Be(first);
+        reordered.Should().NotBe(first);
+    }
+
     private static MonthlyEntryProjection Make(
         FinancialMonthlyEntryStatus status, decimal effectiveAmount, decimal paidAmount, decimal? plannedAmount = null,
-        DateTime? dueDate = null) =>
+        DateTime? dueDate = null, FinancialCategory[]? categories = null, decimal? installmentTotal = null) =>
         new(
             FinancialEntryId: 1,
             FinancialMonthlyEntryId: null,
             Description: "Supermarket",
             EffectiveAmount: effectiveAmount,
             EntryType: FinancialEntryType.Outcome,
-            Category: null,
+            Categories: new ValueList<FinancialCategory>(categories ?? []),
             Status: status,
             IsProjected: false,
             InstallmentLabel: null,
-            InstallmentTotalAmount: null,
+            InstallmentTotalAmount: installmentTotal,
             PaidAmount: paidAmount,
             PlannedAmount: plannedAmount,
             DueDate: dueDate

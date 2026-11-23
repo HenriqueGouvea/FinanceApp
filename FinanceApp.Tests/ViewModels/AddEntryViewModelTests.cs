@@ -29,6 +29,8 @@ public class AddEntryViewModelTests
         _categoryService = Substitute.For<ICategoryService>();
         _categoryService.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<FinancialCategory>>([Housing, Education, Salary]));
         _service.GetPaymentsAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>()).Returns([]);
+        // Entries being edited are in "Moradia" unless a test says otherwise.
+        _service.GetEntryCategoryIdsAsync(Arg.Any<int>()).Returns([Housing.Id]);
         _paymentSourceService = Substitute.For<IPaymentSourceService>();
         _paymentSourceService.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<PaymentSource>>([Checking, Card]));
         _vm = new AddEntryViewModel(_service, _categoryService, _paymentSourceService, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
@@ -42,13 +44,14 @@ public class AddEntryViewModelTests
     {
         _vm.Description = "Old description";
         _vm.Amount = 999m;
-        _vm.SelectedCategory = Housing;
+        ToggleCategory(Housing);
 
         await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
 
         _vm.Description.Should().BeEmpty();
         _vm.Amount.Should().Be(0m);
-        _vm.SelectedCategory.Should().BeNull();
+        _vm.SelectedCategoryIds.Should().BeEmpty();
+        _vm.Categories.Should().OnlyContain(c => !c.IsSelected);
     }
 
     [Fact]
@@ -56,7 +59,7 @@ public class AddEntryViewModelTests
     {
         await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
 
-        _vm.Categories.Should().Equal(Housing, Education);
+        OfferedCategories().Should().Equal(Housing, Education);
     }
 
     [Fact]
@@ -110,7 +113,7 @@ public class AddEntryViewModelTests
         _vm.SelectedRecurrence = RecurrenceType.OneTime;
 
         await _vm.SaveCommand.ExecuteAsync(null);
-        await _service.Received().SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Id == 0));
+        await _service.Received().SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Id == 0), Arg.Any<IReadOnlyList<int>?>());
     }
 
     // --- PrepareForEdit ---
@@ -118,12 +121,12 @@ public class AddEntryViewModelTests
     [Fact]
     public async Task PrepareForEdit_SetsAllFieldsFromEntry()
     {
+        _service.GetEntryCategoryIdsAsync(7).Returns([Education.Id]);
         var entry = new FinancialEntry
         {
             Id = 7,
             Description = "Laptop",
             Amount = 1500m,
-            CategoryId = Education.Id,
             StartDate = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Local),
             EntryType = FinancialEntryType.Outcome,
             Recurrence = RecurrenceType.Installments,
@@ -134,7 +137,8 @@ public class AddEntryViewModelTests
 
         _vm.Description.Should().Be("Laptop");
         _vm.Amount.Should().Be(1500m);
-        _vm.SelectedCategory.Should().BeSameAs(Education);
+        _vm.SelectedCategoryIds.Should().Equal(Education.Id);
+        ChipOf(Education).IsSelected.Should().BeTrue();
         _vm.EntryType.Should().Be(FinancialEntryType.Outcome);
         _vm.SelectedRecurrence.Should().Be(RecurrenceType.Installments);
         _vm.TotalInstallments.Should().Be(10);
@@ -156,7 +160,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Id == entry.Id));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Id == entry.Id), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -168,7 +172,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.EndDate == entry.EndDate));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.EndDate == entry.EndDate), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -182,7 +186,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.EndDate == null));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.EndDate == null), Arg.Any<IReadOnlyList<int>?>());
     }
 
     // --- Categories by entry type ---
@@ -190,7 +194,7 @@ public class AddEntryViewModelTests
     [Fact]
     public void Categories_NewOutcome_OffersOnlyOutcomeCategories()
     {
-        _vm.Categories.Should().Equal(Housing, Education);
+        OfferedCategories().Should().Equal(Housing, Education);
     }
 
     [Fact]
@@ -198,7 +202,7 @@ public class AddEntryViewModelTests
     {
         _vm.SelectIncomeCommand.Execute(null);
 
-        _vm.Categories.Should().Equal(Salary);
+        OfferedCategories().Should().Equal(Salary);
     }
 
     [Fact]
@@ -208,17 +212,17 @@ public class AddEntryViewModelTests
 
         _vm.SelectOutcomeCommand.Execute(null);
 
-        _vm.Categories.Should().Equal(Housing, Education);
+        OfferedCategories().Should().Equal(Housing, Education);
     }
 
     [Fact]
     public void SelectIncome_WithOutcomeCategorySelected_ClearsSelection()
     {
-        _vm.SelectedCategory = Housing;
+        ToggleCategory(Housing);
 
         _vm.SelectIncomeCommand.Execute(null);
 
-        _vm.SelectedCategory.Should().BeNull();
+        _vm.SelectedCategoryIds.Should().BeEmpty();
     }
 
     [Fact]
@@ -228,7 +232,7 @@ public class AddEntryViewModelTests
 
         await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
 
-        _vm.Categories.Should().Equal(Housing, Education);
+        OfferedCategories().Should().Equal(Housing, Education);
     }
 
     [Fact]
@@ -236,12 +240,12 @@ public class AddEntryViewModelTests
     {
         var entry = MakeEntry();
         entry.EntryType = FinancialEntryType.Income;
-        entry.CategoryId = Salary.Id;
+        _service.GetEntryCategoryIdsAsync(entry.Id).Returns([Salary.Id]);
 
         await _vm.PrepareForEditAsync(entry);
 
-        _vm.Categories.Should().Equal(Salary);
-        _vm.SelectedCategory.Should().BeSameAs(Salary);
+        OfferedCategories().Should().Equal(Salary);
+        _vm.SelectedCategoryIds.Should().Equal(Salary.Id);
     }
 
     [Fact]
@@ -252,8 +256,8 @@ public class AddEntryViewModelTests
 
         await _vm.PrepareForEditAsync(entry);
 
-        _vm.Categories.Should().Equal(Housing, Salary);
-        _vm.SelectedCategory.Should().BeSameAs(Housing);
+        OfferedCategories().Should().Equal(Housing, Salary);
+        _vm.SelectedCategoryIds.Should().Equal(Housing.Id);
     }
 
     [Fact]
@@ -266,7 +270,7 @@ public class AddEntryViewModelTests
         await _vm.PrepareAsync(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Local));
         _vm.SelectIncomeCommand.Execute(null);
 
-        _vm.Categories.Should().Equal(Salary);
+        OfferedCategories().Should().Equal(Salary);
     }
 
     // --- IsIncome / SelectIncome / SelectOutcome ---
@@ -466,7 +470,7 @@ public class AddEntryViewModelTests
         await _vm.SaveCommand.ExecuteAsync(null);
 
         await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e =>
-            e.Recurrence == RecurrenceType.Annual && e.TotalInstallments == saved));
+            e.Recurrence == RecurrenceType.Annual && e.TotalInstallments == saved), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -478,7 +482,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.TotalInstallments == null));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.TotalInstallments == null), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -486,7 +490,7 @@ public class AddEntryViewModelTests
     {
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.DidNotReceive().SaveEntryAsync(Arg.Any<FinancialEntry>());
+        await _service.DidNotReceive().SaveEntryAsync(Arg.Any<FinancialEntry>(), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -503,7 +507,7 @@ public class AddEntryViewModelTests
             e.Description == "Salary" &&
             e.Amount == 3000m &&
             e.EntryType == FinancialEntryType.Income &&
-            e.Recurrence == RecurrenceType.Recurrent));
+            e.Recurrence == RecurrenceType.Recurrent), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -517,28 +521,79 @@ public class AddEntryViewModelTests
         await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e =>
             e.StartDate.Year == 2026 &&
             e.StartDate.Month == 4 &&
-            e.StartDate.Day == 1));
+            e.StartDate.Day == 1), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
-    public async Task SaveCommand_WithSelectedCategory_PassesCategoryId()
+    public async Task SaveCommand_WithSeveralCategories_PassesThemInPickedOrder()
     {
-        _vm.SelectedCategory = Education;
+        ToggleCategory(Education);
+        ToggleCategory(Housing);
         _vm.SelectedRecurrence = RecurrenceType.OneTime;
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.CategoryId == Education.Id));
+        await _service.Received(1).SaveEntryAsync(Arg.Any<FinancialEntry>(),
+            Arg.Is<IReadOnlyList<int>?>(ids => ids != null && ids.SequenceEqual(new[] { Education.Id, Housing.Id })));
     }
 
     [Fact]
-    public async Task SaveCommand_WithoutCategory_PassesNullCategoryId()
+    public async Task SaveCommand_WithoutCategory_PassesAnEmptyList()
     {
         _vm.SelectedRecurrence = RecurrenceType.OneTime;
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.CategoryId == null));
+        await _service.Received(1).SaveEntryAsync(Arg.Any<FinancialEntry>(), Arg.Is<IReadOnlyList<int>?>(ids => ids != null && ids.Count == 0));
+    }
+
+    [Fact]
+    public async Task SaveCommand_EditingWithoutTouchingCategories_KeepsThem()
+    {
+        _service.GetEntryCategoryIdsAsync(42).Returns([Education.Id, Housing.Id]);
+        await _vm.PrepareForEditAsync(MakeEntry());
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Any<FinancialEntry>(),
+            Arg.Is<IReadOnlyList<int>?>(ids => ids != null && ids.SequenceEqual(new[] { Education.Id, Housing.Id })));
+    }
+
+    // --- ToggleCategory ---
+
+    [Fact]
+    public void ToggleCategory_FirstPicked_IsTheMainOne()
+    {
+        ToggleCategory(Education);
+        ToggleCategory(Housing);
+
+        ChipOf(Education).IsMain.Should().BeTrue();
+        ChipOf(Housing).IsMain.Should().BeFalse();
+        ChipOf(Housing).Position.Should().Be(2);
+        _vm.ShowsMainCategoryHint.Should().BeTrue();
+        _vm.MainCategoryHint.Should().Contain("🎓 Educação");
+    }
+
+    [Fact]
+    public void ToggleCategory_MainOneUnpicked_NextOneBecomesMain()
+    {
+        ToggleCategory(Education);
+        ToggleCategory(Housing);
+
+        ToggleCategory(Education);
+
+        _vm.SelectedCategoryIds.Should().Equal(Housing.Id);
+        ChipOf(Education).IsSelected.Should().BeFalse();
+        ChipOf(Housing).IsMain.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ToggleCategory_SingleCategory_ShowsNoMainCategoryHint()
+    {
+        ToggleCategory(Housing);
+
+        _vm.ShowsMainCategoryHint.Should().BeFalse();
+        _vm.MainCategoryHint.Should().BeEmpty();
     }
 
     [Fact]
@@ -551,7 +606,7 @@ public class AddEntryViewModelTests
 
         await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e =>
             e.Recurrence == RecurrenceType.Installments &&
-            e.TotalInstallments == 6));
+            e.TotalInstallments == 6), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -578,7 +633,7 @@ public class AddEntryViewModelTests
         _vm.SaveCommand.CanExecute(null).Should().BeFalse("a second tap while the page closes would save the entry twice");
         closing.SetResult();
         await save;
-        await _service.Received(1).SaveEntryAsync(Arg.Any<FinancialEntry>());
+        await _service.Received(1).SaveEntryAsync(Arg.Any<FinancialEntry>(), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -589,7 +644,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Id == entry.Id));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Id == entry.Id), Arg.Any<IReadOnlyList<int>?>());
     }
 
     // --- Estimated amount ---
@@ -623,7 +678,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.IsEstimated));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.IsEstimated), Arg.Any<IReadOnlyList<int>?>());
     }
 
     // --- Due date ---
@@ -673,7 +728,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.DueDay == 10));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.DueDay == 10), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -683,7 +738,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.DueDay == null));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.DueDay == null), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -696,7 +751,7 @@ public class AddEntryViewModelTests
         _vm.SelectedDueDay = AddEntryViewModel.NoDueDay;
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Id == entry.Id && e.DueDay == null));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Id == entry.Id && e.DueDay == null), Arg.Any<IReadOnlyList<int>?>());
     }
 
     // --- Credit card bill ---
@@ -774,7 +829,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.DueDay == null && e.PaymentSourceId == Card.Id));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.DueDay == null && e.PaymentSourceId == Card.Id), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -787,7 +842,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.DueDay == 10));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.DueDay == 10), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -800,7 +855,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => !e.IsEstimated && !e.AllowsPartialPayment));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => !e.IsEstimated && !e.AllowsPartialPayment), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -814,7 +869,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.IsEstimated && e.AllowsPartialPayment));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.IsEstimated && e.AllowsPartialPayment), Arg.Any<IReadOnlyList<int>?>());
     }
 
     // --- Partial payment flag ---
@@ -848,7 +903,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.AllowsPartialPayment));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.AllowsPartialPayment), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -994,7 +1049,7 @@ public class AddEntryViewModelTests
 
         Received.InOrder(() =>
         {
-            _service.SaveEntryAsync(Arg.Any<FinancialEntry>());
+            _service.SaveEntryAsync(Arg.Any<FinancialEntry>(), Arg.Any<IReadOnlyList<int>?>());
             _service.SetPaidAmountAsync(entry.Id, 2026, 6, 250m);
         });
     }
@@ -1285,7 +1340,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.PaymentSourceId == Card.Id));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.PaymentSourceId == Card.Id), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -1295,7 +1350,7 @@ public class AddEntryViewModelTests
 
         await _vm.SaveCommand.ExecuteAsync(null);
 
-        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.PaymentSourceId == null));
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.PaymentSourceId == null), Arg.Any<IReadOnlyList<int>?>());
     }
 
     [Fact]
@@ -1312,12 +1367,17 @@ public class AddEntryViewModelTests
         notified.Should().Contain(nameof(AddEntryViewModel.PaymentSourceLabel));
     }
 
+    private IEnumerable<FinancialCategory> OfferedCategories() => _vm.Categories.Select(c => c.Category);
+
+    private CategoryChip ChipOf(FinancialCategory category) => _vm.Categories.Single(c => c.Category.Id == category.Id);
+
+    private void ToggleCategory(FinancialCategory category) => _vm.ToggleCategoryCommand.Execute(ChipOf(category));
+
     private static FinancialEntry MakeEntry() => new()
     {
         Id = 42,
         Description = "Rent",
         Amount = 800m,
-        CategoryId = Housing.Id,
         StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
         EntryType = FinancialEntryType.Outcome,
         Recurrence = RecurrenceType.Recurrent

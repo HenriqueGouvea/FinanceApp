@@ -78,28 +78,47 @@
                                                LongPressCompleted="OnEntryLongPressed" />
                     </Grid.Behaviors>
 
-                    <!-- Status: grey ring while pending, orange ring when partially paid, green check once paid/received -->
-                    <Grid Grid.Column="0" WidthRequest="22" HeightRequest="22" VerticalOptions="Center">
-                        <Border AutomationId="EntryPendingIcon"
-                                StrokeShape="RoundRectangle 11"
-                                Stroke="{StaticResource MutedBrush}"
-                                StrokeThickness="2"
-                                BackgroundColor="Transparent"
-                                IsVisible="{Binding IsPending}" />
+                    <!-- The main category's icon (a neutral one when uncategorized), with the status on it:
+                         an orange ring around it while partially paid, a green check in the corner once paid/received -->
+                    <Grid Grid.Column="0" WidthRequest="38" HeightRequest="38" VerticalOptions="Center">
                         <Border AutomationId="EntryPartialIcon"
-                                StrokeShape="RoundRectangle 11"
+                                StrokeShape="Ellipse"
                                 Stroke="{StaticResource PartialBrush}"
-                                StrokeThickness="3"
+                                StrokeThickness="2.5"
                                 BackgroundColor="Transparent"
                                 IsVisible="{Binding IsPartiallyPaid}" />
-                        <Border AutomationId="EntryPaidIcon"
-                                StrokeShape="RoundRectangle 11"
+                        <Border AutomationId="EntryCategoryIcon"
+                                WidthRequest="32"
+                                HeightRequest="32"
+                                HorizontalOptions="Center"
+                                VerticalOptions="Center"
+                                StrokeShape="Ellipse"
                                 StrokeThickness="0"
+                                BackgroundColor="{Binding Category.Color, Converter={x:Static converters:HexToColorConverter.Instance}}">
+                            <Border.Triggers>
+                                <DataTrigger TargetType="Border" Binding="{Binding HasCategory}" Value="False">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource Secondary}" />
+                                </DataTrigger>
+                            </Border.Triggers>
+                            <Label AutomationId="EntryCategoryIconLabel"
+                                   Text="{Binding Category.Icon, FallbackValue='🏷️', TargetNullValue='🏷️'}"
+                                   FontSize="15"
+                                   HorizontalOptions="Center"
+                                   VerticalOptions="Center" />
+                        </Border>
+                        <Border AutomationId="EntryPaidIcon"
+                                WidthRequest="16"
+                                HeightRequest="16"
+                                HorizontalOptions="End"
+                                VerticalOptions="End"
+                                StrokeShape="Ellipse"
+                                Stroke="{StaticResource WhiteBrush}"
+                                StrokeThickness="1.5"
                                 BackgroundColor="{StaticResource Paid}"
                                 IsVisible="{Binding IsPaid}">
                             <Label Text="✓"
                                    TextColor="White"
-                                   FontSize="12"
+                                   FontSize="9"
                                    FontAttributes="Bold"
                                    HorizontalOptions="Center"
                                    VerticalOptions="Center" />
@@ -124,17 +143,20 @@
                             </Border>
                         </HorizontalStackLayout>
 
-                        <!-- One line of details; each part after the category brings its own " · " -->
+                        <!-- One line of details; each part brings the " · " before it, unless it is the first shown.
+                             A single category is already the icon, so only several (or none) are named -->
                         <HorizontalStackLayout IsClippedToBounds="True">
                             <Label AutomationId="EntryCategoryLabel"
-                                   Text="{Binding Category.Name}"
+                                   Text="{Binding CategoryNames}"
                                    Style="{StaticResource EntryMeta}"
-                                   IsVisible="{Binding Category, Converter={x:Static converters:IsNotNullConverter.Instance}}" />
-                            <Label Text="Sem categoria"
+                                   LineBreakMode="TailTruncation"
+                                   IsVisible="{Binding HasSeveralCategories}" />
+                            <Label AutomationId="EntryUncategorizedLabel"
+                                   Text="Sem categoria"
                                    Style="{StaticResource EntryMeta}"
-                                   IsVisible="{Binding Category, Converter={x:Static converters:IsNullConverter.Instance}}" />
+                                   IsVisible="{Binding HasCategory, Converter={x:Static converters:InverseBoolConverter.Instance}}" />
                             <HorizontalStackLayout IsVisible="{Binding IsPaid}">
-                                <Label Text=" · " Style="{StaticResource EntryMeta}" />
+                                <Label Text=" · " Style="{StaticResource EntryMeta}" IsVisible="{Binding StatusNeedsSeparator}" />
                                 <Label AutomationId="EntryStatusLabel"
                                        Text="{Binding EntryType, Converter={x:Static converters:EntryTypeToPaidLabelConverter.Instance}}"
                                        Style="{StaticResource EntryMeta}"
@@ -143,7 +165,7 @@
                             </HorizontalStackLayout>
                             <!-- Turns red while it is due today and not yet paid/received -->
                             <HorizontalStackLayout IsVisible="{Binding ShowsDueDateInRow}">
-                                <Label Text=" · " Style="{StaticResource EntryMeta}" />
+                                <Label Text=" · " Style="{StaticResource EntryMeta}" IsVisible="{Binding DueDateNeedsSeparator}" />
                                 <Label AutomationId="EntryDueDateLabel"
                                        Text="{Binding DueDate, Converter={x:Static converters:DueDateToLabelConverter.Instance}}"
                                        Style="{StaticResource EntryMeta}">
@@ -155,17 +177,17 @@
                                     </Label.Triggers>
                                 </Label>
                             </HorizontalStackLayout>
-                            <HorizontalStackLayout IsVisible="{Binding InstallmentTotalAmount, Converter={x:Static converters:IsNotNullConverter.Instance}}">
-                                <Label Text=" · " Style="{StaticResource EntryMeta}" />
+                            <HorizontalStackLayout IsVisible="{Binding ShowsInstallmentTotalInRow}">
+                                <Label Text=" · " Style="{StaticResource EntryMeta}" IsVisible="{Binding InstallmentTotalNeedsSeparator}" />
                                 <Label AutomationId="EntryInstallmentTotalLabel"
                                        Text="{Binding InstallmentTotalAmount, Converter={x:Static converters:MoneyConverter.Instance}, StringFormat='total {0}'}"
                                        Style="{StaticResource EntryMeta}" />
                             </HorizontalStackLayout>
                             <HorizontalStackLayout IsVisible="{Binding ShowsPaymentSourceInRow}">
+                                <Label Text=" · " Style="{StaticResource EntryMeta}" IsVisible="{Binding PaymentSourceNeedsSeparator}" />
                                 <Label Style="{StaticResource EntryMeta}">
                                     <Label.FormattedText>
                                         <FormattedString>
-                                            <Span Text=" · " />
                                             <Span Text="{Binding PaymentSource.Type, Converter={x:Static converters:PaymentSourceTypeToIconConverter.Instance}}" />
                                             <Span Text=" " />
                                         </FormattedString>

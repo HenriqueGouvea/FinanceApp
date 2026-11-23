@@ -8,8 +8,13 @@ public class DatabaseContext : IDatabaseContext
     public const string MonthIndex = "IX_FinancialMonthlyEntry_Year_Month";
     public const string MonthlyEntryTemplateIndex = "IX_FinancialMonthlyEntry_FinancialEntryId";
     public const string PaymentMonthlyEntryIndex = "IX_FinancialPayment_FinancialMonthlyEntryId";
+    public const string CategoryEntryEntryIndex = "IX_FinancialCategoryEntry_FinancialEntryId";
+    public const string CategoryEntryCategoryIndex = "IX_FinancialCategoryEntry_FinancialCategoryId";
 
-    private const string LegacyCategoryColumn = "Category";
+    // Databases created before category management stored the category name as text on FinancialEntry.
+    private const string LegacyCategoryNameColumn = "Category";
+    // Then, before an entry could have several categories, the id of its only one.
+    private const string LegacyCategoryIdColumn = "CategoryId";
 
     private static readonly FinancialCategory[] DefaultOutcomeCategories =
     [
@@ -61,11 +66,15 @@ public class DatabaseContext : IDatabaseContext
         var categoryColumns = await connection.GetTableInfoAsync(nameof(FinancialCategory));
         var hadCategoryType = categoryColumns.Any(c => c.Name == nameof(FinancialCategory.EntryType));
         var categoryTable = await connection.CreateTableAsync<FinancialCategory>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
+        var categoryEntryTable = await connection.CreateTableAsync<FinancialCategoryEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
 
         if (categoryTable == CreateTableResult.Created)
             await SeedDefaultCategoriesAsync(connection);
         else if (!hadCategoryType)
             await MigrateCategoryTypesAsync(connection);
+
+        if (categoryEntryTable == CreateTableResult.Created)
+            await MigrateCategoryLinksAsync(connection);
 
         await CreateIndexesAsync(connection);
 
@@ -83,6 +92,34 @@ public class DatabaseContext : IDatabaseContext
             [nameof(FinancialMonthlyEntry.FinancialEntryId)]);
         await db.CreateIndexAsync(PaymentMonthlyEntryIndex, nameof(FinancialPayment),
             [nameof(FinancialPayment.FinancialMonthlyEntryId)]);
+        await db.CreateIndexAsync(CategoryEntryEntryIndex, nameof(FinancialCategoryEntry),
+            [nameof(FinancialCategoryEntry.FinancialEntryId)]);
+        await db.CreateIndexAsync(CategoryEntryCategoryIndex, nameof(FinancialCategoryEntry),
+            [nameof(FinancialCategoryEntry.FinancialCategoryId)]);
+    }
+
+    /// <summary>
+    /// Links each entry to the category kept in the legacy columns of <see cref="FinancialEntry"/> (its name as text,
+    /// or its id), as its main category. Entries that already have links are left as they are.
+    /// </summary>
+    public static async Task MigrateCategoryLinksAsync(SQLiteAsyncConnection db)
+    {
+        var columns = await db.GetTableInfoAsync(nameof(FinancialEntry));
+        var match = columns.Any(c => c.Name == LegacyCategoryIdColumn)
+            ? $"c.{nameof(FinancialCategory.Id)} = e.{LegacyCategoryIdColumn}"
+            : columns.Any(c => c.Name == LegacyCategoryNameColumn)
+                ? $"c.{nameof(FinancialCategory.Name)} = e.{LegacyCategoryNameColumn}"
+                : null;
+        if (match is null)
+            return;
+
+        await db.ExecuteAsync(
+            $"INSERT INTO {nameof(FinancialCategoryEntry)} ({nameof(FinancialCategoryEntry.FinancialEntryId)}, " +
+            $"{nameof(FinancialCategoryEntry.FinancialCategoryId)}, {nameof(FinancialCategoryEntry.Position)}) " +
+            $"SELECT e.{nameof(FinancialEntry.Id)}, MIN(c.{nameof(FinancialCategory.Id)}), 0 " +
+            $"FROM {nameof(FinancialEntry)} e JOIN {nameof(FinancialCategory)} c ON {match} " +
+            $"WHERE e.{nameof(FinancialEntry.Id)} NOT IN (SELECT {nameof(FinancialCategoryEntry.FinancialEntryId)} FROM {nameof(FinancialCategoryEntry)}) " +
+            $"GROUP BY e.{nameof(FinancialEntry.Id)}");
     }
 
     /// <summary>
@@ -91,18 +128,8 @@ public class DatabaseContext : IDatabaseContext
     public static IReadOnlyList<FinancialCategory> CreateDefaultCategories() =>
         [.. Copy([.. DefaultOutcomeCategories, .. DefaultIncomeCategories])];
 
-    private static async Task SeedDefaultCategoriesAsync(SQLiteAsyncConnection db)
-    {
-        await db.InsertAllAsync(CreateDefaultCategories());
-
-        // Databases created before category management stored the category name as text on FinancialEntry.
-        var columns = await db.GetTableInfoAsync(nameof(FinancialEntry));
-        if (columns.Any(c => c.Name == LegacyCategoryColumn))
-            await db.ExecuteAsync(
-                $"UPDATE {nameof(FinancialEntry)} SET {nameof(FinancialEntry.CategoryId)} = " +
-                $"(SELECT {nameof(FinancialCategory.Id)} FROM {nameof(FinancialCategory)} WHERE {nameof(FinancialCategory.Name)} = {nameof(FinancialEntry)}.{LegacyCategoryColumn}) " +
-                $"WHERE {nameof(FinancialEntry.CategoryId)} IS NULL");
-    }
+    private static Task SeedDefaultCategoriesAsync(SQLiteAsyncConnection db) =>
+        db.InsertAllAsync(CreateDefaultCategories());
 
     // Categories created before the income/outcome split were all used for outcomes.
     private static async Task MigrateCategoryTypesAsync(SQLiteAsyncConnection db)

@@ -589,7 +589,7 @@ public class MonthViewModelTests
             Description: "Test",
             EffectiveAmount: amount,
             EntryType: type,
-            Category: null,
+            Categories: ValueList<FinancialCategory>.Empty,
             Status: status,
             IsProjected: true,
             InstallmentLabel: null,

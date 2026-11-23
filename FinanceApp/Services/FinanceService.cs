@@ -40,6 +40,13 @@ public class FinanceService : IFinanceService
 
         var categories = await _categoryService.GetAllAsync();
         var categoryLookup = categories.ToDictionary(c => c.Id);
+        var links = await db.Table<FinancialCategoryEntry>().ToListAsync();
+        var categoriesByEntry = links
+            .GroupBy(l => l.FinancialEntryId)
+            .ToDictionary(g => g.Key, g => new ValueList<FinancialCategory>(g
+                .OrderBy(l => l.Position).ThenBy(l => l.Id)
+                .Select(l => categoryLookup.GetValueOrDefault(l.FinancialCategoryId))
+                .OfType<FinancialCategory>()));
 
         var sources = await _paymentSourceService.GetAllAsync();
         var sourceLookup = sources.ToDictionary(s => s.Id);
@@ -48,7 +55,7 @@ public class FinanceService : IFinanceService
 
         foreach (var template in activeTemplates)
         {
-            var category = template.CategoryId is { } categoryId ? categoryLookup.GetValueOrDefault(categoryId) : null;
+            var entryCategories = categoriesByEntry.GetValueOrDefault(template.Id, ValueList<FinancialCategory>.Empty);
             var source = template.PaymentSourceId is { } sourceId ? sourceLookup.GetValueOrDefault(sourceId) : null;
             var isOnCardBill = template.EntryType == FinancialEntryType.Outcome && source?.Type == PaymentSourceType.CreditCard;
             // An outcome paid with a credit card falls due with the card's bill.
@@ -68,7 +75,7 @@ public class FinanceService : IFinanceService
                     Description: template.Description,
                     EffectiveAmount: effectiveAmount,
                     EntryType: template.EntryType,
-                    Category: category,
+                    Categories: entryCategories,
                     Status: status,
                     IsProjected: false,
                     InstallmentLabel: BuildInstallmentLabel(template, year, month),
@@ -90,7 +97,7 @@ public class FinanceService : IFinanceService
                     Description: template.Description,
                     EffectiveAmount: template.Amount,
                     EntryType: template.EntryType,
-                    Category: category,
+                    Categories: entryCategories,
                     Status: FinancialMonthlyEntryStatus.Pending,
                     IsProjected: true,
                     InstallmentLabel: BuildInstallmentLabel(template, year, month),
@@ -113,14 +120,62 @@ public class FinanceService : IFinanceService
         return await db.Table<FinancialEntry>().Where(e => e.Id == id).FirstOrDefaultAsync();
     }
 
-    public async Task SaveEntryAsync(FinancialEntry entry)
+    public async Task<IReadOnlyList<int>> GetEntryCategoryIdsAsync(int entryId)
     {
         var db = await _context.GetConnectionAsync();
+        var links = await db.Table<FinancialCategoryEntry>().Where(l => l.FinancialEntryId == entryId).ToListAsync();
+        return [.. links.OrderBy(l => l.Position).ThenBy(l => l.Id).Select(l => l.FinancialCategoryId)];
+    }
 
-        if (entry.Id != 0)
-            await db.UpdateAsync(entry);
-        else
-            await db.InsertAsync(entry);
+    public Task SaveEntryAsync(FinancialEntry entry, IReadOnlyList<int>? categoryIds = null) =>
+        InTransactionAsync(conn =>
+        {
+            if (entry.Id != 0)
+                conn.Update(entry);
+            else
+                conn.Insert(entry);
+
+            if (categoryIds is not null)
+                SetCategories(conn, entry.Id, categoryIds);
+        });
+
+    /// <summary>
+    /// Replaces the entry's categories with <paramref name="categoryIds"/>, in their order (the first is the main one).
+    /// </summary>
+    public static void SetCategories(SQLiteConnection conn, int entryId, IReadOnlyList<int> categoryIds)
+    {
+        conn.Table<FinancialCategoryEntry>().Delete(l => l.FinancialEntryId == entryId);
+        conn.InsertAll(categoryIds.Distinct().Select((categoryId, position) => new FinancialCategoryEntry
+        {
+            FinancialEntryId = entryId,
+            FinancialCategoryId = categoryId,
+            Position = position
+        }), runInTransaction: false);
+    }
+
+    public async Task<CategoryReport> GetCategoryReportAsync(int year, int month)
+    {
+        var entries = (await GetMergedEntriesForMonthAsync(year, month)).ToList();
+
+        List<CategoryTotal> totals =
+        [
+            .. entries
+                .SelectMany(e => e.HasCategory
+                    ? e.Categories.Select(c => (e.EntryType, Category: (FinancialCategory?)c, e.EffectiveAmount))
+                    : [(e.EntryType, Category: null, e.EffectiveAmount)])
+                .GroupBy(t => (t.EntryType, t.Category))
+                .Select(g => new CategoryTotal(g.Key.EntryType, g.Key.Category, g.Sum(t => t.EffectiveAmount), g.Count()))
+                .OrderBy(t => t.EntryType)
+                .ThenByDescending(t => t.Amount)
+                // Uncategorized last among equal amounts, then by name, so the order is stable.
+                .ThenBy(t => t.Category is null)
+                .ThenBy(t => t.Category?.Name, StringComparer.CurrentCultureIgnoreCase)
+        ];
+
+        return new CategoryReport(
+            totals,
+            entries.Where(e => e.EntryType == FinancialEntryType.Income).Sum(e => e.EffectiveAmount),
+            entries.Where(e => e.EntryType == FinancialEntryType.Outcome).Sum(e => e.EffectiveAmount));
     }
 
     public async Task SaveMonthlyEntryAsync(FinancialMonthlyEntry entry)
@@ -380,6 +435,7 @@ public class FinanceService : IFinanceService
                     foreach (var r in monthlyRecords)
                         DeleteMonthlyRecord(conn, r);
 
+                    conn.Table<FinancialCategoryEntry>().Delete(l => l.FinancialEntryId == entryId);
                     conn.Delete(template);
                     break;
             }
@@ -388,6 +444,7 @@ public class FinanceService : IFinanceService
     public Task ClearAllDataAsync() =>
         InTransactionAsync(conn =>
         {
+            conn.DeleteAll<FinancialCategoryEntry>();
             conn.DeleteAll<FinancialEntry>();
             conn.DeleteAll<FinancialMonthlyEntry>();
             conn.DeleteAll<FinancialPayment>();

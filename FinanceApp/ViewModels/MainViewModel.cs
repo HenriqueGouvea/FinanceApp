@@ -16,7 +16,7 @@ public partial class MainViewModel : ObservableObject,
     IRecipient<SetupCompletedMessage>,
     IRecipient<DataReplacedMessage>
 {
-    private const int MaxMonthsFromToday = 24;
+    public const int MaxMonthsFromToday = 24;
     private const string IncomesExpandedKey = "incomes_expanded";
     private const string OutcomesExpandedKey = "outcomes_expanded";
     private const string ShowSwipeHintKey = "show_month_swipe_hint";
@@ -281,7 +281,7 @@ public partial class MainViewModel : ObservableObject,
     }
 
     // Some cultures (e.g. pt-BR) write month names in lowercase.
-    private static string FormatMonthName(DateTime date)
+    public static string FormatMonthName(DateTime date)
     {
         var name = date.ToString("MMMM yyyy", CultureInfo.CurrentCulture);
         return CultureInfo.CurrentCulture.TextInfo.ToUpper(name[0]) + name[1..];

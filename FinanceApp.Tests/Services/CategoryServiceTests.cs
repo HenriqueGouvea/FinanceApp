@@ -135,9 +135,9 @@ public class CategoryServiceTests
         var leisure = new FinancialCategory { Name = "Lazer" };
         await _service.SaveAsync(housing);
         await _service.SaveAsync(leisure);
-        await _financeService.SaveEntryAsync(MakeEntry("Rent", housing.Id));
-        await _financeService.SaveEntryAsync(MakeEntry("Condo fee", housing.Id));
-        await _financeService.SaveEntryAsync(MakeEntry("Cinema", leisure.Id));
+        await _financeService.SaveEntryAsync(MakeEntry("Rent"), [housing.Id]);
+        await _financeService.SaveEntryAsync(MakeEntry("Condo fee"), [housing.Id]);
+        await _financeService.SaveEntryAsync(MakeEntry("Cinema"), [leisure.Id]);
 
         var count = await _service.CountEntriesAsync(housing.Id);
 
@@ -162,14 +162,29 @@ public class CategoryServiceTests
     {
         var category = new FinancialCategory { Name = "Lazer" };
         await _service.SaveAsync(category);
-        var entry = MakeEntry("Cinema", category.Id);
-        await _financeService.SaveEntryAsync(entry);
+        var entry = MakeEntry("Cinema");
+        await _financeService.SaveEntryAsync(entry, [category.Id]);
 
         await _service.DeleteAsync(category.Id);
 
-        var stored = await _financeService.GetEntryByIdAsync(entry.Id);
-        stored.Should().NotBeNull();
-        stored!.CategoryId.Should().BeNull();
+        (await _financeService.GetEntryByIdAsync(entry.Id)).Should().NotBeNull();
+        (await _financeService.GetEntryCategoryIdsAsync(entry.Id)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_MainCategoryOfEntryWithSeveral_NextOneBecomesMain()
+    {
+        var health = new FinancialCategory { Name = "Saúde" };
+        var children = new FinancialCategory { Name = "Filhos" };
+        await _service.SaveAsync(health);
+        await _service.SaveAsync(children);
+        var pharmacy = MakeEntry("Farmácia");
+        await _financeService.SaveEntryAsync(pharmacy, [health.Id, children.Id]);
+
+        await _service.DeleteAsync(health.Id);
+
+        (await _financeService.GetEntryCategoryIdsAsync(pharmacy.Id)).Should().Equal(children.Id);
+        (await _service.CountEntriesAsync(children.Id)).Should().Be(1);
     }
 
     [Fact]
@@ -179,19 +194,18 @@ public class CategoryServiceTests
         var housing = new FinancialCategory { Name = "Moradia" };
         await _service.SaveAsync(leisure);
         await _service.SaveAsync(housing);
-        var rent = MakeEntry("Rent", housing.Id);
-        await _financeService.SaveEntryAsync(rent);
+        var rent = MakeEntry("Rent");
+        await _financeService.SaveEntryAsync(rent, [housing.Id]);
 
         await _service.DeleteAsync(leisure.Id);
 
-        (await _financeService.GetEntryByIdAsync(rent.Id))!.CategoryId.Should().Be(housing.Id);
+        (await _financeService.GetEntryCategoryIdsAsync(rent.Id)).Should().Equal(housing.Id);
     }
 
-    private static FinancialEntry MakeEntry(string description, int? categoryId) => new()
+    private static FinancialEntry MakeEntry(string description) => new()
     {
         Description = description,
         Amount = 100m,
-        CategoryId = categoryId,
         StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
         Recurrence = RecurrenceType.Recurrent,
         EntryType = FinancialEntryType.Outcome

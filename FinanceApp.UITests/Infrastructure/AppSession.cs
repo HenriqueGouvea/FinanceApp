@@ -107,6 +107,10 @@ public sealed class AppSession : IDisposable
         MobileBy.AndroidUIAutomator(
             $"new UiSelector().resourceId(\"{E2ESettings.AppPackage}:id/{automationId}\").text(\"{text}\")");
 
+    public static By AutomationIdWithTextEnding(string automationId, string textEnd) =>
+        MobileBy.AndroidUIAutomator(
+            $"new UiSelector().resourceId(\"{E2ESettings.AppPackage}:id/{automationId}\").textMatches(\"(?s).*{Regex.Escape(textEnd)}$\")");
+
     public static By Text(string text) =>
         MobileBy.AndroidUIAutomator($"new UiSelector().text(\"{text}\")");
 

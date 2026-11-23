@@ -27,6 +27,8 @@ public class MainPageObject
     private static readonly By EntryDescription = AppSession.AutomationId("EntryDescriptionLabel");
     private static readonly By EntryAmount = AppSession.AutomationId("EntryAmountLabel");
     private static readonly By EntryCategory = AppSession.AutomationId("EntryCategoryLabel");
+    private static readonly By EntryCategoryIconLabel = AppSession.AutomationId("EntryCategoryIconLabel");
+    private static readonly By EntryUncategorized = AppSession.AutomationId("EntryUncategorizedLabel");
     private static readonly By EntryPaymentSource = AppSession.AutomationId("EntryPaymentSourceLabel");
     private static readonly By EntryInstallment = AppSession.AutomationId("EntryInstallmentLabel");
     private static readonly By EntryInstallmentTotal = AppSession.AutomationId("EntryInstallmentTotalLabel");
@@ -152,7 +154,6 @@ public class MainPageObject
 
     public IReadOnlyList<string> VisibleEntryDescriptions => _session.VisibleTexts(EntryDescription);
     public IReadOnlyList<string> VisibleEntryAmounts => _session.VisibleTexts(EntryAmount);
-    public IReadOnlyList<string> VisibleEntryCategories => _session.VisibleTexts(EntryCategory);
     public IReadOnlyList<string> VisibleEntryPaymentSources => _session.VisibleTexts(EntryPaymentSource);
     /// <summary>
     /// The installment badges beside the descriptions, e.g. "1/3".
@@ -215,7 +216,7 @@ public class MainPageObject
             entryPage.SelectDueDay(dueDay);
 
         if (category is not null)
-            entryPage.SelectCategory(category);
+            entryPage.ToggleCategory(category);
 
         if (paymentSource is not null)
             entryPage.SelectPaymentSource(paymentSource);
@@ -300,6 +301,21 @@ public class MainPageObject
         FindRow(description).FindElements(EntryPaidIcon).Any(e => e.Displayed);
 
     public IReadOnlyList<string> VisibleEntryStatuses => _session.VisibleTexts(EntryStatus);
+
+    /// <summary>
+    /// The emoji on the row's icon: its main category's, or a neutral one (<see cref="AppLabels.UncategorizedIcon"/>).
+    /// </summary>
+    public string EntryCategoryIcon(string description) =>
+        FindRow(description).FindElements(EntryCategoryIconLabel).First(e => e.Displayed).Text;
+
+    /// <summary>
+    /// The categories named in the row's details: only shown when there are several (e.g. "Saúde, Filhos"), null otherwise.
+    /// </summary>
+    public string? EntryCategoryNames(string description) =>
+        FindRow(description).FindElements(EntryCategory).FirstOrDefault(e => e.Displayed)?.Text;
+
+    public bool IsEntryUncategorized(string description) =>
+        FindRow(description).FindElements(EntryUncategorized).Any(e => e.Displayed);
 
     public bool IsEntryPartiallyPaid(string description) =>
         FindRow(description).FindElements(EntryPartialIcon).Any(e => e.Displayed);
@@ -552,6 +568,13 @@ public class MainPageObject
         _session.Tap(FlyoutButton);
         _session.Tap(AppSession.Text(AppLabels.CategoriesMenuItem));
         return new CategoriesPageObject(_session).WaitUntilLoaded();
+    }
+
+    public ReportsPageObject OpenReports()
+    {
+        _session.Tap(FlyoutButton);
+        _session.Tap(AppSession.Text(AppLabels.ReportsMenuItem));
+        return new ReportsPageObject(_session).WaitUntilLoaded();
     }
 
     /// <summary>

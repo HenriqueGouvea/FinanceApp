@@ -287,8 +287,7 @@ public class FinanceServiceTests
         var category = new FinancialCategory { Name = "Moradia", Icon = "🏠", Color = "#1E88E5" };
         await _categoryService.SaveAsync(category);
         var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
-        template.CategoryId = category.Id;
-        await _service.SaveEntryAsync(template);
+        await _service.SaveEntryAsync(template, [category.Id]);
 
         var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
 
@@ -306,6 +305,37 @@ public class FinanceServiceTests
         var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
 
         projection.Category.Should().BeNull();
+        projection.Categories.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_EntryWithSeveralCategories_ListsThemInPickedOrderWithTheFirstAsMain()
+    {
+        var health = new FinancialCategory { Name = "Saúde" };
+        var children = new FinancialCategory { Name = "Filhos" };
+        await _categoryService.SaveAsync(health);
+        await _categoryService.SaveAsync(children);
+        var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveEntryAsync(template, [children.Id, health.Id]);
+
+        var projection = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        projection.Categories.Select(c => c.Name).Should().Equal("Filhos", "Saúde");
+        projection.Category!.Name.Should().Be("Filhos");
+    }
+
+    [Fact]
+    public async Task GetMergedEntries_SameDataLoadedTwice_ProjectionsAreEqual()
+    {
+        var health = new FinancialCategory { Name = "Saúde" };
+        await _categoryService.SaveAsync(health);
+        var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveEntryAsync(template, [health.Id]);
+
+        var first = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+        var second = (await _service.GetMergedEntriesForMonthAsync(2026, 4)).Single();
+
+        second.Should().Be(first);
     }
 
     [Fact]
@@ -1682,8 +1712,7 @@ public class FinanceServiceTests
         var category = new FinancialCategory { Name = "Moradia", Icon = "🏠", Color = "#1E88E5" };
         await _categoryService.SaveAsync(category);
         var rent = await SaveTemplateAsync(RecurrenceType.Recurrent);
-        rent.CategoryId = category.Id;
-        await _service.SaveEntryAsync(rent);
+        await _service.SaveEntryAsync(rent, [category.Id]);
         await _service.GetMergedEntriesForMonthAsync(2026, 4);
 
         await _categoryService.SaveAsync(new FinancialCategory { Id = category.Id, Name = "Casa", Icon = "🏠", Color = "#1E88E5" });
@@ -1710,6 +1739,8 @@ public class FinanceServiceTests
     [InlineData("SELECT * FROM FinancialMonthlyEntry WHERE Year = 2026 AND Month = 4", DatabaseContext.MonthIndex)]
     [InlineData("SELECT * FROM FinancialMonthlyEntry WHERE FinancialEntryId = 1", DatabaseContext.MonthlyEntryTemplateIndex)]
     [InlineData("SELECT * FROM FinancialPayment WHERE FinancialMonthlyEntryId = 1", DatabaseContext.PaymentMonthlyEntryIndex)]
+    [InlineData("SELECT * FROM FinancialCategoryEntry WHERE FinancialEntryId = 1", DatabaseContext.CategoryEntryEntryIndex)]
+    [InlineData("SELECT * FROM FinancialCategoryEntry WHERE FinancialCategoryId = 1", DatabaseContext.CategoryEntryCategoryIndex)]
     public async Task CreateIndexesAsync_FrequentLookups_UseAnIndex(string query, string expectedIndex)
     {
         var db = await _context.GetConnectionAsync();
@@ -1737,6 +1768,186 @@ public class FinanceServiceTests
         };
         await _paymentSourceService.SaveAsync(card);
         return card;
+    }
+
+    // --- SaveEntryAsync categories ---
+
+    [Fact]
+    public async Task SaveEntryAsync_NewCategoryIds_ReplacesTheEntrysCategories()
+    {
+        var (health, children, leisure) = await SaveThreeCategoriesAsync();
+        var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveEntryAsync(template, [health.Id, children.Id]);
+
+        await _service.SaveEntryAsync(template, [leisure.Id, health.Id]);
+
+        (await _service.GetEntryCategoryIdsAsync(template.Id)).Should().Equal(leisure.Id, health.Id);
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_NullCategoryIds_KeepsTheEntrysCategories()
+    {
+        var (health, children, _) = await SaveThreeCategoriesAsync();
+        var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveEntryAsync(template, [health.Id, children.Id]);
+
+        template.Amount = 250m;
+        await _service.SaveEntryAsync(template);
+
+        (await _service.GetEntryCategoryIdsAsync(template.Id)).Should().Equal(health.Id, children.Id);
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_EmptyCategoryIds_LeavesTheEntryUncategorized()
+    {
+        var (health, _, _) = await SaveThreeCategoriesAsync();
+        var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveEntryAsync(template, [health.Id]);
+
+        await _service.SaveEntryAsync(template, []);
+
+        (await _service.GetEntryCategoryIdsAsync(template.Id)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DeleteEntryAsync_AllMonths_RemovesItsCategoryLinks()
+    {
+        var (health, _, _) = await SaveThreeCategoriesAsync();
+        var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveEntryAsync(template, [health.Id]);
+
+        await _service.DeleteEntryAsync(template.Id, 2026, 4, EntryDeleteScope.All);
+
+        var db = await _context.GetConnectionAsync();
+        (await db.Table<FinancialCategoryEntry>().CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DeleteEntryAsync_ThisMonthOnly_KeepsItsCategories()
+    {
+        var (health, _, _) = await SaveThreeCategoriesAsync();
+        var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveEntryAsync(template, [health.Id]);
+
+        await _service.DeleteEntryAsync(template.Id, 2026, 4, EntryDeleteScope.ThisMonth);
+
+        (await _service.GetEntryCategoryIdsAsync(template.Id)).Should().Equal(health.Id);
+    }
+
+    // --- GetCategoryReportAsync ---
+
+    [Fact]
+    public async Task GetCategoryReportAsync_EntryWithSeveralCategories_CountsInEachButOnceInTheMonthTotal()
+    {
+        var (health, children, _) = await SaveThreeCategoriesAsync();
+        var pharmacy = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveEntryAsync(pharmacy, [health.Id, children.Id]);
+        var school = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        school.Amount = 300m;
+        await _service.SaveEntryAsync(school, [children.Id]);
+
+        var report = await _service.GetCategoryReportAsync(2026, 4);
+
+        report.Totals.Select(t => (t.Category!.Name, t.Amount, t.EntryCount)).Should().Equal(
+            ("Filhos", 400m, 2),
+            ("Saúde", 100m, 1));
+        report.TotalOutcomes.Should().Be(400m);
+    }
+
+    [Fact]
+    public async Task GetCategoryReportAsync_UncategorizedAndIncomes_GroupsThemApartWithIncomesFirst()
+    {
+        await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveEntryAsync(new FinancialEntry
+        {
+            Description = "Salary",
+            Amount = 5000m,
+            StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local),
+            Recurrence = RecurrenceType.Recurrent,
+            EntryType = FinancialEntryType.Income
+        });
+
+        var report = await _service.GetCategoryReportAsync(2026, 4);
+
+        report.Totals.Should().Equal(
+            new CategoryTotal(FinancialEntryType.Income, null, 5000m, 1),
+            new CategoryTotal(FinancialEntryType.Outcome, null, 100m, 1));
+        report.TotalIncomes.Should().Be(5000m);
+        report.TotalOutcomes.Should().Be(100m);
+    }
+
+    [Fact]
+    public async Task GetCategoryReportAsync_PaidAboveThePlan_CountsWhatWasPaid()
+    {
+        var (health, _, _) = await SaveThreeCategoriesAsync();
+        var template = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveEntryAsync(template, [health.Id]);
+        await _service.SetPaidAmountAsync(template.Id, 2026, 4, 180m);
+
+        var report = await _service.GetCategoryReportAsync(2026, 4);
+
+        report.Totals.Single().Amount.Should().Be(180m);
+    }
+
+    // --- MigrateCategoryLinksAsync ---
+
+    [Fact]
+    public async Task MigrateCategoryLinksAsync_LegacyCategoryIdColumn_LinksEachEntryToItsCategory()
+    {
+        var (health, _, _) = await SaveThreeCategoriesAsync();
+        var db = await _context.GetConnectionAsync();
+        await db.ExecuteAsync("ALTER TABLE FinancialEntry ADD COLUMN CategoryId INTEGER");
+        var withCategory = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        var withDeletedCategory = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        var uncategorized = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await db.ExecuteAsync("UPDATE FinancialEntry SET CategoryId = ? WHERE Id = ?", health.Id, withCategory.Id);
+        await db.ExecuteAsync("UPDATE FinancialEntry SET CategoryId = 999 WHERE Id = ?", withDeletedCategory.Id);
+
+        await DatabaseContext.MigrateCategoryLinksAsync(db);
+
+        (await _service.GetEntryCategoryIdsAsync(withCategory.Id)).Should().Equal(health.Id);
+        (await _service.GetEntryCategoryIdsAsync(withDeletedCategory.Id)).Should().BeEmpty();
+        (await _service.GetEntryCategoryIdsAsync(uncategorized.Id)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task MigrateCategoryLinksAsync_LegacyCategoryNameColumn_LinksByName()
+    {
+        var (_, children, _) = await SaveThreeCategoriesAsync();
+        var db = await _context.GetConnectionAsync();
+        await db.ExecuteAsync("ALTER TABLE FinancialEntry ADD COLUMN Category TEXT");
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await db.ExecuteAsync("UPDATE FinancialEntry SET Category = 'Filhos' WHERE Id = ?", entry.Id);
+
+        await DatabaseContext.MigrateCategoryLinksAsync(db);
+
+        (await _service.GetEntryCategoryIdsAsync(entry.Id)).Should().Equal(children.Id);
+    }
+
+    [Fact]
+    public async Task MigrateCategoryLinksAsync_EntryAlreadyLinked_KeepsItsLinks()
+    {
+        var (health, children, _) = await SaveThreeCategoriesAsync();
+        var db = await _context.GetConnectionAsync();
+        await db.ExecuteAsync("ALTER TABLE FinancialEntry ADD COLUMN CategoryId INTEGER");
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SaveEntryAsync(entry, [children.Id]);
+        await db.ExecuteAsync("UPDATE FinancialEntry SET CategoryId = ? WHERE Id = ?", health.Id, entry.Id);
+
+        await DatabaseContext.MigrateCategoryLinksAsync(db);
+
+        (await _service.GetEntryCategoryIdsAsync(entry.Id)).Should().Equal(children.Id);
+    }
+
+    private async Task<(FinancialCategory Health, FinancialCategory Children, FinancialCategory Leisure)> SaveThreeCategoriesAsync()
+    {
+        var health = new FinancialCategory { Name = "Saúde" };
+        var children = new FinancialCategory { Name = "Filhos" };
+        var leisure = new FinancialCategory { Name = "Lazer" };
+        await _categoryService.SaveAsync(health);
+        await _categoryService.SaveAsync(children);
+        await _categoryService.SaveAsync(leisure);
+        return (health, children, leisure);
     }
 
     private async Task<FinancialEntry> SaveTemplateAsync(RecurrenceType recurrence, int? totalInstallments = null, int? dueDay = null, int? paymentSourceId = null)

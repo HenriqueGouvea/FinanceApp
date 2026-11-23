@@ -123,7 +123,7 @@ public class CreditCardBillTests
             Description: "Netflix",
             EffectiveAmount: amount,
             EntryType: FinancialEntryType.Outcome,
-            Category: null,
+            Categories: ValueList<FinancialCategory>.Empty,
             Status: status,
             IsProjected: false,
             InstallmentLabel: null,

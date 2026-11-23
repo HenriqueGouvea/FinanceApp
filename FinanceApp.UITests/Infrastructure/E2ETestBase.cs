@@ -49,6 +49,22 @@ public abstract class E2ETestBase
     protected Task<List<FinancialCategoryRow>> GetCategoryRowsAsync() =>
         Session.Database.QueryAsync<FinancialCategoryRow>("SELECT * FROM FinancialCategory");
 
+    /// <summary>
+    /// The ids of the entry's categories in the order they were picked: the first is the main one.
+    /// </summary>
+    protected async Task<List<int>> GetEntryCategoryIdsAsync(int entryId) =>
+        [.. (await Session.Database.QueryAsync<FinancialCategoryEntryRow>(
+            "SELECT * FROM FinancialCategoryEntry WHERE FinancialEntryId = ? ORDER BY Position, Id", entryId))
+            .Select(l => l.FinancialCategoryId)];
+
+    /// <summary>
+    /// Each categorized entry's main category id, by entry id (an uncategorized entry isn't in it).
+    /// </summary>
+    protected async Task<Dictionary<int, int?>> GetMainCategoryIdsAsync() =>
+        (await Session.Database.QueryAsync<FinancialCategoryEntryRow>("SELECT * FROM FinancialCategoryEntry ORDER BY Position, Id"))
+            .GroupBy(l => l.FinancialEntryId)
+            .ToDictionary(g => g.Key, g => (int?)g.First().FinancialCategoryId);
+
     protected Task<List<PaymentSourceRow>> GetPaymentSourceRowsAsync() =>
         Session.Database.QueryAsync<PaymentSourceRow>("SELECT * FROM PaymentSource");
 }

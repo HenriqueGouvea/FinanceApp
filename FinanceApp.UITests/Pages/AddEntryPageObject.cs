@@ -19,7 +19,7 @@ public class AddEntryPageObject
     private static readonly By AnnualInstallmentsEntry = AppSession.AutomationId("AnnualInstallmentsEntry");
     private static readonly By AmountEntry = AppSession.AutomationId("AmountEntry");
     private static readonly By InstallmentsTotal = AppSession.AutomationId("InstallmentsTotalLabel");
-    private const string CategoryPickerId = "CategoryPicker";
+    private const string CategoryChipsId = "CategoryChips";
     private const string DueDayPickerId = "DueDayPicker";
     private const string CreditCardBillDueHintId = "CreditCardBillDueHintLabel";
     private const string PaymentSourcePickerId = "PaymentSourcePicker";
@@ -245,11 +245,11 @@ public class AddEntryPageObject
         return this;
     }
 
-    // The list sits between the paid amount field and the category picker, so showing both shows the whole list.
+    // The list sits between the paid amount field and the category chips, so showing both shows the whole list.
     private void ScrollPaymentsIntoView()
     {
         _session.TryScrollTo(PaymentsHeaderId);
-        _session.TryScrollTo(CategoryPickerId);
+        _session.TryScrollTo(CategoryChipsId);
     }
 
     public AddEntryPageObject ClearPaidAmount()
@@ -260,11 +260,24 @@ public class AddEntryPageObject
         return this;
     }
 
-    public AddEntryPageObject SelectCategory(string categoryName)
+    /// <summary>
+    /// Taps the category's chip, picking it (or unpicking it when already picked). The first one picked is the main one.
+    /// </summary>
+    public AddEntryPageObject ToggleCategory(string categoryName)
     {
-        PickOption(CategoryPickerId, categoryName);
+        _session.TryScrollTo(CategoryChipsId);
+        _session.Tap(CategoryChip(categoryName));
         return this;
     }
+
+    /// <summary>
+    /// With several categories picked, the line naming the main one, e.g. "Principal: 🩺 Saúde, a primeira escolhida...".
+    /// </summary>
+    public string MainCategoryHint => _session.ScrollTo("MainCategoryHintLabel").Text;
+
+    // The chip reads "🩺 Saúde": its icon, then the name.
+    private static By CategoryChip(string categoryName) =>
+        AppSession.AutomationIdWithTextEnding("CategoryChipLabel", $" {categoryName}");
 
     public AddEntryPageObject SelectPaymentSource(string sourceName)
     {

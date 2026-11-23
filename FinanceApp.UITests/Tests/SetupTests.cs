@@ -166,6 +166,7 @@ public sealed class SetupTests : E2ETestBase
         var cardId = sources.Single(s => s.Name == Card).Id;
 
         var categories = await GetCategoryRowsAsync();
+        var mainCategories = await GetMainCategoryIdsAsync();
         int CategoryId(string name) => categories.Single(c => c.Name == name).Id;
 
         var entries = await GetEntryRowsAsync();
@@ -176,7 +177,7 @@ public sealed class SetupTests : E2ETestBase
         entries.Where(e => e != phone).Should().OnlyContain(e =>
             e.Recurrence == AppFormat.Recurrent && e.StartDate.Date == AppFormat.CurrentMonth && e.EndDate == null);
         entries.Where(e => e != phone)
-            .Select(e => (e.Description, e.Amount, e.EntryType, e.DueDay, e.IsEstimated, e.AllowsPartialPayment, e.CategoryId, e.PaymentSourceId))
+            .Select(e => (e.Description, e.Amount, e.EntryType, e.DueDay, e.IsEstimated, e.AllowsPartialPayment, mainCategories.GetValueOrDefault(e.Id), e.PaymentSourceId))
             .Should().BeEquivalentTo(
             [
                 (Salary, 5000m, AppFormat.Income, (int?)6, false, false, (int?)CategoryId("Salário"), (int?)accountId),
@@ -226,9 +227,10 @@ public sealed class SetupTests : E2ETestBase
         main.SummaryOutcomeText.Should().Be(AppFormat.Money(3130));
 
         var categories = await GetCategoryRowsAsync();
+        var mainCategories = await GetMainCategoryIdsAsync();
         int? CategoryId(string name) => categories.Single(c => c.Name == name).Id;
         (await GetEntryRowsAsync())
-            .Select(e => (e.Description, e.EntryType, e.DueDay, e.IsEstimated, e.AllowsPartialPayment, e.CategoryId))
+            .Select(e => (e.Description, e.EntryType, e.DueDay, e.IsEstimated, e.AllowsPartialPayment, mainCategories.GetValueOrDefault(e.Id)))
             .Should().BeEquivalentTo(
             [
                 (Salary, AppFormat.Income, (int?)5, false, false, CategoryId("Salário")),
@@ -268,9 +270,10 @@ public sealed class SetupTests : E2ETestBase
         _setup.Finish();
 
         var categories = await GetCategoryRowsAsync();
+        var mainCategories = await GetMainCategoryIdsAsync();
         int? CategoryId(string name) => categories.Single(c => c.Name == name).Id;
         (await GetEntryRowsAsync())
-            .Select(e => (e.Description, e.Recurrence, e.StartDate.Date, e.TotalInstallments, e.Amount, e.CategoryId))
+            .Select(e => (e.Description, e.Recurrence, e.StartDate.Date, e.TotalInstallments, e.Amount, mainCategories.GetValueOrDefault(e.Id)))
             .Should().BeEquivalentTo(
             [
                 // The 9th of 120 installments falls this month, so the financing started eight months ago.

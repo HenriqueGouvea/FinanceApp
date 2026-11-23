@@ -36,6 +36,7 @@ public sealed class DataManagementServiceTests : IDisposable
         (await db.Table<FinancialMonthlyEntry>().CountAsync()).Should().Be(0);
         (await db.Table<FinancialPayment>().CountAsync()).Should().Be(0);
         (await db.Table<PaymentSource>().CountAsync()).Should().Be(0);
+        (await db.Table<FinancialCategoryEntry>().CountAsync()).Should().Be(0);
         (await db.Table<FinancialCategory>().ToListAsync()).Select(c => c.Name)
             .Should().Equal(DatabaseContext.CreateDefaultCategories().Select(c => c.Name));
     }
@@ -97,9 +98,9 @@ public sealed class DataManagementServiceTests : IDisposable
         var csv = await File.ReadAllTextAsync((await _phone.Service.ExportAsync())[1], Encoding.UTF8);
 
         csv.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).Should().Equal(
-            "Tipo;Descrição;Valor;Recorrência;Início;Fim;Parcelas;Vencimento;Categoria;Conta ou cartão;Valor estimado;Pagamento parcial",
+            "Tipo;Descrição;Valor;Recorrência;Início;Fim;Parcelas;Vencimento;Categorias;Conta ou cartão;Valor estimado;Pagamento parcial",
             "Receita;Salário;5000,00;Todo mês;11/2026;;;5;Salário;Itaú;Não;Não",
-            "Despesa;Mercado;1234,56;Todo mês;11/2026;;;;Mercado;Itaú;Sim;Sim",
+            "Despesa;Mercado;1234,56;Todo mês;11/2026;;;;Mercado, Casa;Itaú;Sim;Sim",
             "Despesa;TV;300,00;Parcelada;11/2026;;10;;;Nubank;Não;Não");
     }
 
@@ -154,6 +155,7 @@ public sealed class DataManagementServiceTests : IDisposable
         (await target.Table<FinancialCategory>().ToListAsync()).Should().BeEquivalentTo(await source.Table<FinancialCategory>().ToListAsync());
         (await target.Table<PaymentSource>().ToListAsync()).Should().BeEquivalentTo(await source.Table<PaymentSource>().ToListAsync());
         (await target.Table<FinancialEntry>().ToListAsync()).Should().BeEquivalentTo(await source.Table<FinancialEntry>().ToListAsync());
+        (await target.Table<FinancialCategoryEntry>().ToListAsync()).Should().BeEquivalentTo(await source.Table<FinancialCategoryEntry>().ToListAsync());
         (await target.Table<FinancialMonthlyEntry>().ToListAsync()).Should().BeEquivalentTo(await source.Table<FinancialMonthlyEntry>().ToListAsync());
         (await target.Table<FinancialPayment>().ToListAsync()).Should().BeEquivalentTo(await source.Table<FinancialPayment>().ToListAsync());
     }
@@ -248,6 +250,31 @@ public sealed class DataManagementServiceTests : IDisposable
         (await act.Should().ThrowAsync<InvalidBackupException>()).Which.IsFromNewerVersion.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task ImportAsync_Version1BackupWithACategoryIdPerEntry_LinksEachEntryToItsCategory()
+    {
+        const string content = """
+            {
+              "format": "mensal-backup",
+              "version": 1,
+              "categories": [
+                { "id": 4, "name": "Saúde", "icon": "🩺", "color": "#E53935", "entryType": "Outcome" }
+              ],
+              "entries": [
+                { "id": 7, "description": "Farmácia", "amount": 80, "startDate": "2026-11-01T00:00:00", "recurrence": "Recurrent", "entryType": "Outcome", "categoryId": 4 },
+                { "id": 8, "description": "Cinema", "amount": 40, "startDate": "2026-11-01T00:00:00", "recurrence": "OneTime", "entryType": "Outcome", "categoryId": null },
+                { "id": 9, "description": "Lanche", "amount": 20, "startDate": "2026-11-01T00:00:00", "recurrence": "OneTime", "entryType": "Outcome", "categoryId": 99 }
+              ]
+            }
+            """;
+
+        await _newPhone.Service.ImportAsync(new MemoryStream(Encoding.UTF8.GetBytes(content)));
+
+        (await _newPhone.Finance.GetEntryCategoryIdsAsync(7)).Should().Equal(4);
+        (await _newPhone.Finance.GetEntryCategoryIdsAsync(8)).Should().BeEmpty();
+        (await _newPhone.Finance.GetEntryCategoryIdsAsync(9)).Should().BeEmpty();
+    }
+
     private async Task ImportIntoNewPhoneAsync()
     {
         var backupPath = (await _phone.Service.ExportAsync())[0];
@@ -294,8 +321,9 @@ public sealed class DataManagementServiceTests : IDisposable
             var db = await Context.GetConnectionAsync();
             var start = new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Local);
             var market = new FinancialCategory { Name = "Mercado", Icon = "🛒", Color = "#F4511E" };
+            var home = new FinancialCategory { Name = "Casa", Icon = "🏠", Color = "#1E88E5" };
             var salaryCategory = new FinancialCategory { Name = "Salário", Icon = "💼", Color = "#00897B", EntryType = FinancialEntryType.Income };
-            await db.InsertAllAsync(new[] { market, salaryCategory });
+            await db.InsertAllAsync(new[] { market, home, salaryCategory });
             var account = new PaymentSource { Name = "Itaú", Balance = 1500.5m };
             await db.InsertAsync(account);
             var card = new PaymentSource { Name = "Nubank", Type = PaymentSourceType.CreditCard, Balance = 5000, BillDueDay = 10, BillPaymentSourceId = account.Id };
@@ -304,8 +332,13 @@ public sealed class DataManagementServiceTests : IDisposable
             var groceries = new FinancialEntry
             {
                 Description = "Mercado", Amount = 1234.56m, StartDate = start, Recurrence = RecurrenceType.Recurrent,
-                EntryType = FinancialEntryType.Outcome, CategoryId = market.Id, PaymentSourceId = account.Id,
+                EntryType = FinancialEntryType.Outcome, PaymentSourceId = account.Id,
                 IsEstimated = true, AllowsPartialPayment = true
+            };
+            var salary = new FinancialEntry
+            {
+                Description = "Salário", Amount = 5000, StartDate = start, Recurrence = RecurrenceType.Recurrent,
+                EntryType = FinancialEntryType.Income, PaymentSourceId = account.Id, DueDay = 5
             };
             await db.InsertAllAsync(new[]
             {
@@ -315,11 +348,13 @@ public sealed class DataManagementServiceTests : IDisposable
                     Description = "TV", Amount = 300, StartDate = start, Recurrence = RecurrenceType.Installments, TotalInstallments = 10,
                     EntryType = FinancialEntryType.Outcome, PaymentSourceId = card.Id
                 },
-                new FinancialEntry
-                {
-                    Description = "Salário", Amount = 5000, StartDate = start, Recurrence = RecurrenceType.Recurrent,
-                    EntryType = FinancialEntryType.Income, CategoryId = salaryCategory.Id, PaymentSourceId = account.Id, DueDay = 5
-                }
+                salary
+            });
+            await db.InsertAllAsync(new[]
+            {
+                new FinancialCategoryEntry { FinancialEntryId = groceries.Id, FinancialCategoryId = market.Id, Position = 0 },
+                new FinancialCategoryEntry { FinancialEntryId = groceries.Id, FinancialCategoryId = home.Id, Position = 1 },
+                new FinancialCategoryEntry { FinancialEntryId = salary.Id, FinancialCategoryId = salaryCategory.Id, Position = 0 }
             });
             var month = new FinancialMonthlyEntry
             {

@@ -19,7 +19,7 @@ public interface ICategoryService
     Task<int> CountEntriesAsync(int categoryId);
 
     /// <summary>
-    /// Deletes the category and leaves the entries that used it uncategorized.
+    /// Deletes the category and removes it from the entries that used it (an entry left with none is uncategorized).
     /// </summary>
     Task DeleteAsync(int categoryId);
 }
