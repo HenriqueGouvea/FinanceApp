@@ -20,6 +20,7 @@ public class AddEntryPageObject
     private static readonly By AmountEntry = AppSession.AutomationId("AmountEntry");
     private static readonly By InstallmentsTotal = AppSession.AutomationId("InstallmentsTotalLabel");
     private const string CategoryChipsId = "CategoryChips";
+    private const string CategoryChipLabelId = "CategoryChipLabel";
     private const string DueDayPickerId = "DueDayPicker";
     private const string CreditCardBillDueHintId = "CreditCardBillDueHintLabel";
     private const string PaymentSourcePickerId = "PaymentSourcePicker";
@@ -265,7 +266,8 @@ public class AddEntryPageObject
     /// </summary>
     public AddEntryPageObject ToggleCategory(string categoryName)
     {
-        _session.TryScrollTo(CategoryChipsId);
+        // The chips wrap onto several rows, so on a small screen the one wanted can sit below the fold.
+        _session.TryScrollToTextEnding(CategoryChipLabelId, $" {categoryName}");
         _session.Tap(CategoryChip(categoryName));
         return this;
     }
@@ -277,7 +279,7 @@ public class AddEntryPageObject
 
     // The chip reads "🩺 Saúde": its icon, then the name.
     private static By CategoryChip(string categoryName) =>
-        AppSession.AutomationIdWithTextEnding("CategoryChipLabel", $" {categoryName}");
+        AppSession.AutomationIdWithTextEnding(CategoryChipLabelId, $" {categoryName}");
 
     public AddEntryPageObject SelectPaymentSource(string sourceName)
     {
