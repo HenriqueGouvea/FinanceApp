@@ -69,7 +69,14 @@ public class SetupService : ISetupService
             }
 
             foreach (var item in setup.Entries.Where(e => e.Amount > 0))
-                conn.Insert(BuildEntry(item, categories, startDate));
+            {
+                var entry = BuildEntry(item, startDate);
+                conn.Insert(entry);
+
+                var category = categories.FirstOrDefault(c => c.EntryType == item.EntryType && c.Name == item.CategoryName);
+                if (category is not null)
+                    FinanceService.SetCategories(conn, entry.Id, [category.Id]);
+            }
         });
         _paymentSourceService.ClearCache();
 
@@ -77,9 +84,8 @@ public class SetupService : ISetupService
         Skip();
     }
 
-    private static FinancialEntry BuildEntry(SetupEntry item, IReadOnlyList<FinancialCategory> categories, DateTime startDate)
+    private static FinancialEntry BuildEntry(SetupEntry item, DateTime startDate)
     {
-        var category = categories.FirstOrDefault(c => c.EntryType == item.EntryType && c.Name == item.CategoryName);
         var (entryStart, totalInstallments) = item.Recurrence switch
         {
             RecurrenceType.Installments => InstallmentsSchedule(item, startDate),
@@ -100,7 +106,6 @@ public class SetupService : ISetupService
             DueDay = item.DueDay,
             IsEstimated = item.IsEstimated && !isOnCardBill,
             AllowsPartialPayment = item.AllowsPartialPayment && !isOnCardBill,
-            CategoryId = category?.Id,
             PaymentSourceId = item.PaymentSource?.Id
         };
     }

@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:FinanceApp.ViewModels"
+             xmlns:controls="clr-namespace:FinanceApp.Controls"
+             xmlns:converters="clr-namespace:FinanceApp.Converters"
+             x:Class="FinanceApp.Views.ReportsPage"
+             x:DataType="vm:ReportsViewModel"
+             Title="Relatórios">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16,14,16,24" Spacing="12">
+
+            <!-- The month, changed with the arrows or by tapping it (month picker) -->
+            <Border Style="{StaticResource Card}" Padding="6,4">
+                <Grid ColumnDefinitions="44, *, 44">
+                    <Button Grid.Column="0"
+                            AutomationId="ReportPreviousMonthButton"
+                            Text="‹"
+                            FontSize="24"
+                            Style="{StaticResource TextButton}"
+                            Command="{Binding PreviousMonthCommand}" />
+                    <Label Grid.Column="1"
+                           AutomationId="ReportMonthTitleLabel"
+                           Text="{Binding MonthTitle, StringFormat='{0} ▾'}"
+                           FontSize="16"
+                           FontFamily="OpenSansSemibold"
+                           TextColor="{StaticResource Primary}"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"
+                           Padding="12,10">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnMonthTitleTapped" />
+                        </Label.GestureRecognizers>
+                    </Label>
+                    <Button Grid.Column="2"
+                            AutomationId="ReportNextMonthButton"
+                            Text="›"
+                            FontSize="24"
+                            Style="{StaticResource TextButton}"
+                            Command="{Binding NextMonthCommand}" />
+                </Grid>
+            </Border>
+
+            <!-- Despesas / Receitas -->
+            <Border Style="{StaticResource SegmentedControl}">
+                <Grid ColumnDefinitions="*, *" ColumnSpacing="3">
+                    <Border Grid.Column="0" AutomationId="ReportOutcomesOption" Style="{StaticResource SegmentOption}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding SelectOutcomesCommand}" />
+                        </Border.GestureRecognizers>
+                        <Border.Triggers>
+                            <DataTrigger TargetType="Border" Binding="{Binding IsOutcome}" Value="True">
+                                <Setter Property="BackgroundColor" Value="{StaticResource Outcome}" />
+                            </DataTrigger>
+                        </Border.Triggers>
+                        <Label Text="Despesas" Style="{StaticResource SegmentLabel}">
+                            <Label.Triggers>
+                                <DataTrigger TargetType="Label" Binding="{Binding IsOutcome}" Value="True">
+                                    <Setter Property="TextColor" Value="White" />
+                                    <Setter Property="FontAttributes" Value="Bold" />
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
+                    </Border>
+                    <Border Grid.Column="1" AutomationId="ReportIncomesOption" Style="{StaticResource SegmentOption}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding SelectIncomesCommand}" />
+                        </Border.GestureRecognizers>
+                        <Border.Triggers>
+                            <DataTrigger TargetType="Border" Binding="{Binding IsOutcome}" Value="False">
+                                <Setter Property="BackgroundColor" Value="{StaticResource Income}" />
+                            </DataTrigger>
+                        </Border.Triggers>
+                        <Label Text="Receitas" Style="{StaticResource SegmentLabel}">
+                            <Label.Triggers>
+                                <DataTrigger TargetType="Label" Binding="{Binding IsOutcome}" Value="False">
+                                    <Setter Property="TextColor" Value="White" />
+                                    <Setter Property="FontAttributes" Value="Bold" />
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- Tabela / Pizza / Colunas -->
+            <Border Style="{StaticResource SegmentedControl}">
+                <Grid ColumnDefinitions="*, *, *" ColumnSpacing="3">
+                    <Border Grid.Column="0" AutomationId="ReportTableOption" Style="{StaticResource SegmentOption}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding SelectViewCommand}" CommandParameter="{x:Static vm:ReportView.Table}" />
+                        </Border.GestureRecognizers>
+                        <Border.Triggers>
+                            <DataTrigger TargetType="Border" Binding="{Binding IsTable}" Value="True">
+                                <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                            </DataTrigger>
+                        </Border.Triggers>
+                        <Label Text="Tabela" Style="{StaticResource SegmentLabel}">
+                            <Label.Triggers>
+                                <DataTrigger TargetType="Label" Binding="{Binding IsTable}" Value="True">
+                                    <Setter Property="TextColor" Value="White" />
+                                    <Setter Property="FontAttributes" Value="Bold" />
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
+                    </Border>
+                    <Border Grid.Column="1" AutomationId="ReportPieOption" Style="{StaticResource SegmentOption}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding SelectViewCommand}" CommandParameter="{x:Static vm:ReportView.Pie}" />
+                        </Border.GestureRecognizers>
+                        <Border.Triggers>
+                            <DataTrigger TargetType="Border" Binding="{Binding IsPie}" Value="True">
+                                <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                            </DataTrigger>
+                        </Border.Triggers>
+                        <Label Text="Pizza" Style="{StaticResource SegmentLabel}">
+                            <Label.Triggers>
+                                <DataTrigger TargetType="Label" Binding="{Binding IsPie}" Value="True">
+                                    <Setter Property="TextColor" Value="White" />
+                                    <Setter Property="FontAttributes" Value="Bold" />
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
+                    </Border>
+                    <Border Grid.Column="2" AutomationId="ReportColumnsOption" Style="{StaticResource SegmentOption}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding SelectViewCommand}" CommandParameter="{x:Static vm:ReportView.Columns}" />
+                        </Border.GestureRecognizers>
+                        <Border.Triggers>
+                            <DataTrigger TargetType="Border" Binding="{Binding IsColumns}" Value="True">
+                                <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                            </DataTrigger>
+                        </Border.Triggers>
+                        <Label Text="Colunas" Style="{StaticResource SegmentLabel}">
+                            <Label.Triggers>
+                                <DataTrigger TargetType="Label" Binding="{Binding IsColumns}" Value="True">
+                                    <Setter Property="TextColor" Value="White" />
+                                    <Setter Property="FontAttributes" Value="Bold" />
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Padding="14,12">
+                <VerticalStackLayout Spacing="10">
+                    <Grid ColumnDefinitions="*, Auto">
+                        <Label Grid.Column="0"
+                               Text="{Binding TotalLabel}"
+                               Style="{StaticResource RowTitle}"
+                               VerticalOptions="Center" />
+                        <Label Grid.Column="1"
+                               AutomationId="ReportTotalLabel"
+                               Text="{Binding MonthTotal, Converter={x:Static converters:MoneyConverter.Instance}}"
+                               FontSize="16"
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource Ink}"
+                               VerticalOptions="Center" />
+                    </Grid>
+
+                    <Label AutomationId="ReportEmptyLabel"
+                           Text="{Binding EmptyLabel}"
+                           Style="{StaticResource Hint}"
+                           HorizontalTextAlignment="Center"
+                           Padding="0,16"
+                           IsVisible="{Binding IsEmpty}" />
+
+                    <!-- Table: each category's total and share -->
+                    <VerticalStackLayout IsVisible="{Binding IsTable}">
+                        <Grid ColumnDefinitions="*, Auto, 48" ColumnSpacing="10" Padding="0,0,0,6" IsVisible="{Binding HasRows}">
+                            <Label Grid.Column="0" Text="Categoria" Style="{StaticResource FieldCaption}" />
+                            <Label Grid.Column="1" Text="Valor" Style="{StaticResource FieldCaption}" HorizontalTextAlignment="End" />
+                            <Label Grid.Column="2" Text="%" Style="{StaticResource FieldCaption}" HorizontalTextAlignment="End" />
+                        </Grid>
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Rows}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CategoryReportRow">
+                                    <Grid AutomationId="ReportRow" ColumnDefinitions="Auto, *, Auto, 48" ColumnSpacing="10" Padding="0,7">
+                                        <Border Grid.Column="0"
+                                                WidthRequest="30" HeightRequest="30"
+                                                StrokeShape="Ellipse"
+                                                StrokeThickness="0"
+                                                BackgroundColor="{Binding Color, Converter={x:Static converters:HexToColorConverter.Instance}}"
+                                                VerticalOptions="Center">
+                                            <Label Text="{Binding Icon}" FontSize="14" HorizontalOptions="Center" VerticalOptions="Center" />
+                                        </Border>
+                                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                            <Label AutomationId="ReportRowNameLabel"
+                                                   Text="{Binding Name}"
+                                                   FontSize="14"
+                                                   FontFamily="OpenSansSemibold"
+                                                   TextColor="{StaticResource Ink}"
+                                                   LineBreakMode="TailTruncation" />
+                                            <Label Text="{Binding EntryCountLabel}" FontSize="11" TextColor="{StaticResource Muted}" />
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="2"
+                                               AutomationId="ReportRowAmountLabel"
+                                               Text="{Binding Amount, Converter={x:Static converters:MoneyConverter.Instance}}"
+                                               FontSize="14"
+                                               FontAttributes="Bold"
+                                               TextColor="{StaticResource Ink}"
+                                               VerticalOptions="Center" />
+                                        <Label Grid.Column="3"
+                                               AutomationId="ReportRowShareLabel"
+                                               Text="{Binding ShareLabel}"
+                                               FontSize="13"
+                                               TextColor="{StaticResource Muted}"
+                                               HorizontalTextAlignment="End"
+                                               VerticalOptions="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+
+                    <!-- Pie or columns, with a legend naming the categories in the same order -->
+                    <VerticalStackLayout Spacing="12" IsVisible="{Binding IsChart}">
+                        <controls:CategoryChart AutomationId="ReportChart"
+                                                HeightRequest="200"
+                                                Rows="{Binding Rows}"
+                                                IsPie="{Binding IsPie}" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Rows}" Spacing="2">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CategoryReportRow">
+                                    <Grid AutomationId="ReportLegendRow" ColumnDefinitions="Auto, *, Auto, 44" ColumnSpacing="8" Padding="0,3">
+                                        <BoxView Grid.Column="0"
+                                                 WidthRequest="12" HeightRequest="12"
+                                                 CornerRadius="3"
+                                                 Color="{Binding Color, Converter={x:Static converters:HexToColorConverter.Instance}}"
+                                                 VerticalOptions="Center" />
+                                        <Label Grid.Column="1"
+                                               AutomationId="ReportLegendNameLabel"
+                                               FontSize="13"
+                                               TextColor="{StaticResource Ink}"
+                                               LineBreakMode="TailTruncation"
+                                               VerticalOptions="Center">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="{Binding Icon}" />
+                                                    <Span Text=" " />
+                                                    <Span Text="{Binding Name}" />
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                        <Label Grid.Column="2"
+                                               Text="{Binding Amount, Converter={x:Static converters:MoneyConverter.Instance}}"
+                                               FontSize="13"
+                                               TextColor="{StaticResource Ink}"
+                                               VerticalOptions="Center" />
+                                        <Label Grid.Column="3"
+                                               AutomationId="ReportLegendShareLabel"
+                                               Text="{Binding ShareLabel}"
+                                               FontSize="13"
+                                               FontAttributes="Bold"
+                                               TextColor="{StaticResource Muted}"
+                                               HorizontalTextAlignment="End"
+                                               VerticalOptions="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+
+                    <Label AutomationId="ReportSharedEntriesNote"
+                           Text="Um lançamento com várias categorias conta em cada uma delas, por isso as categorias somam mais que o total do mês."
+                           Style="{StaticResource Hint}"
+                           IsVisible="{Binding CategoriesExceedTotal}" />
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

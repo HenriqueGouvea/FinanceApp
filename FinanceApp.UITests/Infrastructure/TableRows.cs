@@ -13,7 +13,6 @@ public class FinancialEntryRow
     public int Recurrence { get; set; }
     public int EntryType { get; set; }
     public int? TotalInstallments { get; set; }
-    public int? CategoryId { get; set; }
     public int? PaymentSourceId { get; set; }
     public bool IsEstimated { get; set; }
     public bool AllowsPartialPayment { get; set; }
@@ -48,6 +47,14 @@ public class FinancialCategoryRow
     public string Icon { get; set; } = string.Empty;
     public string Color { get; set; } = string.Empty;
     public int EntryType { get; set; }
+}
+
+public class FinancialCategoryEntryRow
+{
+    public int Id { get; set; }
+    public int FinancialEntryId { get; set; }
+    public int FinancialCategoryId { get; set; }
+    public int Position { get; set; }
 }
 
 public class PaymentSourceRow

@@ -19,13 +19,13 @@ public partial class AddEntryViewModel : ObservableObject
     private DateTime _editingMonth;
     private decimal _initialPaidAmount;
     private readonly List<PaymentItem> _deletedPayments = [];
-    private int? _editingCategoryId;
+    private IReadOnlyList<int> _editingCategoryIds = [];
+    private readonly List<int> _selectedCategoryIds = [];
     private IReadOnlyList<FinancialCategory> _allCategories = [];
 
     [ObservableProperty] string pageTitle = "Novo Lançamento";
     [ObservableProperty] string description = string.Empty;
     [ObservableProperty] decimal amount;
-    [ObservableProperty] FinancialCategory? selectedCategory;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOnCreditCardBill))]
     [NotifyPropertyChangedFor(nameof(CreditCardBillDueHint))]
@@ -85,7 +85,22 @@ public partial class AddEntryViewModel : ObservableObject
     public bool IsEditing => _editingEntryId != 0;
     public double StructuralFieldsOpacity => IsEditing ? 0.4 : 1.0;
 
-    public ObservableCollection<FinancialCategory> Categories { get; } = [];
+    public ObservableCollection<CategoryChip> Categories { get; } = [];
+
+    /// <summary>
+    /// The picked categories in the order they were picked: the first is the main one.
+    /// </summary>
+    public IReadOnlyList<int> SelectedCategoryIds => _selectedCategoryIds;
+
+    /// <summary>
+    /// With several categories picked, says which one is the main: the first picked, shown as the row's icon.
+    /// </summary>
+    public string MainCategoryHint => ShowsMainCategoryHint && Categories.FirstOrDefault(c => c.IsMain)?.Category is { } main
+        ? $"Principal: {main.Icon} {main.Name}, a primeira escolhida. Ela é o ícone do lançamento."
+        : string.Empty;
+
+    public bool ShowsMainCategoryHint => _selectedCategoryIds.Count > 1;
+
     public ObservableCollection<PaymentSource> PaymentSources { get; } = [];
 
     /// <summary>
@@ -153,7 +168,8 @@ public partial class AddEntryViewModel : ObservableObject
     {
         _editingEntryId = 0;
         _editingEndDate = null;
-        _editingCategoryId = null;
+        _editingCategoryIds = [];
+        _selectedCategoryIds.Clear();
         await LoadCategoriesAsync();
         await LoadPaymentSourcesAsync();
 
@@ -164,7 +180,6 @@ public partial class AddEntryViewModel : ObservableObject
         PageTitle = "Novo Lançamento";
         Description = string.Empty;
         Amount = 0;
-        SelectedCategory = null;
         SelectedPaymentSource = null;
         EntryType = FinancialEntryType.Outcome;
         FilterCategories();
@@ -186,7 +201,9 @@ public partial class AddEntryViewModel : ObservableObject
     {
         _editingEntryId = entry.Id;
         _editingEndDate = entry.EndDate;
-        _editingCategoryId = entry.CategoryId;
+        _editingCategoryIds = await _financeService.GetEntryCategoryIdsAsync(entry.Id);
+        _selectedCategoryIds.Clear();
+        _selectedCategoryIds.AddRange(_editingCategoryIds);
         await LoadCategoriesAsync();
         await LoadPaymentSourcesAsync();
 
@@ -199,7 +216,6 @@ public partial class AddEntryViewModel : ObservableObject
         Amount = entry.Amount;
         EntryType = entry.EntryType;
         FilterCategories();
-        SelectedCategory = Categories.FirstOrDefault(c => c.Id == entry.CategoryId);
         SelectedPaymentSource = PaymentSources.FirstOrDefault(s => s.Id == entry.PaymentSourceId);
         SelectedRecurrence = entry.Recurrence;
         TotalInstallments = entry.TotalInstallments;
@@ -241,7 +257,6 @@ public partial class AddEntryViewModel : ObservableObject
             Id = _editingEntryId,
             Description = Description,
             Amount = Amount,
-            CategoryId = SelectedCategory?.Id,
             PaymentSourceId = SelectedPaymentSource?.Id,
             StartDate = new DateTime(_targetMonth.Year, _targetMonth.Month, 1),
             EndDate = _editingEndDate,
@@ -261,7 +276,7 @@ public partial class AddEntryViewModel : ObservableObject
 
         var saved = await _writeGuard.TryAsync(async () =>
         {
-            await _financeService.SaveEntryAsync(entry);
+            await _financeService.SaveEntryAsync(entry, [.. _selectedCategoryIds]);
 
             if (IsEditing)
             {
@@ -300,15 +315,37 @@ public partial class AddEntryViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowsCreditCardChoiceHint));
     }
 
-    // The edited entry keeps its category even when it belongs to the other type (data from before the split).
+    [RelayCommand]
+    void ToggleCategory(CategoryChip chip)
+    {
+        if (!_selectedCategoryIds.Remove(chip.Category.Id))
+            _selectedCategoryIds.Add(chip.Category.Id);
+
+        UpdateCategoryChips();
+    }
+
+    // Shows the categories of the entry's type. The edited entry keeps its categories even when they belong to the
+    // other type (data from before the split); picked ones of the other type are dropped when the type changes.
     private void FilterCategories()
     {
-        var selectedId = SelectedCategory?.Id;
-
         Categories.Clear();
-        foreach (var category in _allCategories.Where(c => c.EntryType == EntryType || c.Id == _editingCategoryId))
-            Categories.Add(category);
+        foreach (var category in _allCategories.Where(c => c.EntryType == EntryType || _editingCategoryIds.Contains(c.Id)))
+            Categories.Add(new CategoryChip(category));
 
-        SelectedCategory = Categories.FirstOrDefault(c => c.Id == selectedId);
+        _selectedCategoryIds.RemoveAll(id => Categories.All(c => c.Category.Id != id));
+        UpdateCategoryChips();
+    }
+
+    private void UpdateCategoryChips()
+    {
+        foreach (var chip in Categories)
+        {
+            chip.Position = _selectedCategoryIds.IndexOf(chip.Category.Id) + 1;
+            chip.IsSelected = chip.Position > 0;
+        }
+
+        OnPropertyChanged(nameof(SelectedCategoryIds));
+        OnPropertyChanged(nameof(MainCategoryHint));
+        OnPropertyChanged(nameof(ShowsMainCategoryHint));
     }
 }

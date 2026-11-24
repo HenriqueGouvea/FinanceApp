@@ -189,9 +189,12 @@ public sealed class SetupServiceTests : IDisposable
 
         var categories = await _categoryService.GetAllAsync();
         var entries = await GetEntriesAsync();
-        entries.Single(e => e.Description == "Salário").CategoryId.Should().Be(categories.Single(c => c.Name == "Salário").Id);
-        entries.Single(e => e.Description == "Aluguel").CategoryId.Should().Be(categories.Single(c => c.Name == "Moradia").Id);
-        entries.Single(e => e.Description == "Mercado").CategoryId.Should().BeNull();
+        var links = await GetCategoryLinksAsync();
+        int? CategoryOf(string description) =>
+            links.SingleOrDefault(l => l.FinancialEntryId == entries.Single(e => e.Description == description).Id)?.FinancialCategoryId;
+        CategoryOf("Salário").Should().Be(categories.Single(c => c.Name == "Salário").Id);
+        CategoryOf("Aluguel").Should().Be(categories.Single(c => c.Name == "Moradia").Id);
+        CategoryOf("Mercado").Should().BeNull();
     }
 
     [Fact]
@@ -392,5 +395,11 @@ public sealed class SetupServiceTests : IDisposable
     {
         var db = await _context.GetConnectionAsync();
         return await db.Table<FinancialEntry>().ToListAsync();
+    }
+
+    private async Task<List<FinancialCategoryEntry>> GetCategoryLinksAsync()
+    {
+        var db = await _context.GetConnectionAsync();
+        return await db.Table<FinancialCategoryEntry>().ToListAsync();
     }
 }

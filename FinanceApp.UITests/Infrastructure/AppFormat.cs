@@ -89,6 +89,11 @@ public static class AppFormat
     public static string InstallmentTotal(decimal total) => $"total {Money(total)}";
 
     /// <summary>
+    /// A category's share in "Relatórios", e.g. "75%".
+    /// </summary>
+    public static string Share(decimal share) => share.ToString("P0", Culture);
+
+    /// <summary>
     /// Date of a recorded payment in the partial payment popup (e.g. "27/10").
     /// </summary>
     public static string PaymentDate(DateTime date) => date.ToString("dd/MM", Culture);

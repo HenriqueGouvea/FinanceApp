@@ -7,7 +7,8 @@ namespace FinanceApp.Models;
 public class DataBackup
 {
     public const string FormatName = "mensal-backup";
-    public const int CurrentVersion = 1;
+    // 2: an entry can have several categories (CategoryEntries), instead of the CategoryId of version 1 entries.
+    public const int CurrentVersion = 2;
 
     public string Format { get; set; } = string.Empty;
     public int Version { get; set; }
@@ -27,6 +28,7 @@ public class DataBackup
     public List<FinancialCategory> Categories { get; set; } = [];
     public List<PaymentSource> PaymentSources { get; set; } = [];
     public List<FinancialEntry> Entries { get; set; } = [];
+    public List<FinancialCategoryEntry> CategoryEntries { get; set; } = [];
     public List<FinancialMonthlyEntry> MonthlyEntries { get; set; } = [];
     public List<FinancialPayment> Payments { get; set; } = [];
 }

@@ -700,7 +700,7 @@ public class MainViewModelTests
         Description: "Test",
         EffectiveAmount: 100m,
         EntryType: FinancialEntryType.Outcome,
-        Category: null,
+        Categories: ValueList<FinancialCategory>.Empty,
         Status: FinancialMonthlyEntryStatus.Pending,
         IsProjected: true,
         InstallmentLabel: null,

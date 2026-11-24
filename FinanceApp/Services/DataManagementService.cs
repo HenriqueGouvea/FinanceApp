@@ -69,6 +69,7 @@ public class DataManagementService : IDataManagementService
             Categories = await db.Table<FinancialCategory>().ToListAsync(),
             PaymentSources = await db.Table<PaymentSource>().ToListAsync(),
             Entries = await db.Table<FinancialEntry>().ToListAsync(),
+            CategoryEntries = await db.Table<FinancialCategoryEntry>().ToListAsync(),
             MonthlyEntries = await db.Table<FinancialMonthlyEntry>().ToListAsync(),
             Payments = await db.Table<FinancialPayment>().ToListAsync()
         };
@@ -109,6 +110,7 @@ public class DataManagementService : IDataManagementService
             foreach (var row in backup.Categories) conn.InsertOrReplace(row);
             foreach (var row in backup.PaymentSources) conn.InsertOrReplace(row);
             foreach (var row in backup.Entries) conn.InsertOrReplace(row);
+            foreach (var row in backup.CategoryEntries) conn.InsertOrReplace(row);
             foreach (var row in backup.MonthlyEntries) conn.InsertOrReplace(row);
             foreach (var row in backup.Payments) conn.InsertOrReplace(row);
         });
@@ -142,6 +144,7 @@ public class DataManagementService : IDataManagementService
     {
         conn.DeleteAll<FinancialPayment>();
         conn.DeleteAll<FinancialMonthlyEntry>();
+        conn.DeleteAll<FinancialCategoryEntry>();
         conn.DeleteAll<FinancialEntry>();
         conn.DeleteAll<PaymentSource>();
         conn.DeleteAll<FinancialCategory>();
@@ -150,21 +153,49 @@ public class DataManagementService : IDataManagementService
     private static async Task<DataBackup> ReadBackupAsync(Stream stream)
     {
         DataBackup? backup;
+        JsonDocument document;
         try
         {
-            backup = await JsonSerializer.DeserializeAsync(stream, BackupJsonContext.Readable.DataBackup);
+            document = await JsonDocument.ParseAsync(stream);
+            backup = document.Deserialize(BackupJsonContext.Readable.DataBackup);
         }
         catch (JsonException ex)
         {
             throw new InvalidBackupException("The file isn't valid JSON.", ex);
         }
 
-        if (backup is null || backup.Format != DataBackup.FormatName || backup.Version < 1)
-            throw new InvalidBackupException("The file isn't a Mensal backup.");
-        if (backup.Version > DataBackup.CurrentVersion)
-            throw new InvalidBackupException($"The backup's version {backup.Version} is newer than this app's.") { IsFromNewerVersion = true };
+        using (document)
+        {
+            if (backup is null || backup.Format != DataBackup.FormatName || backup.Version < 1)
+                throw new InvalidBackupException("The file isn't a Mensal backup.");
+            if (backup.Version > DataBackup.CurrentVersion)
+                throw new InvalidBackupException($"The backup's version {backup.Version} is newer than this app's.") { IsFromNewerVersion = true };
+
+            if (backup.Version < 2)
+                backup.CategoryEntries = ReadVersion1CategoryLinks(document.RootElement, backup.Categories);
+        }
 
         return backup;
+    }
+
+    // Version 1 entries had a single "categoryId", which isn't on FinancialEntry anymore: it becomes their main category.
+    private static List<FinancialCategoryEntry> ReadVersion1CategoryLinks(JsonElement root, List<FinancialCategory> categories)
+    {
+        var categoryIds = categories.Select(c => c.Id).ToHashSet();
+        if (!root.TryGetProperty("entries", out var entries) || entries.ValueKind != JsonValueKind.Array)
+            return [];
+
+        var links = new List<FinancialCategoryEntry>();
+        foreach (var entry in entries.EnumerateArray())
+        {
+            if (entry.ValueKind == JsonValueKind.Object
+                && entry.TryGetProperty("id", out var id) && id.TryGetInt32(out var entryId)
+                && entry.TryGetProperty("categoryId", out var category) && category.ValueKind == JsonValueKind.Number
+                && category.TryGetInt32(out var categoryId) && categoryIds.Contains(categoryId))
+                links.Add(new FinancialCategoryEntry { Id = links.Count + 1, FinancialEntryId = entryId, FinancialCategoryId = categoryId });
+        }
+
+        return links;
     }
 
     private static byte[]? DecodePhoto(DataBackup backup)
@@ -186,9 +217,13 @@ public class DataManagementService : IDataManagementService
     private static string BuildEntriesCsv(DataBackup backup)
     {
         var categories = backup.Categories.ToDictionary(c => c.Id, c => c.Name);
+        var categoriesByEntry = backup.CategoryEntries
+            .OrderBy(l => l.Position).ThenBy(l => l.Id)
+            .Where(l => categories.ContainsKey(l.FinancialCategoryId))
+            .ToLookup(l => l.FinancialEntryId, l => categories[l.FinancialCategoryId]);
         var sources = backup.PaymentSources.ToDictionary(s => s.Id, s => s.Name);
         var csv = new StringBuilder();
-        csv.AppendLine("Tipo;Descrição;Valor;Recorrência;Início;Fim;Parcelas;Vencimento;Categoria;Conta ou cartão;Valor estimado;Pagamento parcial");
+        csv.AppendLine("Tipo;Descrição;Valor;Recorrência;Início;Fim;Parcelas;Vencimento;Categorias;Conta ou cartão;Valor estimado;Pagamento parcial");
 
         foreach (var entry in backup.Entries.OrderBy(e => e.EntryType).ThenBy(e => e.StartDate).ThenBy(e => e.Description))
         {
@@ -202,7 +237,7 @@ public class DataManagementService : IDataManagementService
                 entry.EndDate?.ToString("MM/yyyy", PtBr) ?? string.Empty,
                 entry.TotalInstallments?.ToString(PtBr) ?? string.Empty,
                 entry.DueDay?.ToString(PtBr) ?? string.Empty,
-                Text(entry.CategoryId is { } categoryId ? categories.GetValueOrDefault(categoryId) : null),
+                Text(string.Join(", ", categoriesByEntry[entry.Id])),
                 Text(entry.PaymentSourceId is { } sourceId ? sources.GetValueOrDefault(sourceId) : null),
                 entry.IsEstimated ? "Sim" : "Não",
                 entry.AllowsPartialPayment ? "Sim" : "Não"

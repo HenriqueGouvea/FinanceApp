@@ -8,7 +8,23 @@ public interface IFinanceService
 
     Task<FinancialEntry?> GetEntryByIdAsync(int id);
 
-    Task SaveEntryAsync(FinancialEntry entry);
+    /// <summary>
+    /// The ids of the entry's categories in the order they were picked: the first is the main one.
+    /// </summary>
+    Task<IReadOnlyList<int>> GetEntryCategoryIdsAsync(int entryId);
+
+    /// <summary>
+    /// Saves the entry and, when <paramref name="categoryIds"/> is given, replaces its categories with them, in their
+    /// order (the first is the main one, an empty list leaves it uncategorized). Null keeps the categories it has.
+    /// </summary>
+    Task SaveEntryAsync(FinancialEntry entry, IReadOnlyList<int>? categoryIds = null);
+
+    /// <summary>
+    /// The month's incomes and outcomes added up by category (uncategorized ones under a null category), incomes
+    /// first and the largest first, plus the month's totals. An entry with several categories counts in each one, so
+    /// the categories can add up to more than the month's total.
+    /// </summary>
+    Task<CategoryReport> GetCategoryReportAsync(int year, int month);
 
     Task SaveMonthlyEntryAsync(FinancialMonthlyEntry entry);
 

@@ -107,6 +107,10 @@ public sealed class AppSession : IDisposable
         MobileBy.AndroidUIAutomator(
             $"new UiSelector().resourceId(\"{E2ESettings.AppPackage}:id/{automationId}\").text(\"{text}\")");
 
+    public static By AutomationIdWithTextEnding(string automationId, string textEnd) =>
+        MobileBy.AndroidUIAutomator(
+            $"new UiSelector().resourceId(\"{E2ESettings.AppPackage}:id/{automationId}\").textMatches(\"(?s).*{Regex.Escape(textEnd)}$\")");
+
     public static By Text(string text) =>
         MobileBy.AndroidUIAutomator($"new UiSelector().text(\"{text}\")");
 
@@ -188,11 +192,21 @@ public sealed class AppSession : IDisposable
     /// Scrolls until the element is on screen and returns it, or null without waiting when it doesn't exist.
     /// The keyboard is hidden first: a scroll swipe over it would glide-type into the focused entry.
     /// </summary>
-    public IWebElement? TryScrollTo(string automationId)
+    public IWebElement? TryScrollTo(string automationId) =>
+        TryScrollIntoView($"new UiSelector().resourceId(\"{E2ESettings.AppPackage}:id/{automationId}\")");
+
+    /// <summary>
+    /// Like <see cref="TryScrollTo(string)"/>, for one of several elements sharing an AutomationId (e.g. a chip in a
+    /// wrapping list), picked by how its text ends.
+    /// </summary>
+    public IWebElement? TryScrollToTextEnding(string automationId, string textEnd) =>
+        TryScrollIntoView(
+            $"new UiSelector().resourceId(\"{E2ESettings.AppPackage}:id/{automationId}\").textMatches(\"(?s).*{Regex.Escape(textEnd)}$\")");
+
+    private IWebElement? TryScrollIntoView(string selector)
     {
         HideKeyboardIfShown();
 
-        var selector = $"new UiSelector().resourceId(\"{E2ESettings.AppPackage}:id/{automationId}\")";
         return Driver.FindElements(MobileBy.AndroidUIAutomator(
                 $"new UiScrollable(new UiSelector().scrollable(true).packageName(\"{E2ESettings.AppPackage}\")).scrollIntoView({selector})"))
             .FirstOrDefault(e => e.Displayed);

@@ -196,7 +196,7 @@ public class PartialPaymentViewModelTests
             Description: "Supermarket",
             EffectiveAmount: effectiveAmount,
             EntryType: type,
-            Category: null,
+            Categories: ValueList<FinancialCategory>.Empty,
             Status: paidAmount > 0 ? FinancialMonthlyEntryStatus.PartiallyPaid : FinancialMonthlyEntryStatus.Pending,
             IsProjected: paidAmount == 0,
             InstallmentLabel: null,
