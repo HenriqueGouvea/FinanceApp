@@ -130,6 +130,118 @@ public class ReportsViewModelTests
         _vm.NextMonthCommand.CanExecute(null).Should().BeTrue();
     }
 
+    [Fact]
+    public async Task SelectRow_Category_ListsItsEntriesWithTheirStatus()
+    {
+        GivenNovemberReport(new CategoryTotal(FinancialEntryType.Outcome, Children, 1300m, 3)
+        {
+            Entries =
+            [
+                Entry("Escola", 1000m, FinancialMonthlyEntryStatus.Paid),
+                Entry("Material", 200m, FinancialMonthlyEntryStatus.PartiallyPaid, paidAmount: 50m),
+                Entry("Notebook", 100m, FinancialMonthlyEntryStatus.Pending, installment: "3/10")
+            ]
+        });
+        await _vm.LoadCommand.ExecuteAsync(null);
+
+        _vm.SelectRowCommand.Execute(_vm.Rows[0]);
+
+        _vm.HasSelectedRow.Should().BeTrue();
+        _vm.ShowsSelectHint.Should().BeFalse();
+        _vm.SelectedRow!.Entries.Select(e => (e.Description, e.Amount, e.StatusLabel)).Should().Equal(
+            ("Escola", 1000m, "Pago"),
+            ("Material", 200m, "Pago R$ 50,00"),
+            ("Notebook 3/10", 100m, "Pendente"));
+    }
+
+    [Fact]
+    public async Task SelectRow_IncomeCategory_SaysReceivedOrToReceive()
+    {
+        GivenNovemberReport(new CategoryTotal(FinancialEntryType.Income, Salary, 6000m, 2)
+        {
+            Entries =
+            [
+                Entry("Salário", 5000m, FinancialMonthlyEntryStatus.Paid, FinancialEntryType.Income),
+                Entry("Freela", 1000m, FinancialMonthlyEntryStatus.Pending, FinancialEntryType.Income)
+            ]
+        });
+        await _vm.LoadCommand.ExecuteAsync(null);
+        _vm.SelectIncomesCommand.Execute(null);
+
+        _vm.SelectRowCommand.Execute(_vm.Rows[0]);
+
+        _vm.SelectedRow!.Entries.Select(e => e.StatusLabel).Should().Equal("Recebido", "A receber");
+    }
+
+    [Fact]
+    public async Task SelectRow_SameRowAgain_HidesItsEntries()
+    {
+        GivenNovemberReport(new CategoryTotal(FinancialEntryType.Outcome, Health, 80m, 1));
+        await _vm.LoadCommand.ExecuteAsync(null);
+        _vm.SelectRowCommand.Execute(_vm.Rows[0]);
+
+        _vm.SelectRowCommand.Execute(_vm.Rows[0]);
+
+        _vm.HasSelectedRow.Should().BeFalse();
+        _vm.ShowsSelectHint.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Load_AgainWithACategoryOpen_KeepsItOpen()
+    {
+        GivenNovemberReport(
+            new CategoryTotal(FinancialEntryType.Outcome, Children, 300m, 1),
+            new CategoryTotal(FinancialEntryType.Outcome, null, 100m, 1));
+        await _vm.LoadCommand.ExecuteAsync(null);
+        _vm.SelectRowCommand.Execute(_vm.Rows[1]);
+
+        await _vm.LoadCommand.ExecuteAsync(null);
+
+        _vm.SelectedRow.Should().BeSameAs(_vm.Rows[1]);
+        _vm.SelectedRow!.Name.Should().Be(ReportsViewModel.UncategorizedName);
+    }
+
+    [Fact]
+    public async Task NextMonth_CategoryNotInIt_ClosesTheEntries()
+    {
+        GivenNovemberReport(new CategoryTotal(FinancialEntryType.Outcome, Health, 80m, 1));
+        await _vm.LoadCommand.ExecuteAsync(null);
+        _vm.SelectRowCommand.Execute(_vm.Rows[0]);
+
+        await _vm.NextMonthCommand.ExecuteAsync(null);
+
+        _vm.HasSelectedRow.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SelectIncomes_WithACategoryOpen_ClosesIt()
+    {
+        GivenNovemberReport(new CategoryTotal(FinancialEntryType.Outcome, null, 80m, 1), new CategoryTotal(FinancialEntryType.Income, null, 100m, 1));
+        await _vm.LoadCommand.ExecuteAsync(null);
+        _vm.SelectRowCommand.Execute(_vm.Rows[0]);
+
+        _vm.SelectIncomesCommand.Execute(null);
+
+        _vm.HasSelectedRow.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CloseSelectedRow_HidesTheEntries()
+    {
+        GivenNovemberReport(new CategoryTotal(FinancialEntryType.Outcome, Health, 80m, 1));
+        await _vm.LoadCommand.ExecuteAsync(null);
+        _vm.SelectRowCommand.Execute(_vm.Rows[0]);
+
+        _vm.CloseSelectedRowCommand.Execute(null);
+
+        _vm.HasSelectedRow.Should().BeFalse();
+    }
+
+    private static MonthlyEntryProjection Entry(
+        string description, decimal amount, FinancialMonthlyEntryStatus status,
+        FinancialEntryType type = FinancialEntryType.Outcome, decimal paidAmount = 0, string? installment = null) =>
+        new(1, null, description, amount, type, ValueList<FinancialCategory>.Empty, status, IsProjected: true, installment, null, paidAmount);
+
     private void GivenNovemberReport(params CategoryTotal[] totals)
     {
         var incomes = totals.Where(t => t.EntryType == FinancialEntryType.Income).Sum(t => t.Amount);

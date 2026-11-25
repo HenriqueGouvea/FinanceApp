@@ -65,6 +65,13 @@ public sealed class SeedData
     }
 
     /// <summary>
+    /// Marks the entry as created by the setup wizard's <paramref name="row"/> (e.g. "salary", "expense:Aluguel"), so
+    /// running the wizard again shows it.
+    /// </summary>
+    public void LinkToSetupRow(int entryId, string row) =>
+        _db.Execute("INSERT INTO SetupLink (Row, \"Group\", GroupName, FinancialEntryId) VALUES (?, '', '', ?)", row, entryId);
+
+    /// <summary>
     /// Records a partial payment dated today on the entry's current month, as "Pagar parcial" does.
     /// </summary>
     public void AddPayment(int entryId, decimal amount, string description = "")

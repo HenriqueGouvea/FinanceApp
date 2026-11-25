@@ -20,6 +20,7 @@ public class SetupViewModelTests
     private readonly IMediaPicker _mediaPicker;
     private readonly IMessenger _messenger = new WeakReferenceMessenger();
     private readonly TimeProvider _timeProvider = Substitute.For<TimeProvider>();
+    private readonly IAlertService _alertService = Substitute.For<IAlertService>();
     private readonly SetupViewModel _vm;
 
     public SetupViewModelTests()
@@ -34,7 +35,7 @@ public class SetupViewModelTests
         _timeProvider.GetUtcNow().Returns(new DateTimeOffset(2026, 4, 15, 12, 0, 0, TimeSpan.Zero));
         _timeProvider.LocalTimeZone.Returns(TimeZoneInfo.Utc);
         _vm = new SetupViewModel(_setupService, _paymentSourceService, _profileService, _mediaPicker, _messenger,
-            new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance), _timeProvider);
+            new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance), _timeProvider, _alertService);
     }
 
     // --- PrepareAsync ---
@@ -1686,6 +1687,183 @@ public class SetupViewModelTests
         _vm.ToggleExpenseCommand.Execute(expense);
         expense.Amount = amount;
         expense.DueDay = dueDay;
+    }
+
+    // --- Running the wizard again ---
+
+    private static readonly PaymentSource Itau = new() { Id = 1, Name = "Itaú", Type = PaymentSourceType.BankAccount };
+    private static readonly PaymentSource Nubank = new() { Id = 2, Name = "Nubank", Type = PaymentSourceType.CreditCard, BillPaymentSourceId = 1, BillDueDay = 10 };
+
+    private void GivenPreviousSetup(params PreviousSetupEntry[] entries)
+    {
+        _paymentSourceService.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<PaymentSource>>([Itau, Nubank]));
+        _setupService.GetPreviousSetupAsync().Returns(Task.FromResult<IReadOnlyList<PreviousSetupEntry>>(entries));
+    }
+
+    private static PreviousSetupEntry Previous(
+        int id, string row, string description, decimal amount, RecurrenceType recurrence = RecurrenceType.Recurrent,
+        DateTime? start = null, int? totalInstallments = null, int? dueDay = null, int? sourceId = 1,
+        FinancialEntryType type = FinancialEntryType.Outcome, string group = "", string groupName = "") =>
+        new(new SetupLink { Row = row, Group = group, GroupName = groupName, FinancialEntryId = id },
+            new FinancialEntry
+            {
+                Id = id, Description = description, Amount = amount, Recurrence = recurrence, EntryType = type,
+                StartDate = start ?? new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Local),
+                TotalInstallments = totalInstallments, DueDay = dueDay, PaymentSourceId = sourceId
+            });
+
+    [Fact]
+    public async Task PrepareAsync_FirstRun_DoesNotLookForAPreviousSetup()
+    {
+        await _vm.PrepareAsync(isRerun: false);
+
+        await _setupService.DidNotReceive().GetPreviousSetupAsync();
+    }
+
+    [Fact]
+    public async Task PrepareAsync_Rerun_ListsTheExistingAccountsAndCards()
+    {
+        GivenPreviousSetup();
+
+        await _vm.PrepareAsync(isRerun: true);
+
+        _vm.ExistingSources.Select(s => s.Name).Should().Equal("Itaú");
+        _vm.ExistingCards.Select(c => (c.Card.Name, c.Detail)).Should().Equal(("Nubank", "Vence dia 10 · Débito em Itaú"));
+        _vm.NewSources.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PrepareAsync_Rerun_FillsInWhatTheWizardCreatedBefore()
+    {
+        GivenPreviousSetup(
+            Previous(1, SetupRows.Salary, "Salário", 5000, dueDay: 5, type: FinancialEntryType.Income),
+            Previous(2, SetupRows.Advance, "Adiantamento salarial", 2000, dueDay: 20, type: FinancialEntryType.Income),
+            Previous(3, SetupRows.Purchase, "Celular", 300, RecurrenceType.Installments, new DateTime(2026, 2, 1), totalInstallments: 10, sourceId: 2),
+            Previous(4, SetupRows.Expense("Aluguel"), "Aluguel do apê", 1500, dueDay: 10),
+            Previous(5, SetupRows.Activity, "Inglês", 400),
+            Previous(6, SetupRows.Activity, "Natação", 200),
+            Previous(7, SetupRows.HomeFinancing, "Financiamento (Casa)", 2000, RecurrenceType.Installments, new DateTime(2025, 9, 1), 120, group: "h", groupName: "Casa"),
+            Previous(8, SetupRows.HomeIptu, "IPTU (Casa)", 300, RecurrenceType.Annual, new DateTime(2026, 2, 1), 10, group: "h", groupName: "Casa"),
+            Previous(9, SetupRows.CarLicensing, "Licenciamento (Carro)", 150, RecurrenceType.Annual, new DateTime(2026, 7, 1), group: "c", groupName: "Carro"),
+            Previous(10, SetupRows.Expense(SetupViewModel.CarInsuranceDescription), "Seguro do carro", 2400, RecurrenceType.Annual, new DateTime(2026, 3, 1)));
+
+        await _vm.PrepareAsync(isRerun: true);
+
+        using (new FluentAssertions.Execution.AssertionScope())
+        {
+            (_vm.Salary, _vm.SalaryDay, _vm.IsSalarySplit, _vm.Advance, _vm.AdvanceDay, _vm.SalarySource).Should().Be((5000m, 5, true, 2000m, 20, Itau));
+            _vm.Purchases.Select(p => p.Detail).Should().Equal("Parcela 3 de 10 · Nubank");
+            var rent = _vm.Expenses.Single(e => e.Description == "Aluguel");
+            (rent.IsSelected, rent.Amount, rent.DueDay, rent.PaymentSource).Should().Be((true, 1500m, 10, Itau));
+            _vm.HasChildren.Should().BeTrue();
+            _vm.SchoolExpenses.Where(e => e.IsSelected).Select(e => (e.EntryDescription, e.Amount)).Should().Equal(("Inglês", 400m), ("Natação", 200m));
+            _vm.HasOwnHome.Should().BeTrue();
+            _vm.Homes.Select(h => h.Detail).Should().Equal("Financiamento 8/120 · IPTU todo ano, fevereiro a novembro (10x) · Itaú");
+            _vm.HasCar.Should().BeTrue();
+            _vm.Cars.Select(c => c.Detail).Should().Equal("Licenciamento todo ano em julho · Itaú");
+            var insurance = _vm.CarExpenses.Single(e => e.OffersYearlyPayment);
+            (insurance.IsSelected, insurance.YearlyInstallments, insurance.YearlyStartMonth).Should().Be((true, 1, 3));
+        }
+    }
+
+    [Fact]
+    public async Task Finish_RerunUnchanged_UpdatesTheSameEntriesAndRemovesNothing()
+    {
+        NewUserSetup? saved = null;
+        await _setupService.CompleteAsync(Arg.Do<NewUserSetup>(s => saved = s));
+        GivenPreviousSetup(
+            Previous(1, SetupRows.Salary, "Salário", 5000, dueDay: 5, type: FinancialEntryType.Income),
+            Previous(4, SetupRows.Expense("Aluguel"), "Aluguel do apê", 1500, dueDay: 10),
+            Previous(7, SetupRows.HomeIptu, "IPTU (Casa)", 300, RecurrenceType.Annual, new DateTime(2026, 2, 1), group: "h", groupName: "Casa"));
+        await _vm.PrepareAsync(isRerun: true);
+        await GoToSummaryAsync();
+
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        saved!.Entries.Select(e => (e.Row, e.ExistingEntryId, e.Group, e.GroupName)).Should().Equal(
+            (SetupRows.Salary, 1, "", ""),
+            (SetupRows.Expense("Aluguel"), 4, "", ""),
+            (SetupRows.HomeIptu, 7, "h", "Casa"));
+        saved.EntriesToRemove.Should().BeEmpty();
+        _vm.SummaryRows.Select(r => r.Description).Should().Contain("Aluguel do apê");
+        await _alertService.DidNotReceiveWithAnyArgs().ChooseAsync(default!, default!, default!);
+    }
+
+    [Theory]
+    [InlineData(SetupViewModel.RemoveFromThisMonthOption, EntryDeleteScope.ThisAndFuture)]
+    [InlineData(SetupViewModel.RemoveFromAllMonthsOption, EntryDeleteScope.All)]
+    public async Task Finish_RerunWithAnExpenseUnticked_AsksAndRemovesIt(string choice, EntryDeleteScope expectedScope)
+    {
+        NewUserSetup? saved = null;
+        await _setupService.CompleteAsync(Arg.Do<NewUserSetup>(s => saved = s));
+        _alertService.ChooseAsync(default!, default!, default!).ReturnsForAnyArgs(choice);
+        GivenPreviousSetup(Previous(4, SetupRows.Expense("Aluguel"), "Aluguel do apê", 1500));
+        await _vm.PrepareAsync(isRerun: true);
+        _vm.ToggleExpenseCommand.Execute(_vm.Expenses.Single(e => e.Description == "Aluguel"));
+        await GoToSummaryAsync();
+
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        _vm.RemovedEntriesText.Should().Be("\"Aluguel do apê\"");
+        (saved!.EntriesToRemove, saved.RemoveScope).Should().BeEquivalentTo((new List<int> { 4 }, expectedScope));
+    }
+
+    [Fact]
+    public async Task Finish_RerunRemovalCancelled_SavesNothing()
+    {
+        _alertService.ChooseAsync(default!, default!, default!).ReturnsForAnyArgs((string?)null);
+        GivenPreviousSetup(Previous(4, SetupRows.Expense("Aluguel"), "Aluguel", 1500));
+        await _vm.PrepareAsync(isRerun: true);
+        _vm.ToggleExpenseCommand.Execute(_vm.Expenses.Single(e => e.Description == "Aluguel"));
+        await GoToSummaryAsync();
+
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        await _setupService.DidNotReceiveWithAnyArgs().CompleteAsync(default!);
+    }
+
+    [Fact]
+    public async Task SkipStep_Rerun_KeepsWhatTheWizardCreatedBefore()
+    {
+        NewUserSetup? saved = null;
+        await _setupService.CompleteAsync(Arg.Do<NewUserSetup>(s => saved = s));
+        GivenPreviousSetup(Previous(4, SetupRows.Expense("Aluguel"), "Aluguel", 1500));
+        await _vm.PrepareAsync(isRerun: true);
+        await GoToStepAsync(SetupStep.HouseExpenses);
+        _vm.ToggleExpenseCommand.Execute(_vm.Expenses.Single(e => e.Description == "Aluguel"));
+
+        _vm.SkipStepCommand.Execute(null);
+        await GoToSummaryAsync();
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        saved!.Entries.Single().ExistingEntryId.Should().Be(4);
+        saved.EntriesToRemove.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Finish_RerunHomeTakenOut_RemovesBothOfItsEntries()
+    {
+        NewUserSetup? saved = null;
+        await _setupService.CompleteAsync(Arg.Do<NewUserSetup>(s => saved = s));
+        _alertService.ChooseAsync(default!, default!, default!).ReturnsForAnyArgs(SetupViewModel.RemoveFromThisMonthOption);
+        GivenPreviousSetup(
+            Previous(7, SetupRows.HomeFinancing, "Financiamento (Casa)", 2000, group: "h", groupName: "Casa"),
+            Previous(8, SetupRows.HomeIptu, "IPTU (Casa)", 300, RecurrenceType.Annual, new DateTime(2026, 2, 1), group: "h", groupName: "Casa"));
+        await _vm.PrepareAsync(isRerun: true);
+
+        _vm.RemoveHomeCommand.Execute(_vm.Homes.Single());
+        await GoToSummaryAsync();
+        await _vm.NextCommand.ExecuteAsync(null);
+
+        saved!.EntriesToRemove.Should().BeEquivalentTo([7, 8]);
+        _vm.RemovedEntriesText.Should().Be("\"Financiamento (Casa)\" e \"IPTU (Casa)\"");
+    }
+
+    [Fact]
+    public void JoinNames_JoinsTheLastWithE()
+    {
+        SetupViewModel.JoinNames(["a", "b", "c"]).Should().Be("a, b e c");
+        SetupViewModel.JoinNames(["a"]).Should().Be("a");
     }
 
     private async Task GoToStepAsync(SetupStep step)

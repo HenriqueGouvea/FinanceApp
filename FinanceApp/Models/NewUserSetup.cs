@@ -20,6 +20,16 @@ public class NewUserSetup
     public List<SetupCreditCard> CreditCards { get; set; } = [];
 
     public List<SetupEntry> Entries { get; set; } = [];
+
+    /// <summary>
+    /// Entries the wizard created before whose rows were unticked or taken out when it ran again.
+    /// </summary>
+    public List<int> EntriesToRemove { get; set; } = [];
+
+    /// <summary>
+    /// How <see cref="EntriesToRemove"/> go: from the current month on (the past months keep them) or from every month.
+    /// </summary>
+    public EntryDeleteScope RemoveScope { get; set; } = EntryDeleteScope.ThisAndFuture;
 }
 
 /// <summary>
@@ -78,4 +88,20 @@ public class SetupEntry
     /// <see cref="NewUserSetup.CreditCards"/>.
     /// </summary>
     public PaymentSource? PaymentSource { get; set; }
+
+    /// <summary>
+    /// The wizard row the entry comes from (see <see cref="SetupRows"/>), kept so the wizard can show it again.
+    /// </summary>
+    public string Row { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The home or car the entry belongs to (<see cref="SetupLink.Group"/>) and its name; empty for the other rows.
+    /// </summary>
+    public string Group { get; set; } = string.Empty;
+    public string GroupName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The entry this row created when the wizard ran before, updated instead of adding another; null for a new row.
+    /// </summary>
+    public int? ExistingEntryId { get; set; }
 }

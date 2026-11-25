@@ -238,6 +238,19 @@ public sealed class AppSession : IDisposable
     }
 
     /// <summary>
+    /// Taps a point of the element given as fractions of its width and height, for drawn content with no elements of
+    /// its own (e.g. a slice of the report's pie chart).
+    /// </summary>
+    public void TapInside(IWebElement element, double xFraction, double yFraction)
+    {
+        Driver.ExecuteScript("mobile: clickGesture", new Dictionary<string, object>
+        {
+            ["x"] = element.Location.X + (int)(element.Size.Width * xFraction),
+            ["y"] = element.Location.Y + (int)(element.Size.Height * yFraction)
+        });
+    }
+
+    /// <summary>
     /// Taps just inside the element's left edge, where a text field would put the cursor before its first character.
     /// </summary>
     public void TapNearStart(IWebElement element)

@@ -71,11 +71,47 @@ public class SetupService : ISetupService
             foreach (var item in setup.Entries.Where(e => e.Amount > 0))
             {
                 var entry = BuildEntry(item, startDate);
-                conn.Insert(entry);
+                var stored = item.ExistingEntryId is { } id ? conn.Find<FinancialEntry>(id) : null;
+                if (stored is not null && KeepsSchedule(stored, entry))
+                {
+                    Update(conn, stored, entry, item, now);
+                    conn.Table<SetupLink>().Delete(l => l.FinancialEntryId == stored.Id);
+                    entry = stored;
+                }
+                else if (stored is not null)
+                {
+                    // A new schedule (monthly to yearly, other months, other installments) would move the entry's past
+                    // months, so the old entry ends last month, keeping what was paid, and a new one starts.
+                    var categoryIds = conn.Table<FinancialCategoryEntry>().Where(l => l.FinancialEntryId == stored.Id)
+                        .ToList().OrderBy(l => l.Position).Select(l => l.FinancialCategoryId).ToList();
+                    if (item.Row is not (SetupRows.Purchase or SetupRows.Activity))
+                        entry.Description = stored.Description;
+                    FinanceService.DeleteEntry(conn, stored.Id, now.Year, now.Month, EntryDeleteScope.ThisAndFuture);
+                    conn.Table<SetupLink>().Delete(l => l.FinancialEntryId == stored.Id);
+                    conn.Insert(entry);
+                    FinanceService.SetCategories(conn, entry.Id, categoryIds);
 
-                var category = categories.FirstOrDefault(c => c.EntryType == item.EntryType && c.Name == item.CategoryName);
-                if (category is not null)
-                    FinanceService.SetCategories(conn, entry.Id, [category.Id]);
+                    // Installments counted from the past (e.g. the 50th of 120 this month) would repeat the months the
+                    // old entry already had, so the new one starts showing from this month in those.
+                    var oldStart = new DateTime(stored.StartDate.Year, stored.StartDate.Month, 1, 0, 0, 0, DateTimeKind.Local);
+                    for (var past = entry.StartDate < oldStart ? oldStart : entry.StartDate; past < startDate; past = past.AddMonths(1))
+                        conn.Insert(new FinancialMonthlyEntry { FinancialEntryId = entry.Id, Year = past.Year, Month = past.Month, IsCancelled = true });
+                }
+                else
+                {
+                    conn.Insert(entry);
+                    var category = categories.FirstOrDefault(c => c.EntryType == item.EntryType && c.Name == item.CategoryName);
+                    if (category is not null)
+                        FinanceService.SetCategories(conn, entry.Id, [category.Id]);
+                }
+
+                conn.Insert(new SetupLink { Row = item.Row, Group = item.Group, GroupName = item.GroupName, FinancialEntryId = entry.Id });
+            }
+
+            foreach (var entryId in setup.EntriesToRemove)
+            {
+                FinanceService.DeleteEntry(conn, entryId, now.Year, now.Month, setup.RemoveScope);
+                conn.Table<SetupLink>().Delete(l => l.FinancialEntryId == entryId);
             }
         });
         _paymentSourceService.ClearCache();
@@ -83,6 +119,78 @@ public class SetupService : ISetupService
         await _profileService.SaveAsync(setup.Name, setup.PhotoPath);
         Skip();
     }
+
+    public async Task<IReadOnlyList<PreviousSetupEntry>> GetPreviousSetupAsync()
+    {
+        var db = await _context.GetConnectionAsync();
+        var links = await db.Table<SetupLink>().ToListAsync();
+        if (links.Count == 0)
+            return [];
+
+        var entries = (await db.Table<FinancialEntry>().ToListAsync()).ToDictionary(e => e.Id);
+        var now = _timeProvider.GetLocalNow();
+        var currentMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Local);
+
+        return
+        [
+            .. links
+                .OrderBy(l => l.Id)
+                .Where(l => entries.ContainsKey(l.FinancialEntryId))
+                .Select(l => new PreviousSetupEntry(l, entries[l.FinancialEntryId]))
+                .Where(p => IsStillRunning(p.Entry, currentMonth))
+        ];
+    }
+
+    /// <summary>
+    /// An entry still to come this month or later: not ended, nor a purchase whose last installment already passed.
+    /// Those that ended are history, so the wizard leaves them out (and never removes them).
+    /// </summary>
+    private static bool IsStillRunning(FinancialEntry entry, DateTime currentMonth)
+    {
+        if (entry.EndDate is { } end && end < currentMonth)
+            return false;
+
+        var start = new DateTime(entry.StartDate.Year, entry.StartDate.Month, 1, 0, 0, 0, DateTimeKind.Local);
+        return entry.Recurrence switch
+        {
+            RecurrenceType.OneTime => start >= currentMonth,
+            RecurrenceType.Installments => start.AddMonths(Math.Max(entry.TotalInstallments ?? 1, 1) - 1) >= currentMonth,
+            _ => true
+        };
+    }
+
+    /// <summary>
+    /// Updates an entry the wizard created before with what the row holds now. A new amount applies from the current
+    /// month on, so the past months keep theirs, and the entry keeps its start (and so its past months) while its
+    /// schedule is the same. The entry keeps its name, which the user may have changed, unless the wizard row is
+    /// where it is typed (a purchase or an activity), and its categories.
+    /// </summary>
+    private static void Update(SQLite.SQLiteConnection conn, FinancialEntry stored, FinancialEntry entry, SetupEntry item, DateTimeOffset now)
+    {
+        var amountChanged = stored.Amount != entry.Amount;
+        if (item.Row is SetupRows.Purchase or SetupRows.Activity)
+            stored.Description = entry.Description;
+        stored.Amount = entry.Amount;
+        stored.DueDay = entry.DueDay;
+        stored.IsEstimated = entry.IsEstimated;
+        stored.AllowsPartialPayment = entry.AllowsPartialPayment;
+        stored.PaymentSourceId = entry.PaymentSourceId;
+
+        if (amountChanged)
+            FinanceService.SaveEntry(conn, stored, null, now.Year, now.Month, AmountChangeScope.ThisAndFuture);
+        else
+            conn.Update(stored);
+    }
+
+    // A recurrent or one-time entry has nothing to recompute; an annual one keeps its start while it falls in the
+    // same months, and an installments one while its current installment and total are the same.
+    private static bool KeepsSchedule(FinancialEntry stored, FinancialEntry entry) =>
+        stored.Recurrence == entry.Recurrence && entry.Recurrence switch
+        {
+            RecurrenceType.OneTime or RecurrenceType.Recurrent => true,
+            RecurrenceType.Annual => stored.StartDate.Month == entry.StartDate.Month && stored.TotalInstallments == entry.TotalInstallments,
+            _ => stored.StartDate == entry.StartDate && stored.TotalInstallments == entry.TotalInstallments
+        };
 
     private static FinancialEntry BuildEntry(SetupEntry item, DateTime startDate)
     {

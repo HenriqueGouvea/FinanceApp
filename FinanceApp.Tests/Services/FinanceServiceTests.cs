@@ -1285,6 +1285,18 @@ public class FinanceServiceTests
     }
 
     [Fact]
+    public async Task DeleteEntryAsync_All_ForgetsTheSetupWizardRowThatCreatedIt()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        var db = await _context.GetConnectionAsync();
+        await db.InsertAsync(new SetupLink { Row = SetupRows.Expense("Aluguel"), FinancialEntryId = entry.Id });
+
+        await _service.DeleteEntryAsync(entry.Id, 2026, 8, EntryDeleteScope.All);
+
+        (await db.Table<SetupLink>().CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
     public async Task DeleteEntryAsync_All_RemovesTemplateAndMonthlyRecords()
     {
         var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
@@ -2014,6 +2026,27 @@ public class FinanceServiceTests
             ("Filhos", 400m, 2),
             ("Saúde", 100m, 1));
         report.TotalOutcomes.Should().Be(400m);
+    }
+
+    [Fact]
+    public async Task GetCategoryReportAsync_EntryWithSeveralCategories_IsListedUnderEachLargestFirst()
+    {
+        var (health, children, _) = await SaveThreeCategoriesAsync();
+        var pharmacy = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        pharmacy.Description = "Pharmacy";
+        await _service.SaveEntryAsync(pharmacy, [health.Id, children.Id]);
+        var school = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        school.Description = "School";
+        school.Amount = 300m;
+        await _service.SaveEntryAsync(school, [children.Id]);
+        await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        var report = await _service.GetCategoryReportAsync(2026, 4);
+
+        report.Totals.Select(t => (t.Category?.Name, string.Join(", ", t.Entries.Select(e => e.Description)))).Should().Equal(
+            ("Filhos", "School, Pharmacy"),
+            ("Saúde", "Pharmacy"),
+            (null, "Gym"));
     }
 
     [Fact]

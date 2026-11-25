@@ -46,6 +46,9 @@ public abstract class E2ETestBase
     protected Task<List<FinancialPaymentRow>> GetPaymentRowsAsync() =>
         Session.Database.QueryAsync<FinancialPaymentRow>("SELECT * FROM FinancialPayment ORDER BY Id");
 
+    protected Task<List<SetupLinkRow>> GetSetupLinkRowsAsync() =>
+        Session.Database.QueryAsync<SetupLinkRow>("SELECT * FROM SetupLink");
+
     protected Task<List<FinancialCategoryRow>> GetCategoryRowsAsync() =>
         Session.Database.QueryAsync<FinancialCategoryRow>("SELECT * FROM FinancialCategory");
 

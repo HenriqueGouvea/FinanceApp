@@ -117,6 +117,27 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task RefreshAllAsync_WhileALoadStartedBeforeItRuns_ShowsTheDataReadAfterTheChange()
+    {
+        // The neighbours of the first load are still being fetched (with the data before the change) when a save
+        // refreshes every month.
+        var staleFetch = new TaskCompletionSource<IEnumerable<MonthlyEntryProjection>>();
+        _service.GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>()).Returns(staleFetch.Task);
+        var initializing = _vm.InitializeAsync();
+        var month = _vm.SelectedMonth!;
+        _service.GetMergedEntriesForMonthAsync(Arg.Any<int>(), Arg.Any<int>())
+            .Returns(Task.FromResult<IEnumerable<MonthlyEntryProjection>>([MakeProjection(2)]));
+
+        var refreshing = _vm.RefreshAllAsync();
+        staleFetch.SetResult([MakeProjection(1)]);
+        await refreshing;
+        await initializing;
+
+        month.Entries.Select(e => e.FinancialEntryId).Should().Equal(2);
+        _vm.IsSelectedMonthLoading.Should().BeFalse();
+    }
+
+    [Fact]
     public void IsSelectedMonthLoading_BeforeInitialization_IsFalse()
     {
         _vm.IsSelectedMonthLoading.Should().BeFalse();

@@ -33,8 +33,95 @@ public class CategoryChart : GraphicsView
 
     public CategoryChart()
     {
-        InputTransparent = true;
         Drawable = new ChartDrawable(this);
+        var tap = new TapGestureRecognizer();
+        tap.Tapped += OnTapped;
+        GestureRecognizers.Add(tap);
+    }
+
+    /// <summary>
+    /// Runs with the row of the slice or column tapped.
+    /// </summary>
+    public System.Windows.Input.ICommand? SelectCommand
+    {
+        get => (System.Windows.Input.ICommand?)GetValue(SelectCommandProperty);
+        set => SetValue(SelectCommandProperty, value);
+    }
+
+    public static readonly BindableProperty SelectCommandProperty = BindableProperty.Create(
+        nameof(SelectCommand), typeof(System.Windows.Input.ICommand), typeof(CategoryChart));
+
+    private void OnTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.GetPosition(this) is not { } position)
+            return;
+
+        var rows = Rows;
+        var amounts = rows.Select(r => r.Amount).ToList();
+        var rect = new RectF(0, 0, (float)Width, (float)Height);
+        var point = new PointF((float)position.X, (float)position.Y);
+        var index = IsPie ? GetSliceAt(amounts, rect, point) : GetColumnAt(rows.Count, rect, point);
+
+        if (index >= 0 && SelectCommand?.CanExecute(rows[index]) == true)
+            SelectCommand.Execute(rows[index]);
+    }
+
+    /// <summary>
+    /// The index of the slice under the point, or -1 outside the pie (its hole included).
+    /// </summary>
+    public static int GetSliceAt(IReadOnlyList<decimal> amounts, RectF rect, PointF point)
+    {
+        var radius = Math.Min(rect.Width, rect.Height) / 2;
+        var dx = point.X - rect.Center.X;
+        var dy = point.Y - rect.Center.Y;
+        var distance = Math.Sqrt(dx * dx + dy * dy);
+        if (distance > radius || distance < radius * DonutHole)
+            return -1;
+
+        // Degrees clockwise from 12 o'clock, like the slices.
+        var angle = (float)(Math.Atan2(dx, -dy) * 180 / Math.PI);
+        if (angle < 0)
+            angle += 360;
+
+        var slices = GetSlices(amounts);
+        for (var i = 0; i < slices.Count; i++)
+        {
+            var (start, sweep) = slices[i];
+            if (sweep > 0 && angle >= start && angle < start + sweep)
+                return i;
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// The index of the column whose width holds the point (at any height, so a short column is easy to tap), or -1
+    /// between or beside the columns.
+    /// </summary>
+    public static int GetColumnAt(int count, RectF rect, PointF point)
+    {
+        if (count == 0)
+            return -1;
+
+        var (x, width) = GetColumnLayout(rect, count);
+        for (var i = 0; i < count; i++)
+        {
+            if (point.X >= x && point.X <= x + width)
+                return i;
+            x += width + ColumnGap;
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// Where the first column starts and how wide each one is: up to 48, centered in the chart.
+    /// </summary>
+    private static (float X, float Width) GetColumnLayout(RectF rect, int count)
+    {
+        var width = Math.Min(48, (rect.Width - ColumnGap * (count - 1)) / count);
+        var used = width * count + ColumnGap * (count - 1);
+        return (rect.X + (rect.Width - used) / 2, width);
     }
 
     /// <summary>
@@ -122,9 +209,7 @@ public class CategoryChart : GraphicsView
         private static void DrawColumns(ICanvas canvas, RectF rect, IReadOnlyList<CategoryReportRow> rows, IReadOnlyList<decimal> amounts)
         {
             var heights = GetColumnHeights(amounts);
-            var width = Math.Min(48, (rect.Width - ColumnGap * (rows.Count - 1)) / rows.Count);
-            var used = width * rows.Count + ColumnGap * (rows.Count - 1);
-            var x = rect.X + (rect.Width - used) / 2;
+            var (x, width) = GetColumnLayout(rect, rows.Count);
 
             canvas.StrokeColor = Color.FromArgb("#D7C9E6");
             canvas.StrokeSize = 1;

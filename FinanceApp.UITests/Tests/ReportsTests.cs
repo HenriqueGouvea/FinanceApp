@@ -62,6 +62,21 @@ public sealed class ReportsTests : E2ETestBase
     }
 
     [Fact]
+    public void TapCategory_InTheChartOrTheTable_ListsItsEntries()
+    {
+        var reports = MainPage.OpenReports().ShowPie();
+
+        // "Educação" is 89% of the pie, from 12 o'clock to past 10: the bottom of the donut is in it.
+        reports.TapChartAt(0.5, 0.9, "Educação");
+        reports.CategoryEntries.Should().Equal(
+            ("Escola", AppFormat.Money(1000m), AppLabels.Pending),
+            ("Farmácia", AppFormat.Money(80m), AppLabels.Pending));
+
+        reports.ShowTable().TapRow(AppLabels.Uncategorized);
+        reports.CategoryEntries.Should().Equal(("Cinema", AppFormat.Money(50m), AppLabels.Pending));
+    }
+
+    [Fact]
     public void GoToNextMonth_ShowsThatMonthsEntries()
     {
         var reports = MainPage.OpenReports().GoToNextMonth();

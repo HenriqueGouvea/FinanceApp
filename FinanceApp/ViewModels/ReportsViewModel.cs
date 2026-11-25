@@ -42,6 +42,7 @@ public partial class ReportsViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsEmpty))]
     [NotifyPropertyChangedFor(nameof(HasRows))]
     [NotifyPropertyChangedFor(nameof(IsChart))]
+    [NotifyPropertyChangedFor(nameof(ShowsSelectHint))]
     IReadOnlyList<CategoryReportRow> rows = [];
 
     [ObservableProperty]
@@ -49,6 +50,14 @@ public partial class ReportsViewModel : ObservableObject
 
     [ObservableProperty]
     bool categoriesExceedTotal;
+
+    /// <summary>
+    /// The category tapped in the table, the chart or its legend, whose entries are listed under the report; null when none.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedRow))]
+    [NotifyPropertyChangedFor(nameof(ShowsSelectHint))]
+    CategoryReportRow? selectedRow;
 
     public ReportsViewModel(IFinanceService financeService, TimeProvider timeProvider)
     {
@@ -76,7 +85,14 @@ public partial class ReportsViewModel : ObservableObject
     public string TotalLabel => IsOutcome ? "Despesas do mês" : "Receitas do mês";
     public string EmptyLabel => IsOutcome ? "Nenhuma despesa neste mês." : "Nenhuma receita neste mês.";
 
-    partial void OnEntryTypeChanged(FinancialEntryType value) => BuildRows();
+    public bool HasSelectedRow => SelectedRow is not null;
+    public bool ShowsSelectHint => HasRows && !HasSelectedRow;
+
+    partial void OnEntryTypeChanged(FinancialEntryType value)
+    {
+        SelectedRow = null;
+        BuildRows();
+    }
 
     [RelayCommand]
     async Task Load() => await LoadMonthAsync(Month);
@@ -109,6 +125,15 @@ public partial class ReportsViewModel : ObservableObject
     [RelayCommand]
     void SelectView(ReportView value) => View = value;
 
+    /// <summary>
+    /// Lists the tapped category's entries; tapping it again hides them.
+    /// </summary>
+    [RelayCommand]
+    void SelectRow(CategoryReportRow? row) => SelectedRow = row is null || ReferenceEquals(row, SelectedRow) ? null : row;
+
+    [RelayCommand]
+    void CloseSelectedRow() => SelectedRow = null;
+
     private async Task LoadMonthAsync(DateTime target)
     {
         Month = target;
@@ -137,8 +162,15 @@ public partial class ReportsViewModel : ObservableObject
                 t.Category?.Color ?? UncategorizedColor,
                 t.Amount,
                 sum > 0 ? (double)(t.Amount / sum) : 0,
-                t.EntryCount))
+                t.EntryCount)
+            {
+                CategoryId = t.Category?.Id,
+                Entries = [.. t.Entries.Select(CategoryReportEntry.From)]
+            })
         ];
+        // After a reload (another month, or back from "Início"), the same category stays open if it is still there.
+        var selectedId = SelectedRow?.CategoryId;
+        SelectedRow = SelectedRow is null ? null : Rows.FirstOrDefault(r => r.CategoryId == selectedId);
         MonthTotal = _report.MonthTotalOf(EntryType);
         CategoriesExceedTotal = sum > MonthTotal;
     }
