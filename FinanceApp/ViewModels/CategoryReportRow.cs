@@ -11,6 +11,16 @@ namespace FinanceApp.ViewModels;
 /// <param name="EntryCount">How many of the month's entries are in the category.</param>
 public record CategoryReportRow(string Name, string Icon, string Color, decimal Amount, double Share, int EntryCount)
 {
+    /// <summary>
+    /// The category's id, or null for "Sem categoria": keeps the row selected when the month reloads.
+    /// </summary>
+    public int? CategoryId { get; init; }
+
+    /// <summary>
+    /// The month's entries of the category, shown when the row (or its slice or column) is tapped.
+    /// </summary>
+    public IReadOnlyList<CategoryReportEntry> Entries { get; init; } = [];
+
     public string ShareLabel => Share.ToString("P0", Culture);
     public string EntryCountLabel => EntryCount == 1 ? "1 lançamento" : $"{EntryCount} lançamentos";
 

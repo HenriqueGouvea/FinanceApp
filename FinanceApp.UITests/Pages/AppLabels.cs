@@ -64,6 +64,9 @@ public static class AppLabels
     public const string SetupActivityDescription = "Cursos e atividades";
     public static string SetupPurchaseHint(string purchase) => $"Você já incluiu \"{purchase}\" nas compras do cartão.";
     public static string SetupSkippedSteps(string steps) => $"Etapas puladas: {steps}";
+    public static string SetupRemovedEntries(string entries) => $"Serão removidos: {entries}";
+    public const string SetupRemoveFromThisMonth = "Deste mês em diante";
+    public const string SetupRemoveFromAllMonths = "De todos os meses";
     public const string EstimatedValue = "valor estimado";
     public const string PartialPaymentValue = "pagamento parcial";
 
@@ -93,6 +96,10 @@ public static class AppLabels
     public const string MarkPaid = "Pagar";
     public const string MarkReceived = "Receber";
     public const string MarkPending = "Pendente";
+    /// <summary>
+    /// An unpaid outcome in the report's list of a category's entries.
+    /// </summary>
+    public const string Pending = "Pendente";
 
     public const string PaidAmountOutcome = "Valor já pago neste mês";
 

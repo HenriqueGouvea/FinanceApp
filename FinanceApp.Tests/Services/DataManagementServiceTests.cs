@@ -37,6 +37,7 @@ public sealed class DataManagementServiceTests : IDisposable
         (await db.Table<FinancialPayment>().CountAsync()).Should().Be(0);
         (await db.Table<PaymentSource>().CountAsync()).Should().Be(0);
         (await db.Table<FinancialCategoryEntry>().CountAsync()).Should().Be(0);
+        (await db.Table<SetupLink>().CountAsync()).Should().Be(0);
         (await db.Table<FinancialCategory>().ToListAsync()).Select(c => c.Name)
             .Should().Equal(DatabaseContext.CreateDefaultCategories().Select(c => c.Name));
     }
@@ -158,6 +159,7 @@ public sealed class DataManagementServiceTests : IDisposable
         (await target.Table<FinancialCategoryEntry>().ToListAsync()).Should().BeEquivalentTo(await source.Table<FinancialCategoryEntry>().ToListAsync());
         (await target.Table<FinancialMonthlyEntry>().ToListAsync()).Should().BeEquivalentTo(await source.Table<FinancialMonthlyEntry>().ToListAsync());
         (await target.Table<FinancialPayment>().ToListAsync()).Should().BeEquivalentTo(await source.Table<FinancialPayment>().ToListAsync());
+        (await target.Table<SetupLink>().ToListAsync()).Should().NotBeEmpty().And.BeEquivalentTo(await source.Table<SetupLink>().ToListAsync());
     }
 
     [Fact]
@@ -362,6 +364,7 @@ public sealed class DataManagementServiceTests : IDisposable
             };
             await db.InsertAsync(month);
             await db.InsertAsync(new FinancialPayment { FinancialMonthlyEntryId = month.Id, Amount = 200, Date = Now, Description = "Feira" });
+            await db.InsertAsync(new SetupLink { Row = SetupRows.Salary, FinancialEntryId = salary.Id });
 
             await Profile.SaveAsync("Ana", TempFileSystem.CreateExternalFile(".jpg", "photo"));
             await AppLock.SetPinAsync("4321");

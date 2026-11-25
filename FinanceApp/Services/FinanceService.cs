@@ -140,62 +140,68 @@ public class FinanceService : IFinanceService
         });
 
     public Task SaveEntryAsync(FinancialEntry entry, IReadOnlyList<int>? categoryIds, int year, int month, AmountChangeScope scope) =>
-        InTransactionAsync(conn =>
+        InTransactionAsync(conn => SaveEntry(conn, entry, categoryIds, year, month, scope));
+
+    /// <summary>
+    /// Saves an existing entry whose amount changed from <paramref name="year"/>/<paramref name="month"/> for the
+    /// months in <paramref name="scope"/>, inside the caller's transaction.
+    /// </summary>
+    public static void SaveEntry(SQLiteConnection conn, FinancialEntry entry, IReadOnlyList<int>? categoryIds, int year, int month, AmountChangeScope scope)
+    {
+        var stored = conn.Table<FinancialEntry>().Where(e => e.Id == entry.Id).FirstOrDefault()
+            ?? throw new InvalidOperationException($"Entry {entry.Id} not found.");
+
+        var targetDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Local);
+        var firstOfStart = new DateTime(stored.StartDate.Year, stored.StartDate.Month, 1, 0, 0, 0, DateTimeKind.Local);
+
+        // A single month is every month of a one-time entry, and from its first month on is all of them.
+        if (stored.Recurrence == RecurrenceType.OneTime ||
+            (scope == AmountChangeScope.ThisAndFuture && targetDate <= firstOfStart))
+            scope = AmountChangeScope.All;
+
+        var records = conn.Table<FinancialMonthlyEntry>().Where(r => r.FinancialEntryId == entry.Id).ToList();
+        var newAmount = entry.Amount;
+
+        switch (scope)
         {
-            var stored = conn.Table<FinancialEntry>().Where(e => e.Id == entry.Id).FirstOrDefault()
-                ?? throw new InvalidOperationException($"Entry {entry.Id} not found.");
+            case AmountChangeScope.ThisMonth:
+                var record = records.FirstOrDefault(r => r.Year == year && r.Month == month)
+                    ?? new FinancialMonthlyEntry { FinancialEntryId = entry.Id, Year = year, Month = month };
+                record.OverrideAmount = newAmount == stored.Amount ? null : newAmount;
+                Upsert(conn, record);
+                entry.Amount = stored.Amount;
+                break;
 
-            var targetDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Local);
-            var firstOfStart = new DateTime(stored.StartDate.Year, stored.StartDate.Month, 1, 0, 0, 0, DateTimeKind.Local);
+            case AmountChangeScope.ThisAndFuture:
+                // Earlier months keep the amount they had: the stored one, unless they had their own.
+                var recordLookup = records.ToDictionary(r => (r.Year, r.Month));
+                for (var past = firstOfStart; past < targetDate; past = past.AddMonths(1))
+                {
+                    if (!IsActiveForMonth(stored, past))
+                        continue;
 
-            // A single month is every month of a one-time entry, and from its first month on is all of them.
-            if (stored.Recurrence == RecurrenceType.OneTime ||
-                (scope == AmountChangeScope.ThisAndFuture && targetDate <= firstOfStart))
-                scope = AmountChangeScope.All;
+                    var pastRecord = recordLookup.GetValueOrDefault((past.Year, past.Month))
+                        ?? new FinancialMonthlyEntry { FinancialEntryId = entry.Id, Year = past.Year, Month = past.Month };
+                    if (pastRecord.OverrideAmount is not null)
+                        continue;
 
-            var records = conn.Table<FinancialMonthlyEntry>().Where(r => r.FinancialEntryId == entry.Id).ToList();
-            var newAmount = entry.Amount;
+                    pastRecord.OverrideAmount = stored.Amount;
+                    Upsert(conn, pastRecord);
+                }
 
-            switch (scope)
-            {
-                case AmountChangeScope.ThisMonth:
-                    var record = records.FirstOrDefault(r => r.Year == year && r.Month == month)
-                        ?? new FinancialMonthlyEntry { FinancialEntryId = entry.Id, Year = year, Month = month };
-                    record.OverrideAmount = newAmount == stored.Amount ? null : newAmount;
-                    Upsert(conn, record);
-                    entry.Amount = stored.Amount;
-                    break;
+                ClearOverrides(conn, records.Where(r => r.Year * 12 + r.Month >= year * 12 + month));
+                break;
 
-                case AmountChangeScope.ThisAndFuture:
-                    // Earlier months keep the amount they had: the stored one, unless they had their own.
-                    var recordLookup = records.ToDictionary(r => (r.Year, r.Month));
-                    for (var past = firstOfStart; past < targetDate; past = past.AddMonths(1))
-                    {
-                        if (!IsActiveForMonth(stored, past))
-                            continue;
+            case AmountChangeScope.All:
+                ClearOverrides(conn, records);
+                break;
+        }
 
-                        var pastRecord = recordLookup.GetValueOrDefault((past.Year, past.Month))
-                            ?? new FinancialMonthlyEntry { FinancialEntryId = entry.Id, Year = past.Year, Month = past.Month };
-                        if (pastRecord.OverrideAmount is not null)
-                            continue;
+        conn.Update(entry);
 
-                        pastRecord.OverrideAmount = stored.Amount;
-                        Upsert(conn, pastRecord);
-                    }
-
-                    ClearOverrides(conn, records.Where(r => r.Year * 12 + r.Month >= year * 12 + month));
-                    break;
-
-                case AmountChangeScope.All:
-                    ClearOverrides(conn, records);
-                    break;
-            }
-
-            conn.Update(entry);
-
-            if (categoryIds is not null)
-                SetCategories(conn, entry.Id, categoryIds);
-        });
+        if (categoryIds is not null)
+            SetCategories(conn, entry.Id, categoryIds);
+    }
 
     private static void ClearOverrides(SQLiteConnection conn, IEnumerable<FinancialMonthlyEntry> records)
     {
@@ -228,10 +234,18 @@ public class FinanceService : IFinanceService
         [
             .. entries
                 .SelectMany(e => e.HasCategory
-                    ? e.Categories.Select(c => (e.EntryType, Category: (FinancialCategory?)c, e.EffectiveAmount))
-                    : [(e.EntryType, Category: null, e.EffectiveAmount)])
+                    ? e.Categories.Select(c => (e.EntryType, Category: (FinancialCategory?)c, Entry: e))
+                    : [(e.EntryType, Category: null, Entry: e)])
                 .GroupBy(t => (t.EntryType, t.Category))
-                .Select(g => new CategoryTotal(g.Key.EntryType, g.Key.Category, g.Sum(t => t.EffectiveAmount), g.Count()))
+                .Select(g => new CategoryTotal(g.Key.EntryType, g.Key.Category, g.Sum(t => t.Entry.EffectiveAmount), g.Count())
+                {
+                    Entries =
+                    [
+                        .. g.Select(t => t.Entry)
+                            .OrderByDescending(e => e.EffectiveAmount)
+                            .ThenBy(e => e.Description, StringComparer.CurrentCultureIgnoreCase)
+                    ]
+                })
                 .OrderBy(t => t.EntryType)
                 .ThenByDescending(t => t.Amount)
                 // Uncategorized last among equal amounts, then by name, so the order is stable.
@@ -464,49 +478,56 @@ public class FinanceService : IFinanceService
         record.PaidAmount ?? (record.Status == FinancialMonthlyEntryStatus.Paid ? plannedAmount : 0);
 
     public Task DeleteEntryAsync(int entryId, int year, int month, EntryDeleteScope scope) =>
-        InTransactionAsync(conn =>
+        InTransactionAsync(conn => DeleteEntry(conn, entryId, year, month, scope));
+
+    /// <summary>
+    /// Deletes the entry from <paramref name="year"/>/<paramref name="month"/> for the months in <paramref name="scope"/>,
+    /// inside the caller's transaction.
+    /// </summary>
+    public static void DeleteEntry(SQLiteConnection conn, int entryId, int year, int month, EntryDeleteScope scope)
+    {
+        var template = conn.Table<FinancialEntry>().Where(e => e.Id == entryId).FirstOrDefault();
+        if (template is null)
+            return;
+
+        var targetDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Local);
+        var firstOfStart = new DateTime(template.StartDate.Year, template.StartDate.Month, 1, 0, 0, 0, DateTimeKind.Local);
+
+        if (template.Recurrence == RecurrenceType.OneTime ||
+            (scope == EntryDeleteScope.ThisAndFuture && targetDate <= firstOfStart))
+            scope = EntryDeleteScope.All;
+
+        var monthlyRecords = conn.Table<FinancialMonthlyEntry>()
+            .Where(r => r.FinancialEntryId == entryId)
+            .ToList();
+
+        switch (scope)
         {
-            var template = conn.Table<FinancialEntry>().Where(e => e.Id == entryId).FirstOrDefault();
-            if (template is null)
-                return;
+            case EntryDeleteScope.ThisMonth:
+                var record = monthlyRecords.FirstOrDefault(r => r.Year == year && r.Month == month)
+                    ?? new FinancialMonthlyEntry { FinancialEntryId = entryId, Year = year, Month = month };
+                record.IsCancelled = true;
+                Upsert(conn, record);
+                break;
 
-            var targetDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Local);
-            var firstOfStart = new DateTime(template.StartDate.Year, template.StartDate.Month, 1, 0, 0, 0, DateTimeKind.Local);
+            case EntryDeleteScope.ThisAndFuture:
+                template.EndDate = targetDate.AddMonths(-1);
+                conn.Update(template);
 
-            if (template.Recurrence == RecurrenceType.OneTime ||
-                (scope == EntryDeleteScope.ThisAndFuture && targetDate <= firstOfStart))
-                scope = EntryDeleteScope.All;
+                foreach (var r in monthlyRecords.Where(r => r.Year * 12 + r.Month >= year * 12 + month))
+                    DeleteMonthlyRecord(conn, r);
+                break;
 
-            var monthlyRecords = conn.Table<FinancialMonthlyEntry>()
-                .Where(r => r.FinancialEntryId == entryId)
-                .ToList();
+            case EntryDeleteScope.All:
+                foreach (var r in monthlyRecords)
+                    DeleteMonthlyRecord(conn, r);
 
-            switch (scope)
-            {
-                case EntryDeleteScope.ThisMonth:
-                    var record = monthlyRecords.FirstOrDefault(r => r.Year == year && r.Month == month)
-                        ?? new FinancialMonthlyEntry { FinancialEntryId = entryId, Year = year, Month = month };
-                    record.IsCancelled = true;
-                    Upsert(conn, record);
-                    break;
-
-                case EntryDeleteScope.ThisAndFuture:
-                    template.EndDate = targetDate.AddMonths(-1);
-                    conn.Update(template);
-
-                    foreach (var r in monthlyRecords.Where(r => r.Year * 12 + r.Month >= year * 12 + month))
-                        DeleteMonthlyRecord(conn, r);
-                    break;
-
-                case EntryDeleteScope.All:
-                    foreach (var r in monthlyRecords)
-                        DeleteMonthlyRecord(conn, r);
-
-                    conn.Table<FinancialCategoryEntry>().Delete(l => l.FinancialEntryId == entryId);
-                    conn.Delete(template);
-                    break;
-            }
-        });
+                conn.Table<FinancialCategoryEntry>().Delete(l => l.FinancialEntryId == entryId);
+                conn.Table<SetupLink>().Delete(l => l.FinancialEntryId == entryId);
+                conn.Delete(template);
+                break;
+        }
+    }
 
     public Task ClearAllDataAsync() =>
         InTransactionAsync(conn =>
@@ -515,6 +536,7 @@ public class FinanceService : IFinanceService
             conn.DeleteAll<FinancialEntry>();
             conn.DeleteAll<FinancialMonthlyEntry>();
             conn.DeleteAll<FinancialPayment>();
+            conn.DeleteAll<SetupLink>();
         });
 
     // Writes touching more than one row run in a transaction, so an app killed halfway leaves no half-made change.

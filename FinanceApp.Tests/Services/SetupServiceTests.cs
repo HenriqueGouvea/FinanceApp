@@ -391,6 +391,270 @@ public sealed class SetupServiceTests : IDisposable
         (await _service.ShouldShowAsync()).Should().BeTrue();
     }
 
+    // --- Running the wizard again ---
+
+    [Fact]
+    public async Task CompleteAsync_Entries_AreLinkedToTheirWizardRows()
+    {
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            Entries =
+            [
+                new SetupEntry { Description = "Salário", Amount = 5000, EntryType = FinancialEntryType.Income, Row = SetupRows.Salary },
+                new SetupEntry { Description = "Financiamento (Casa)", Amount = 2000, Row = SetupRows.HomeFinancing, Group = "g1", GroupName = "Casa" }
+            ]
+        });
+
+        var previous = await _service.GetPreviousSetupAsync();
+
+        previous.Select(p => (p.Link.Row, p.Link.Group, p.Link.GroupName, p.Entry.Description)).Should().Equal(
+            (SetupRows.Salary, "", "", "Salário"),
+            (SetupRows.HomeFinancing, "g1", "Casa", "Financiamento (Casa)"));
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ExistingEntryWithANewAmount_UpdatesItFromThisMonthOnAndKeepsItsName()
+    {
+        var rent = await SeedLinkedEntryAsync(new FinancialEntry
+        {
+            Description = "Aluguel do apê", Amount = 1500, StartDate = new DateTime(2026, 9, 1), Recurrence = RecurrenceType.Recurrent
+        }, SetupRows.Expense("Aluguel"));
+
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            Entries = [new SetupEntry { Description = "Aluguel", Amount = 1600, DueDay = 10, Row = SetupRows.Expense("Aluguel"), ExistingEntryId = rent.Id }]
+        });
+
+        var entry = (await GetEntriesAsync()).Should().ContainSingle().Subject;
+        (entry.Description, entry.Amount, entry.DueDay, entry.StartDate).Should().Be(("Aluguel do apê", 1600m, (int?)10, new DateTime(2026, 9, 1)));
+        (await _financeService.GetMergedEntriesForMonthAsync(2026, 10)).Single().EffectiveAmount.Should().Be(1500m);
+        (await _financeService.GetMergedEntriesForMonthAsync(2026, 11)).Single().EffectiveAmount.Should().Be(1600m);
+        (await _service.GetPreviousSetupAsync()).Should().ContainSingle(p => p.Entry.Id == rent.Id);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ExistingEntry_KeepsItsCategories()
+    {
+        await _categoryService.SaveAsync(new FinancialCategory { Name = "Moradia", EntryType = FinancialEntryType.Outcome });
+        await _categoryService.SaveAsync(new FinancialCategory { Name = "Lazer", EntryType = FinancialEntryType.Outcome });
+        var rent = await SeedLinkedEntryAsync(new FinancialEntry
+        {
+            Description = "Aluguel", Amount = 1500, StartDate = new DateTime(2026, 9, 1), Recurrence = RecurrenceType.Recurrent
+        }, SetupRows.Expense("Aluguel"));
+        var leisure = (await _categoryService.GetAllAsync()).First(c => c.Name == "Lazer");
+        await _financeService.SaveEntryAsync(rent, [leisure.Id]);
+
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            Entries = [new SetupEntry { Description = "Aluguel", Amount = 1500, CategoryName = "Moradia", ExistingEntryId = rent.Id }]
+        });
+
+        (await _financeService.GetEntryCategoryIdsAsync(rent.Id)).Should().Equal(leisure.Id);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_PurchaseRenamedInTheWizard_TakesTheNewName()
+    {
+        var purchase = await SeedLinkedEntryAsync(new FinancialEntry
+        {
+            Description = "Celular", Amount = 300, StartDate = new DateTime(2026, 9, 1), Recurrence = RecurrenceType.Installments, TotalInstallments = 10
+        }, SetupRows.Purchase);
+
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            Entries =
+            [
+                new SetupEntry
+                {
+                    Description = "iPhone", Amount = 300, Recurrence = RecurrenceType.Installments, TotalInstallments = 10, CurrentInstallment = 3,
+                    Row = SetupRows.Purchase, ExistingEntryId = purchase.Id
+                }
+            ]
+        });
+
+        var entry = (await GetEntriesAsync()).Single();
+        (entry.Description, entry.StartDate).Should().Be(("iPhone", new DateTime(2026, 9, 1)));
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ExistingAnnualEntryInTheSameMonths_KeepsItsStart()
+    {
+        var ipva = await SeedLinkedEntryAsync(new FinancialEntry
+        {
+            Description = "IPVA (Carro)", Amount = 1000, StartDate = new DateTime(2026, 1, 1), Recurrence = RecurrenceType.Annual, TotalInstallments = 3
+        }, SetupRows.CarIpva);
+
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            Entries = [AnnualIpva(startMonth: 1, ipva.Id)]
+        });
+
+        (await GetEntriesAsync()).Single().StartDate.Should().Be(new DateTime(2026, 1, 1));
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ExistingAnnualEntryMovedToOtherMonths_EndsItAndStartsANewOneKeepingThePast()
+    {
+        var ipva = await SeedLinkedEntryAsync(new FinancialEntry
+        {
+            Description = "IPVA (Carro)", Amount = 1000, StartDate = new DateTime(2026, 1, 1), Recurrence = RecurrenceType.Annual, TotalInstallments = 3
+        }, SetupRows.CarIpva);
+        await _financeService.SetEntryStatusAsync(ipva.Id, 2026, 2, FinancialMonthlyEntryStatus.Paid);
+
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            Entries = [AnnualIpva(startMonth: 3, ipva.Id)]
+        });
+
+        var entries = await GetEntriesAsync();
+        entries.Select(e => (e.Id == ipva.Id, e.StartDate, e.EndDate)).Should().BeEquivalentTo(
+        [
+            (true, new DateTime(2026, 1, 1), (DateTime?)new DateTime(2026, 10, 1)),
+            (false, new DateTime(2027, 3, 1), (DateTime?)null)
+        ]);
+        (await _financeService.GetMergedEntriesForMonthAsync(2026, 2)).Single().IsPaid.Should().BeTrue("the paid installment stays");
+        (await _service.GetPreviousSetupAsync()).Single().Entry.StartDate.Should().Be(new DateTime(2027, 3, 1));
+    }
+
+    [Fact]
+    public async Task CompleteAsync_MonthlyInsuranceNowYearly_KeepsThePastMonthsOfTheMonthlyOne()
+    {
+        var categories = await SaveCategoryAsync("Transporte");
+        var insurance = await SeedLinkedEntryAsync(new FinancialEntry
+        {
+            Description = "Seguro do carro", Amount = 200, StartDate = new DateTime(2026, 1, 1), Recurrence = RecurrenceType.Recurrent
+        }, SetupRows.Expense("Seguro do carro"));
+        await _financeService.SaveEntryAsync(insurance, [categories]);
+
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            Entries =
+            [
+                new SetupEntry
+                {
+                    Description = "Seguro do carro", Amount = 2400, Recurrence = RecurrenceType.Annual, AnnualStartMonth = 3, TotalInstallments = 1,
+                    Row = SetupRows.Expense("Seguro do carro"), ExistingEntryId = insurance.Id
+                }
+            ]
+        });
+
+        (await _financeService.GetMergedEntriesForMonthAsync(2026, 10)).Single().EffectiveAmount.Should().Be(200m);
+        (await _financeService.GetMergedEntriesForMonthAsync(2026, 11)).Should().BeEmpty();
+        var yearly = (await _financeService.GetMergedEntriesForMonthAsync(2027, 3)).Single();
+        (yearly.EffectiveAmount, yearly.Category!.Id).Should().Be((2400m, categories));
+    }
+
+    [Fact]
+    public async Task CompleteAsync_FinancingGivenInstallmentsFromThePast_DoesNotRepeatTheMonthsItHadAlready()
+    {
+        var financing = await SeedLinkedEntryAsync(new FinancialEntry
+        {
+            Description = "Financiamento (Casa)", Amount = 2000, StartDate = new DateTime(2026, 9, 1), Recurrence = RecurrenceType.Recurrent
+        }, SetupRows.HomeFinancing);
+
+        await _service.CompleteAsync(new NewUserSetup
+        {
+            Entries =
+            [
+                new SetupEntry
+                {
+                    Description = "Financiamento (Casa)", Amount = 2000, Recurrence = RecurrenceType.Installments, TotalInstallments = 120,
+                    CurrentInstallment = 50, Row = SetupRows.HomeFinancing, ExistingEntryId = financing.Id
+                }
+            ]
+        });
+
+        (await _financeService.GetMergedEntriesForMonthAsync(2026, 10)).Select(e => e.InstallmentLabel).Should().Equal((string?)null);
+        (await _financeService.GetMergedEntriesForMonthAsync(2026, 11)).Single().InstallmentLabel.Should().Be("50/120");
+    }
+
+    private async Task<int> SaveCategoryAsync(string name)
+    {
+        var category = new FinancialCategory { Name = name, EntryType = FinancialEntryType.Outcome };
+        await _categoryService.SaveAsync(category);
+        return category.Id;
+    }
+
+    private static SetupEntry AnnualIpva(int startMonth, int existingEntryId) => new()
+    {
+        Description = "IPVA (Carro)", Amount = 1000, Recurrence = RecurrenceType.Annual, AnnualStartMonth = startMonth, TotalInstallments = 3,
+        Row = SetupRows.CarIpva, ExistingEntryId = existingEntryId
+    };
+
+    [Fact]
+    public async Task CompleteAsync_EntryToRemoveFromThisMonth_EndsItLastMonthAndForgetsTheRow()
+    {
+        var rent = await SeedLinkedEntryAsync(new FinancialEntry
+        {
+            Description = "Aluguel", Amount = 1500, StartDate = new DateTime(2026, 9, 1), Recurrence = RecurrenceType.Recurrent
+        }, SetupRows.Expense("Aluguel"));
+
+        await _service.CompleteAsync(new NewUserSetup { EntriesToRemove = [rent.Id], RemoveScope = EntryDeleteScope.ThisAndFuture });
+
+        (await GetEntriesAsync()).Single().EndDate.Should().Be(new DateTime(2026, 10, 1));
+        (await _financeService.GetMergedEntriesForMonthAsync(2026, 10)).Should().ContainSingle();
+        (await _financeService.GetMergedEntriesForMonthAsync(2026, 11)).Should().BeEmpty();
+        (await GetSetupLinksAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CompleteAsync_EntryToRemoveFromAllMonths_DeletesIt()
+    {
+        var rent = await SeedLinkedEntryAsync(new FinancialEntry
+        {
+            Description = "Aluguel", Amount = 1500, StartDate = new DateTime(2026, 9, 1), Recurrence = RecurrenceType.Recurrent
+        }, SetupRows.Expense("Aluguel"));
+
+        await _service.CompleteAsync(new NewUserSetup { EntriesToRemove = [rent.Id], RemoveScope = EntryDeleteScope.All });
+
+        (await GetEntriesAsync()).Should().BeEmpty();
+        (await GetSetupLinksAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetPreviousSetupAsync_EndedOrDeletedEntries_LeavesThemOut()
+    {
+        await SeedLinkedEntryAsync(new FinancialEntry
+        {
+            Description = "Notebook", Amount = 300, StartDate = new DateTime(2026, 1, 1), Recurrence = RecurrenceType.Installments, TotalInstallments = 10
+        }, SetupRows.Purchase);
+        await SeedLinkedEntryAsync(new FinancialEntry
+        {
+            Description = "Tênis", Amount = 300, StartDate = new DateTime(2026, 10, 1), Recurrence = RecurrenceType.OneTime
+        }, SetupRows.Purchase);
+        await SeedLinkedEntryAsync(new FinancialEntry
+        {
+            Description = "Academia", Amount = 100, StartDate = new DateTime(2026, 1, 1), EndDate = new DateTime(2026, 10, 1), Recurrence = RecurrenceType.Recurrent
+        }, SetupRows.Expense("Academia"));
+        var deleted = await SeedLinkedEntryAsync(new FinancialEntry
+        {
+            Description = "Internet", Amount = 100, StartDate = new DateTime(2026, 1, 1), Recurrence = RecurrenceType.Recurrent
+        }, SetupRows.Expense("Internet"));
+        await (await _context.GetConnectionAsync()).DeleteAsync(deleted);
+        await SeedLinkedEntryAsync(new FinancialEntry
+        {
+            Description = "Celular", Amount = 300, StartDate = new DateTime(2026, 3, 1), Recurrence = RecurrenceType.Installments, TotalInstallments = 10
+        }, SetupRows.Purchase);
+
+        var previous = await _service.GetPreviousSetupAsync();
+
+        previous.Select(p => p.Entry.Description).Should().Equal("Celular");
+    }
+
+    private async Task<FinancialEntry> SeedLinkedEntryAsync(FinancialEntry entry, string row)
+    {
+        var db = await _context.GetConnectionAsync();
+        await db.InsertAsync(entry);
+        await db.InsertAsync(new SetupLink { Row = row, FinancialEntryId = entry.Id });
+        return entry;
+    }
+
+    private async Task<List<SetupLink>> GetSetupLinksAsync()
+    {
+        var db = await _context.GetConnectionAsync();
+        return await db.Table<SetupLink>().ToListAsync();
+    }
+
     private async Task<List<FinancialEntry>> GetEntriesAsync()
     {
         var db = await _context.GetConnectionAsync();

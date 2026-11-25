@@ -7,6 +7,8 @@ namespace FinanceApp.ViewModels;
 /// <paramref name="IpvaStartMonth"/>, and the licensing fee ("licenciamento"), paid once a year in
 /// <paramref name="LicensingMonth"/>. Both fall due by the plate's final digit on each state's calendar, so the user
 /// picks the months.
+/// Run again, the wizard shows the cars it created before, tied by <paramref name="Group"/> to their entries
+/// (<paramref name="IpvaEntryId"/>, <paramref name="LicensingEntryId"/>), which saving updates.
 /// </summary>
 public record SetupCarItem(
     string Name,
@@ -15,7 +17,10 @@ public record SetupCarItem(
     int IpvaInstallments,
     decimal Licensing,
     int LicensingMonth,
-    PaymentSource? PaymentSource = null)
+    PaymentSource? PaymentSource = null,
+    string Group = "",
+    int? IpvaEntryId = null,
+    int? LicensingEntryId = null)
 {
     /// <summary>
     /// "IPVA todo ano, janeiro a março (3x) · Licenciamento todo ano em julho · Nubank".

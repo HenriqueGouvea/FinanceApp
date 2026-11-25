@@ -43,6 +43,11 @@ public partial class SetupExpenseItem : ObservableObject
     /// </summary>
     public bool IsRemovable { get; init; }
 
+    /// <summary>
+    /// The entry an earlier run of the wizard created from this row, updated on saving (or removed once unticked).
+    /// </summary>
+    public int? ExistingEntryId { get; set; }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsEstimatedOption), nameof(ShowsPartialPaymentOption), nameof(ShowsPurchaseHint))]
     bool isSelected;

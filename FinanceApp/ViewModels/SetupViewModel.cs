@@ -40,8 +40,22 @@ public partial class SetupViewModel : ObservableObject
     private readonly IMessenger _messenger;
     private readonly IWriteGuard _writeGuard;
     private readonly TimeProvider _timeProvider;
+    private readonly IAlertService _alertService;
     private readonly HashSet<SetupStep> _skippedSteps = [];
     private Func<bool, Task>? _onClosed;
+
+    /// <summary>
+    /// Run again, the entries the wizard created before (still running), which fill its rows in.
+    /// </summary>
+    private IReadOnlyList<PreviousSetupEntry> _previous = [];
+
+    /// <summary>
+    /// The previous entries shown in a row, by id: those no row holds once the wizard finishes are removed.
+    /// </summary>
+    private readonly Dictionary<int, FinancialEntry> _shownPrevious = [];
+
+    private int? _salaryEntryId;
+    private int? _advanceEntryId;
 
     /// <summary>
     /// The first bank account added in this run, which pays every expense until the user picks another for it.
@@ -185,6 +199,13 @@ public partial class SetupViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Balance))]
     decimal totalOutcome;
 
+    /// <summary>
+    /// Run again: the entries created before whose rows were unticked or taken out, removed when the wizard finishes.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRemovedEntries))]
+    string removedEntriesText = string.Empty;
+
     public int StepCount { get; } = Enum.GetValues<SetupStep>().Length;
     public int StepNumber => (int)Step + 1;
     public double Progress => (double)StepNumber / StepCount;
@@ -209,6 +230,16 @@ public partial class SetupViewModel : ObservableObject
     public string Initial => string.IsNullOrWhiteSpace(Name) ? "👤" : Name.Trim()[..1].ToUpperInvariant();
     public string SummaryTitle => string.IsNullOrWhiteSpace(Name) ? "Tudo pronto!" : $"Tudo pronto, {Name.Trim()}!";
     public decimal Balance => TotalIncome - TotalOutcome;
+    public bool HasRemovedEntries => RemovedEntriesText.Length > 0;
+
+    /// <summary>
+    /// Run again, the summary also lists the entries an earlier run created, which saving updates.
+    /// </summary>
+    public string SummaryIntro => _shownPrevious.Count > 0
+        ? "Seus lançamentos ficarão assim a partir deste mês:"
+        : "Estes lançamentos serão criados a partir deste mês:";
+    public bool HasExistingSources => ExistingSources.Count > 0;
+    public bool HasExistingCards => ExistingCards.Count > 0;
     public bool HasNewSources => NewSources.Count > 0;
     public bool HasAvailableSources => AvailableSources.Count > 0;
     public bool HasBillAccounts => BillAccounts.Count > 0;
@@ -225,6 +256,17 @@ public partial class SetupViewModel : ObservableObject
     public string SalaryCaption => IsSalarySplit ? "Pagamento (restante do salário)" : "Salário";
 
     public decimal MonthlySalary => Salary + (IsSalarySplit ? Advance : 0);
+
+    /// <summary>
+    /// Accounts and vouchers that already exist (e.g. from an earlier run), listed so they aren't added twice. They
+    /// are changed in "Contas e cartões".
+    /// </summary>
+    public ObservableCollection<PaymentSource> ExistingSources { get; } = [];
+
+    /// <summary>
+    /// Credit cards that already exist, listed like <see cref="ExistingSources"/>.
+    /// </summary>
+    public ObservableCollection<SetupCreditCardItem> ExistingCards { get; } = [];
 
     /// <summary>
     /// Accounts and vouchers added in this run, created only when the wizard finishes.
@@ -286,8 +328,10 @@ public partial class SetupViewModel : ObservableObject
         IMediaPicker mediaPicker,
         IMessenger messenger,
         IWriteGuard writeGuard,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IAlertService alertService)
     {
+        _alertService = alertService;
         _setupService = setupService;
         _paymentSourceService = paymentSourceService;
         _profileService = profileService;
@@ -295,6 +339,8 @@ public partial class SetupViewModel : ObservableObject
         _messenger = messenger;
         _writeGuard = writeGuard;
         _timeProvider = timeProvider;
+        ExistingSources.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasExistingSources));
+        ExistingCards.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasExistingCards));
         NewSources.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasNewSources));
         NewCards.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasNewCards));
         AvailableSources.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasAvailableSources));
@@ -312,7 +358,9 @@ public partial class SetupViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Starts the wizard from its first step. Run again (<paramref name="isRerun"/>), it shows the current name and photo.
+    /// Starts the wizard from its first step. Run again (<paramref name="isRerun"/>), it shows the current name and
+    /// photo and opens with what it created before (the incomes, card purchases, ticked expenses, homes and cars), so
+    /// saving updates those entries.
     /// </summary>
     public async Task PrepareAsync(bool isRerun)
     {
@@ -323,12 +371,21 @@ public partial class SetupViewModel : ObservableObject
 
         NewSources.Clear();
         NewCards.Clear();
+        ExistingSources.Clear();
+        ExistingCards.Clear();
         AvailableSources.Clear();
         BillAccounts.Clear();
         CreditCards.Clear();
         Purchases.Clear();
-        foreach (var source in await _paymentSourceService.GetAllAsync())
+        var sources = await _paymentSourceService.GetAllAsync();
+        foreach (var source in sources)
+        {
             AddToPickers(source);
+            if (source.Type == PaymentSourceType.CreditCard)
+                ExistingCards.Add(new SetupCreditCardItem(source, sources.FirstOrDefault(s => s.Id == source.BillPaymentSourceId)));
+            else
+                ExistingSources.Add(source);
+        }
         ResetNewSourceForm();
         ResetNewCardForm();
         ResetNewPurchaseForm();
@@ -363,6 +420,208 @@ public partial class SetupViewModel : ObservableObject
         SummaryRows.Clear();
         TotalIncome = 0;
         TotalOutcome = 0;
+        RemovedEntriesText = string.Empty;
+
+        _shownPrevious.Clear();
+        _salaryEntryId = null;
+        _advanceEntryId = null;
+        _previous = isRerun ? await _setupService.GetPreviousSetupAsync() : [];
+        foreach (var step in Enum.GetValues<SetupStep>())
+            ApplyPrevious(step);
+    }
+
+    // --- What an earlier run created ---
+
+    /// <summary>
+    /// Fills the step's rows in with the entries an earlier run created, as they are now (the user may have changed
+    /// their amount, due day or account since).
+    /// </summary>
+    private void ApplyPrevious(SetupStep step)
+    {
+        if (_previous.Count == 0)
+            return;
+
+        switch (step)
+        {
+            case SetupStep.CreditCards:
+                foreach (var entry in PreviousOf(SetupRows.Purchase))
+                    ApplyPreviousPurchase(entry);
+                break;
+            case SetupStep.Income:
+                ApplyPreviousIncome();
+                break;
+            case SetupStep.HouseExpenses:
+                ApplyPreviousExpenses(Expenses);
+                HasOwnHome = ApplyPreviousHomes() || HasOwnHome;
+                break;
+            case SetupStep.OtherExpenses:
+                ApplyPreviousExpenses(HealthExpenses);
+                HasChildren = ApplyPreviousExpenses(SchoolExpenses) | ApplyPreviousActivities() || HasChildren;
+                HasCar = ApplyPreviousExpenses(CarExpenses) | ApplyPreviousCars() || HasCar;
+                ApplyPreviousExpenses(LeisureExpenses);
+                break;
+        }
+    }
+
+    private IEnumerable<FinancialEntry> PreviousOf(string row) => _previous.Where(p => p.Link.Row == row).Select(p => p.Entry);
+
+    private FinancialEntry Show(FinancialEntry entry)
+    {
+        _shownPrevious[entry.Id] = entry;
+        return entry;
+    }
+
+    private PaymentSource? SourceOf(FinancialEntry entry) => AvailableSources.FirstOrDefault(s => s.Id == entry.PaymentSourceId);
+
+    private static int DueDayOf(FinancialEntry entry) => entry.DueDay ?? NoDueDay;
+
+    // The installment that falls this month, counted from the first one.
+    private int CurrentInstallmentOf(FinancialEntry entry)
+    {
+        var now = _timeProvider.GetLocalNow();
+        return (now.Year - entry.StartDate.Year) * 12 + now.Month - entry.StartDate.Month + 1;
+    }
+
+    private void ApplyPreviousPurchase(FinancialEntry entry)
+    {
+        // A purchase whose card was deleted since has no row to show it in, so it stays as it is.
+        if (CreditCards.FirstOrDefault(c => c.Id == entry.PaymentSourceId) is not { } card)
+            return;
+
+        var isInstallments = entry.Recurrence == RecurrenceType.Installments;
+        Purchases.Add(new SetupPurchaseItem(
+            Show(entry).Description,
+            entry.Amount,
+            entry.Recurrence,
+            card,
+            isInstallments ? entry.TotalInstallments : null,
+            isInstallments ? CurrentInstallmentOf(entry) : null,
+            entry.Id));
+    }
+
+    private void ApplyPreviousIncome()
+    {
+        if (PreviousOf(SetupRows.Salary).FirstOrDefault() is { } salary)
+        {
+            Salary = Show(salary).Amount;
+            SalaryDay = DueDayOf(salary);
+            SalarySource = SourceOf(salary);
+            _salaryEntryId = salary.Id;
+        }
+
+        if (PreviousOf(SetupRows.Advance).FirstOrDefault() is { } advance)
+        {
+            IsSalarySplit = true;
+            Advance = Show(advance).Amount;
+            AdvanceDay = DueDayOf(advance);
+            SalarySource ??= SourceOf(advance);
+            _advanceEntryId = advance.Id;
+        }
+    }
+
+    /// <summary>
+    /// Ticks the rows of the list an earlier run created an entry from, with its values. True when any was.
+    /// </summary>
+    private bool ApplyPreviousExpenses(IEnumerable<SetupExpenseItem> expenses)
+    {
+        var applied = false;
+        foreach (var expense in expenses.Where(e => !e.IsDescriptionEditable))
+        {
+            if (PreviousOf(SetupRows.Expense(expense.Description)).FirstOrDefault() is not { } entry)
+                continue;
+
+            ApplyPreviousExpense(expense, entry);
+            applied = true;
+        }
+
+        return applied;
+    }
+
+    private void ApplyPreviousExpense(SetupExpenseItem expense, FinancialEntry entry)
+    {
+        expense.ExistingEntryId = Show(entry).Id;
+        expense.IsSelected = true;
+        expense.Amount = entry.Amount;
+        expense.DueDay = DueDayOf(entry);
+        expense.PaymentSource = SourceOf(entry);
+        if (expense.CanBeEstimated)
+            expense.IsEstimated = entry.IsEstimated;
+        if (expense.CanBePartiallyPaid)
+            expense.AllowsPartialPayment = entry.AllowsPartialPayment;
+        if (expense.OffersYearlyPayment)
+        {
+            var isAnnual = entry.Recurrence == RecurrenceType.Annual;
+            expense.YearlyInstallments = isAnnual ? Math.Max(entry.TotalInstallments ?? 1, 1) : SetupExpenseItem.MonthlyPayment;
+            if (isAnnual)
+                expense.YearlyStartMonth = entry.StartDate.Month;
+        }
+    }
+
+    // The first activity goes in the row the list always has; each other one gets a row of its own.
+    private bool ApplyPreviousActivities()
+    {
+        var activities = PreviousOf(SetupRows.Activity).ToList();
+        for (var i = 0; i < activities.Count; i++)
+        {
+            var row = i == 0 ? SchoolExpenses.First(e => e.IsDescriptionEditable) : Prepare(CreateActivity(isRemovable: true));
+            if (i > 0)
+                SchoolExpenses.Add(row);
+
+            row.CustomDescription = activities[i].Description == ActivityDescription ? string.Empty : activities[i].Description;
+            ApplyPreviousExpense(row, activities[i]);
+        }
+
+        return activities.Count > 0;
+    }
+
+    private IEnumerable<IGrouping<string, PreviousSetupEntry>> PreviousGroups(params string[] rows) =>
+        _previous.Where(p => rows.Contains(p.Link.Row)).GroupBy(p => p.Link.Group);
+
+    private bool ApplyPreviousHomes()
+    {
+        foreach (var home in PreviousGroups(SetupRows.HomeFinancing, SetupRows.HomeIptu))
+        {
+            var financing = home.FirstOrDefault(p => p.Link.Row == SetupRows.HomeFinancing)?.Entry;
+            var iptu = home.FirstOrDefault(p => p.Link.Row == SetupRows.HomeIptu)?.Entry;
+            var hasInstallments = financing?.Recurrence == RecurrenceType.Installments;
+            Homes.Add(new SetupHomeItem(
+                home.First().Link.GroupName,
+                financing is null ? 0 : Show(financing).Amount,
+                financing is null ? NoDueDay : DueDayOf(financing),
+                iptu is null ? 0 : Show(iptu).Amount,
+                iptu?.StartDate.Month ?? DefaultIptuStartMonth,
+                Math.Max(iptu?.TotalInstallments ?? 1, 1),
+                SourceOf((financing ?? iptu)!),
+                hasInstallments ? financing!.TotalInstallments : null,
+                hasInstallments ? CurrentInstallmentOf(financing!) : null,
+                home.Key,
+                financing?.Id,
+                iptu?.Id));
+        }
+
+        return Homes.Count > 0;
+    }
+
+    private bool ApplyPreviousCars()
+    {
+        foreach (var car in PreviousGroups(SetupRows.CarIpva, SetupRows.CarLicensing))
+        {
+            var ipva = car.FirstOrDefault(p => p.Link.Row == SetupRows.CarIpva)?.Entry;
+            var licensing = car.FirstOrDefault(p => p.Link.Row == SetupRows.CarLicensing)?.Entry;
+            Cars.Add(new SetupCarItem(
+                car.First().Link.GroupName,
+                ipva is null ? 0 : Show(ipva).Amount,
+                ipva?.StartDate.Month ?? DefaultIpvaStartMonth,
+                Math.Max(ipva?.TotalInstallments ?? 1, 1),
+                licensing is null ? 0 : Show(licensing).Amount,
+                licensing?.StartDate.Month ?? DefaultLicensingMonth,
+                SourceOf((ipva ?? licensing)!),
+                car.Key,
+                ipva?.Id,
+                licensing?.Id));
+        }
+
+        return Cars.Count > 0;
     }
 
     /// <summary>
@@ -645,6 +904,7 @@ public partial class SetupViewModel : ObservableObject
             case SetupStep.CreditCards:
                 foreach (var card in NewCards.ToList())
                     RemoveCard(card);
+                Purchases.Clear();
                 ResetNewCardForm();
                 ResetNewPurchaseForm();
                 break;
@@ -672,6 +932,9 @@ public partial class SetupViewModel : ObservableObject
                 Reset(LeisureExpenses, CreateLeisureExpenses());
                 break;
         }
+
+        // Run again, skipping a step leaves what an earlier run created as it is.
+        ApplyPrevious(step);
     }
 
     /// <summary>
@@ -705,9 +968,25 @@ public partial class SetupViewModel : ObservableObject
             await _onClosed(false);
     }
 
+    public const string RemoveFromThisMonthOption = "Deste mês em diante";
+    public const string RemoveFromAllMonthsOption = "De todos os meses";
+
     private async Task FinishAsync()
     {
-        if (!await _writeGuard.TryAsync(() => _setupService.CompleteAsync(BuildSetup())))
+        var setup = BuildSetup();
+
+        // Unticking a row an earlier run created removes its entry, so the user confirms it and picks the months.
+        if (setup.EntriesToRemove.Count > 0)
+        {
+            var choice = await _alertService.ChooseAsync(
+                $"Remover {RemovedEntriesText}?", "Cancelar", RemoveFromThisMonthOption, RemoveFromAllMonthsOption);
+            if (choice is not (RemoveFromThisMonthOption or RemoveFromAllMonthsOption))
+                return;
+
+            setup.RemoveScope = choice == RemoveFromAllMonthsOption ? EntryDeleteScope.All : EntryDeleteScope.ThisAndFuture;
+        }
+
+        if (!await _writeGuard.TryAsync(() => _setupService.CompleteAsync(setup)))
             return;
 
         _messenger.Send(new SetupCompletedMessage());
@@ -716,25 +995,39 @@ public partial class SetupViewModel : ObservableObject
             await _onClosed(true);
     }
 
-    private NewUserSetup BuildSetup() => new()
+    private NewUserSetup BuildSetup()
     {
-        Name = Name,
-        PhotoPath = PhotoPath,
-        PaymentSources = [.. NewSources],
-        CreditCards = [.. NewCards.Select(c => new SetupCreditCard { Card = c.Card, BillAccount = c.BillAccount })],
-        Entries = [.. BuildEntries().Select(e => e.Entry)]
-    };
+        var entries = BuildEntries().Select(e => e.Entry).ToList();
+        return new()
+        {
+            Name = Name,
+            PhotoPath = PhotoPath,
+            PaymentSources = [.. NewSources],
+            CreditCards = [.. NewCards.Select(c => new SetupCreditCard { Card = c.Card, BillAccount = c.BillAccount })],
+            Entries = entries,
+            EntriesToRemove = [.. RemovedEntries(entries).Select(e => e.Id)]
+        };
+    }
+
+    /// <summary>
+    /// The entries an earlier run created that no row holds anymore: unticked, taken out or left without an amount.
+    /// </summary>
+    private IEnumerable<FinancialEntry> RemovedEntries(IEnumerable<SetupEntry> entries)
+    {
+        var kept = entries.Select(e => e.ExistingEntryId).OfType<int>().ToHashSet();
+        return _shownPrevious.Values.Where(e => !kept.Contains(e.Id));
+    }
 
     private IEnumerable<(string Icon, SetupEntry Entry)> BuildEntries()
     {
         if (Salary > 0)
-            yield return (SalaryIcon, CreateIncome(SalaryDescription, Salary, SalaryDay));
+            yield return (SalaryIcon, Link(CreateIncome(SalaryDescription, Salary, SalaryDay), SetupRows.Salary, _salaryEntryId));
 
         if (IsSalarySplit && Advance > 0)
-            yield return (SalaryIcon, CreateIncome(AdvanceDescription, Advance, AdvanceDay));
+            yield return (SalaryIcon, Link(CreateIncome(AdvanceDescription, Advance, AdvanceDay), SetupRows.Advance, _advanceEntryId));
 
         foreach (var purchase in Purchases)
-            yield return (PurchaseIcon, new SetupEntry
+            yield return (PurchaseIcon, Link(new SetupEntry
             {
                 Description = purchase.Description,
                 Amount = purchase.Amount,
@@ -742,7 +1035,7 @@ public partial class SetupViewModel : ObservableObject
                 TotalInstallments = purchase.TotalInstallments,
                 CurrentInstallment = purchase.CurrentInstallment,
                 PaymentSource = purchase.Card
-            });
+            }, SetupRows.Purchase, purchase.ExistingEntryId));
 
         foreach (var entry in BuildExpenses(Expenses))
             yield return entry;
@@ -772,8 +1065,9 @@ public partial class SetupViewModel : ObservableObject
     {
         foreach (var home in Homes)
         {
+            var group = home.Group.Length > 0 ? home.Group : NewGroup();
             if (home.Financing > 0)
-                yield return ("🏠", new SetupEntry
+                yield return ("🏠", Link(new SetupEntry
                 {
                     Description = $"Financiamento ({home.Name})",
                     Amount = home.Financing,
@@ -783,22 +1077,41 @@ public partial class SetupViewModel : ObservableObject
                     DueDay = home.FinancingDueDay == NoDueDay ? null : home.FinancingDueDay,
                     CategoryName = "Moradia",
                     PaymentSource = home.PaymentSource
-                });
+                }, SetupRows.HomeFinancing, home.FinancingEntryId, group, home.Name));
 
             if (home.Iptu > 0)
-                yield return ("🧾", CreateAnnualTax($"IPTU ({home.Name})", home.Iptu, home.IptuStartMonth, home.IptuInstallments, "Moradia", home.PaymentSource));
+                yield return ("🧾", Link(
+                    CreateAnnualTax($"IPTU ({home.Name})", home.Iptu, home.IptuStartMonth, home.IptuInstallments, "Moradia", home.PaymentSource),
+                    SetupRows.HomeIptu, home.IptuEntryId, group, home.Name));
         }
+    }
+
+    // Ties a new home's (or car's) entries together; one an earlier run created keeps its group.
+    private static string NewGroup() => Guid.NewGuid().ToString("N");
+
+    private static SetupEntry Link(SetupEntry entry, string row, int? existingEntryId, string group = "", string groupName = "")
+    {
+        entry.Row = row;
+        entry.ExistingEntryId = existingEntryId;
+        entry.Group = group;
+        entry.GroupName = groupName;
+        return entry;
     }
 
     private IEnumerable<(string Icon, SetupEntry Entry)> BuildCarEntries()
     {
         foreach (var car in Cars)
         {
+            var group = car.Group.Length > 0 ? car.Group : NewGroup();
             if (car.Ipva > 0)
-                yield return ("🚗", CreateAnnualTax($"IPVA ({car.Name})", car.Ipva, car.IpvaStartMonth, car.IpvaInstallments, "Transporte", car.PaymentSource));
+                yield return ("🚗", Link(
+                    CreateAnnualTax($"IPVA ({car.Name})", car.Ipva, car.IpvaStartMonth, car.IpvaInstallments, "Transporte", car.PaymentSource),
+                    SetupRows.CarIpva, car.IpvaEntryId, group, car.Name));
 
             if (car.Licensing > 0)
-                yield return ("📄", CreateAnnualTax($"Licenciamento ({car.Name})", car.Licensing, car.LicensingMonth, 1, "Transporte", car.PaymentSource));
+                yield return ("📄", Link(
+                    CreateAnnualTax($"Licenciamento ({car.Name})", car.Licensing, car.LicensingMonth, 1, "Transporte", car.PaymentSource),
+                    SetupRows.CarLicensing, car.LicensingEntryId, group, car.Name));
         }
     }
 
@@ -825,7 +1138,7 @@ public partial class SetupViewModel : ObservableObject
 
     // An expense on a credit card bill falls due with the bill, so its own due day is dropped.
     private static IEnumerable<(string Icon, SetupEntry Entry)> BuildExpenses(IEnumerable<SetupExpenseItem> expenses) =>
-        expenses.Where(e => e.IsSelected && e.Amount > 0).Select(expense => (expense.Icon, new SetupEntry
+        expenses.Where(e => e.IsSelected && e.Amount > 0).Select(expense => (expense.Icon, Link(new SetupEntry
         {
             Description = expense.EntryDescription,
             Amount = expense.Amount,
@@ -837,7 +1150,7 @@ public partial class SetupViewModel : ObservableObject
             AllowsPartialPayment = expense.AllowsPartialPayment && !expense.IsOnCreditCardBill,
             CategoryName = expense.CategoryName,
             PaymentSource = expense.PaymentSource
-        }));
+        }, expense.IsDescriptionEditable ? SetupRows.Activity : SetupRows.Expense(expense.Description), expense.ExistingEntryId)));
 
     private void BuildSummary()
     {
@@ -845,12 +1158,31 @@ public partial class SetupViewModel : ObservableObject
 
         SummaryRows.Clear();
         foreach (var (icon, entry) in entries)
-            SummaryRows.Add(new SetupSummaryRow(icon, entry.Description, DescribeSchedule(entry), entry.Amount, entry.EntryType));
+            SummaryRows.Add(new SetupSummaryRow(icon, SummaryDescription(entry), DescribeSchedule(entry), entry.Amount, entry.EntryType));
+
+        RemovedEntriesText = JoinNames(RemovedEntries(entries.Select(e => e.Entry)).Select(e => $"\"{e.Description}\""));
+        OnPropertyChanged(nameof(SummaryIntro));
 
         TotalIncome = entries.Where(e => e.Entry.EntryType == FinancialEntryType.Income).Sum(e => e.Entry.Amount);
         TotalOutcome = entries.Where(e => e.Entry.EntryType == FinancialEntryType.Outcome).Sum(e => e.Entry.Amount);
 
         SkippedStepsText = string.Join(", ", Enum.GetValues<SetupStep>().Where(_skippedSteps.Contains).Select(DescribeStep));
+    }
+
+    // An entry an earlier run created keeps the name it has now (see SetupService), unless the row is where it is typed.
+    private string SummaryDescription(SetupEntry entry) =>
+        entry.ExistingEntryId is { } id && entry.Row is not (SetupRows.Purchase or SetupRows.Activity)
+            && _shownPrevious.TryGetValue(id, out var previous)
+            ? previous.Description
+            : entry.Description;
+
+    /// <summary>
+    /// "a", "a e b", "a, b e c".
+    /// </summary>
+    public static string JoinNames(IEnumerable<string> names)
+    {
+        var list = names.ToList();
+        return list.Count <= 1 ? string.Join(string.Empty, list) : $"{string.Join(", ", list[..^1])} e {list[^1]}";
     }
 
     /// <summary>

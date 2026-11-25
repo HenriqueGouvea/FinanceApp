@@ -59,6 +59,7 @@ public class DatabaseContext : IDatabaseContext
         await connection.CreateTableAsync<FinancialMonthlyEntry>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
         await connection.CreateTableAsync<FinancialPayment>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
         await connection.CreateTableAsync<PaymentSource>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
+        await connection.CreateTableAsync<SetupLink>(CreateFlags.ImplicitPK | CreateFlags.AutoIncPK | CreateFlags.ImplicitIndex);
 
         if (entryColumns.Count > 0 && !hadPartialPaymentFlag)
             await MigratePartialPaymentFlagAsync(connection);

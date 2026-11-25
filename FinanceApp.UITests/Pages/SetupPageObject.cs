@@ -537,6 +537,32 @@ public class SetupPageObject
     /// </summary>
     public string SkippedStepsText => _session.ScrollTo("SetupSkippedStepsLabel").Text;
 
+    /// <summary>
+    /// Run again: "Serão removidos: "Internet"", the entries an earlier run created whose rows were unticked.
+    /// </summary>
+    public string RemovedEntriesText => _session.ScrollTo("SetupRemovedEntriesLabel").Text;
+
+    /// <summary>
+    /// Run again: the accounts and vouchers that already exist, listed above the form.
+    /// </summary>
+    public IReadOnlyList<string> ExistingSourceNames => _session.VisibleTexts(AppSession.AutomationId("SetupExistingSourceNameLabel"));
+
+    /// <summary>
+    /// The salary field's text (e.g. "R$ 5.000,00"), filled in when the wizard runs again.
+    /// </summary>
+    public string SalaryText => _session.ScrollTo(SalaryEntryId).Text;
+
+    /// <summary>
+    /// Taps "Começar" when unticked rows remove entries an earlier run created, and picks from which months.
+    /// </summary>
+    public MainPageObject FinishRemoving(string monthsOption)
+    {
+        _session.Tap(NextButton);
+        _session.Tap(AppSession.DialogOption(monthsOption));
+        _session.WaitForGone(StepLabel);
+        return new MainPageObject(_session).WaitUntilLoaded();
+    }
+
     // --- 7. Summary ---
 
     public string SummaryTitleText => _session.WaitForVisible(SummaryTitle).Text;

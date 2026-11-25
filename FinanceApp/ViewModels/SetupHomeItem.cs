@@ -7,6 +7,8 @@ namespace FinanceApp.ViewModels;
 /// city's yearly property tax, paid at once or in installments from <paramref name="IptuStartMonth"/>. A financing
 /// with <paramref name="FinancingTotalInstallments"/> ends on its last installment, and
 /// <paramref name="FinancingCurrentInstallment"/> falls this month; without them, it goes on every month.
+/// Run again, the wizard shows the homes it created before, tied by <paramref name="Group"/> to their entries
+/// (<paramref name="FinancingEntryId"/>, <paramref name="IptuEntryId"/>), which saving updates.
 /// </summary>
 public record SetupHomeItem(
     string Name,
@@ -17,7 +19,10 @@ public record SetupHomeItem(
     int IptuInstallments,
     PaymentSource? PaymentSource = null,
     int? FinancingTotalInstallments = null,
-    int? FinancingCurrentInstallment = null)
+    int? FinancingCurrentInstallment = null,
+    string Group = "",
+    int? FinancingEntryId = null,
+    int? IptuEntryId = null)
 {
     public bool HasFinancingInstallments => FinancingTotalInstallments is > 0;
 

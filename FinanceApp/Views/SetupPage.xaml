@@ -262,6 +262,35 @@
                            TextColor="{StaticResource Ink}"
                            Text="Cadastre suas contas bancárias e vales. Assim cada receita diz onde cai e cada despesa diz como é paga. Os cartões de crédito vêm no próximo passo." />
 
+                    <!-- What already exists, so it isn't added twice -->
+                    <VerticalStackLayout Spacing="2" IsVisible="{Binding HasExistingSources}">
+                        <Label Text="Já cadastradas" Style="{StaticResource FieldCaption}" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding ExistingSources}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:PaymentSource">
+                                    <Grid AutomationId="SetupExistingSourceRow" ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10" Padding="0,4">
+                                        <Label Grid.Column="0"
+                                               Text="{Binding Type, Converter={x:Static converters:PaymentSourceTypeToIconConverter.Instance}}"
+                                               FontSize="16"
+                                               VerticalOptions="Center" />
+                                        <Label Grid.Column="1"
+                                               AutomationId="SetupExistingSourceNameLabel"
+                                               Text="{Binding Name}"
+                                               FontSize="14"
+                                               LineBreakMode="TailTruncation"
+                                               VerticalOptions="Center" />
+                                        <Label Grid.Column="2"
+                                               Text="{Binding Balance, Converter={x:Static converters:MoneyConverter.Instance}}"
+                                               FontSize="13"
+                                               TextColor="{StaticResource Muted}"
+                                               VerticalOptions="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Label Text="Para mudar o nome ou o saldo delas, use Contas e cartões no menu." Style="{StaticResource Hint}" />
+                    </VerticalStackLayout>
+
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding NewSources}" Spacing="4" IsVisible="{Binding HasNewSources}">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="models:PaymentSource">
@@ -370,6 +399,25 @@
                     <Label FontSize="14"
                            TextColor="{StaticResource Ink}"
                            Text="Cadastre seus cartões de crédito e as compras que já estão neles. Todo mês, as compras de um cartão de crédito são reunidas na fatura dele, que vence em um só dia." />
+
+                    <!-- What already exists, so it isn't added twice -->
+                    <VerticalStackLayout Spacing="2" IsVisible="{Binding HasExistingCards}">
+                        <Label Text="Já cadastrados" Style="{StaticResource FieldCaption}" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding ExistingCards}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SetupCreditCardItem">
+                                    <Grid AutomationId="SetupExistingCardRow" ColumnDefinitions="Auto, *" ColumnSpacing="10" Padding="0,4">
+                                        <Label Grid.Column="0" Text="💳" FontSize="16" VerticalOptions="Center" />
+                                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                            <Label AutomationId="SetupExistingCardNameLabel" Text="{Binding Card.Name}" FontSize="14" LineBreakMode="TailTruncation" />
+                                            <Label Text="{Binding Detail}" FontSize="11" TextColor="{StaticResource Muted}" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Label Text="Para mudar um deles, use Contas e cartões no menu." Style="{StaticResource Hint}" />
+                    </VerticalStackLayout>
 
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding NewCards}" Spacing="4" IsVisible="{Binding HasNewCards}">
                         <BindableLayout.ItemTemplate>
@@ -1143,7 +1191,7 @@
                     <Label AutomationId="SetupSummaryTitleLabel" Text="{Binding SummaryTitle}" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
 
                     <VerticalStackLayout Spacing="8" IsVisible="{Binding HasSummaryRows}">
-                        <Label Text="Estes lançamentos serão criados a partir deste mês:" FontSize="14" TextColor="{StaticResource Ink}" />
+                        <Label Text="{Binding SummaryIntro}" FontSize="14" TextColor="{StaticResource Ink}" />
                         <VerticalStackLayout BindableLayout.ItemsSource="{Binding SummaryRows}" Spacing="2">
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate x:DataType="vm:SetupSummaryRow">
@@ -1181,6 +1229,25 @@
                                    FontSize="14" FontAttributes="Bold" />
                         </Grid>
                     </VerticalStackLayout>
+
+                    <Border AutomationId="SetupRemovedEntries"
+                            Style="{StaticResource Card}"
+                            Padding="14"
+                            IsVisible="{Binding HasRemovedEntries}">
+                        <VerticalStackLayout Spacing="4">
+                            <Label AutomationId="SetupRemovedEntriesLabel" FontSize="14" TextColor="{StaticResource Ink}">
+                                <Label.FormattedText>
+                                    <FormattedString>
+                                        <Span Text="Serão removidos: " FontAttributes="Bold" TextColor="{StaticResource Outcome}" />
+                                        <Span Text="{Binding RemovedEntriesText}" />
+                                    </FormattedString>
+                                </Label.FormattedText>
+                            </Label>
+                            <Label Text="Você desmarcou ou tirou estes lançamentos. Ao tocar em Começar, você escolhe se saem deste mês em diante ou de todos os meses."
+                                   FontSize="12"
+                                   TextColor="{StaticResource Muted}" />
+                        </VerticalStackLayout>
+                    </Border>
 
                     <Border AutomationId="SetupSkippedSteps"
                             Style="{StaticResource Card}"

@@ -71,7 +71,8 @@ public class DataManagementService : IDataManagementService
             Entries = await db.Table<FinancialEntry>().ToListAsync(),
             CategoryEntries = await db.Table<FinancialCategoryEntry>().ToListAsync(),
             MonthlyEntries = await db.Table<FinancialMonthlyEntry>().ToListAsync(),
-            Payments = await db.Table<FinancialPayment>().ToListAsync()
+            Payments = await db.Table<FinancialPayment>().ToListAsync(),
+            SetupLinks = await db.Table<SetupLink>().ToListAsync()
         };
         if (_profileService.PhotoPath is { } photoPath)
         {
@@ -113,6 +114,7 @@ public class DataManagementService : IDataManagementService
             foreach (var row in backup.CategoryEntries) conn.InsertOrReplace(row);
             foreach (var row in backup.MonthlyEntries) conn.InsertOrReplace(row);
             foreach (var row in backup.Payments) conn.InsertOrReplace(row);
+            foreach (var row in backup.SetupLinks) conn.InsertOrReplace(row);
         });
         ClearCaches();
 
@@ -143,6 +145,7 @@ public class DataManagementService : IDataManagementService
     private static void DeleteAllRows(SQLite.SQLiteConnection conn)
     {
         conn.DeleteAll<FinancialPayment>();
+        conn.DeleteAll<SetupLink>();
         conn.DeleteAll<FinancialMonthlyEntry>();
         conn.DeleteAll<FinancialCategoryEntry>();
         conn.DeleteAll<FinancialEntry>();

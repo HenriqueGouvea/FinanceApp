@@ -31,4 +31,9 @@ public class DataBackup
     public List<FinancialCategoryEntry> CategoryEntries { get; set; } = [];
     public List<FinancialMonthlyEntry> MonthlyEntries { get; set; } = [];
     public List<FinancialPayment> Payments { get; set; } = [];
+
+    /// <summary>
+    /// Which entries the setup wizard created (absent from backups made before it was kept, which read as none).
+    /// </summary>
+    public List<SetupLink> SetupLinks { get; set; } = [];
 }

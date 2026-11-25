@@ -66,3 +66,12 @@ public class PaymentSourceRow
     public int? BillDueDay { get; set; }
     public int? BillPaymentSourceId { get; set; }
 }
+
+public class SetupLinkRow
+{
+    public int Id { get; set; }
+    public string Row { get; set; } = string.Empty;
+    public string Group { get; set; } = string.Empty;
+    public string GroupName { get; set; } = string.Empty;
+    public int FinancialEntryId { get; set; }
+}
