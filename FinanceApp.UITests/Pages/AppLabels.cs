@@ -29,6 +29,9 @@ public static class AppLabels
     public const string DeleteThisMonth = "Somente este mês";
     public const string DeleteThisAndFuture = "Este e os próximos meses";
     public const string DeleteAllMonths = "Todos os meses";
+    public const string AmountThisMonth = "Somente este mês";
+    public const string AmountThisAndFuture = "Este e os próximos meses";
+    public const string AmountAllMonths = "Todos os meses";
 
     public const string HomeMenuItem = "Início";
     public const string CategoriesMenuItem = "Categorias";

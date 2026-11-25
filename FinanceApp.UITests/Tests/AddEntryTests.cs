@@ -114,6 +114,29 @@ public sealed class AddEntryTests : E2ETestBase
     }
 
     [Fact]
+    public async Task AddEntry_InstallmentsWithCurrentInstallment_StartsInAnEarlierMonth()
+    {
+        var page = MainPage.OpenAddEntry()
+            .EnterDescription("Geladeira E2E")
+            .SelectRecurrence(AppLabels.Installments)
+            .EnterInstallments("10")
+            .EnterCurrentInstallment("3")
+            .EnterAmount(200);
+        var firstMonth = AppFormat.CurrentMonth.AddMonths(-2);
+        page.CurrentInstallmentHintText.Should().Be($"A 1ª parcela foi em {AppFormat.MonthName(firstMonth)}.");
+        page.Save();
+
+        MainPage.WaitForEntry("Geladeira E2E");
+        MainPage.VisibleInstallmentLabels.Should().ContainSingle().Which.Should().Be("3/10");
+        MainPage.GoToPreviousMonth().WaitForEntry("Geladeira E2E");
+        MainPage.VisibleInstallmentLabels.Should().ContainSingle().Which.Should().StartWith("2/10");
+
+        var row = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
+        row.StartDate.Date.Should().Be(firstMonth);
+        row.TotalInstallments.Should().Be(10);
+    }
+
+    [Fact]
     public async Task AddEntry_AnnualInInstallments_FallsInTheSameMonthsEveryYear()
     {
         var page = MainPage.OpenAddEntry()

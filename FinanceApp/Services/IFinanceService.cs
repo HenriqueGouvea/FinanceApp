@@ -20,6 +20,15 @@ public interface IFinanceService
     Task SaveEntryAsync(FinancialEntry entry, IReadOnlyList<int>? categoryIds = null);
 
     /// <summary>
+    /// Saves an edited entry whose amount changed in the month (<paramref name="year"/>, <paramref name="month"/>),
+    /// with <paramref name="entry"/>'s amount applied to <paramref name="scope"/>: that month only (its own amount, the
+    /// others keep the stored one), that month and the ones after it (earlier months keep the amount they had), or
+    /// every month (amounts set for a single month are dropped). Its other fields apply to every month, as in
+    /// <see cref="SaveEntryAsync"/>.
+    /// </summary>
+    Task SaveEntryAsync(FinancialEntry entry, IReadOnlyList<int>? categoryIds, int year, int month, AmountChangeScope scope);
+
+    /// <summary>
     /// The month's incomes and outcomes added up by category (uncategorized ones under a null category), incomes
     /// first and the largest first, plus the month's totals. An entry with several categories counts in each one, so
     /// the categories can add up to more than the month's total.

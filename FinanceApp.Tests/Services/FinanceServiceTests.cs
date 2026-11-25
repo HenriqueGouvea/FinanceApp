@@ -1327,6 +1327,168 @@ public class FinanceServiceTests
         (await db.Table<FinancialPayment>().CountAsync()).Should().Be(1);
     }
 
+    // --- SaveEntryAsync amount scope ---
+
+    [Fact]
+    public async Task SaveEntryAsync_AmountThisMonth_ChangesOnlyThatMonth()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        entry.Amount = 150m;
+        entry.Description = "Academia";
+        await _service.SaveEntryAsync(entry, null, 2026, 6, AmountChangeScope.ThisMonth);
+
+        (await MonthAmountAsync(2026, 5)).Should().Be(100m);
+        (await MonthAmountAsync(2026, 6)).Should().Be(150m);
+        (await MonthAmountAsync(2026, 7)).Should().Be(100m);
+        var stored = await _service.GetEntryByIdAsync(entry.Id);
+        stored!.Amount.Should().Be(100m);
+        stored.Description.Should().Be("Academia");
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_AmountThisMonthBackToTemplateAmount_DropsTheMonthOverride()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        entry.Amount = 150m;
+        await _service.SaveEntryAsync(entry, null, 2026, 6, AmountChangeScope.ThisMonth);
+
+        entry.Amount = 100m;
+        await _service.SaveEntryAsync(entry, null, 2026, 6, AmountChangeScope.ThisMonth);
+
+        var db = await _context.GetConnectionAsync();
+        (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Should().ContainSingle().Which.OverrideAmount.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_AmountThisAndFuture_KeepsEarlierMonthsAmounts()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        entry.Amount = 120m;
+        await _service.SaveEntryAsync(entry, null, 2026, 5, AmountChangeScope.ThisMonth);
+
+        entry.Amount = 150m;
+        await _service.SaveEntryAsync(entry, null, 2026, 7, AmountChangeScope.ThisAndFuture);
+
+        (await MonthAmountAsync(2026, 4)).Should().Be(100m);
+        (await MonthAmountAsync(2026, 5)).Should().Be(120m);
+        (await MonthAmountAsync(2026, 6)).Should().Be(100m);
+        (await MonthAmountAsync(2026, 7)).Should().Be(150m);
+        (await MonthAmountAsync(2027, 3)).Should().Be(150m);
+        (await _service.GetEntryByIdAsync(entry.Id))!.Amount.Should().Be(150m);
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_AmountThisAndFuture_DropsLaterMonthOverrides()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        entry.Amount = 120m;
+        await _service.SaveEntryAsync(entry, null, 2026, 9, AmountChangeScope.ThisMonth);
+
+        entry.Amount = 150m;
+        await _service.SaveEntryAsync(entry, null, 2026, 6, AmountChangeScope.ThisAndFuture);
+
+        (await MonthAmountAsync(2026, 9)).Should().Be(150m);
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_AmountThisAndFutureOnInstallments_KeepsEarlierInstallmentsOnly()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Installments, totalInstallments: 3);
+
+        entry.Amount = 150m;
+        await _service.SaveEntryAsync(entry, null, 2026, 5, AmountChangeScope.ThisAndFuture);
+
+        (await MonthAmountAsync(2026, 4)).Should().Be(100m);
+        (await MonthAmountAsync(2026, 5)).Should().Be(150m);
+        (await MonthAmountAsync(2026, 6)).Should().Be(150m);
+        var db = await _context.GetConnectionAsync();
+        (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Should().ContainSingle().Which.Month.Should().Be(4);
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_AmountThisAndFutureFromStartMonth_ChangesEveryMonth()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        entry.Amount = 150m;
+        await _service.SaveEntryAsync(entry, null, 2026, 4, AmountChangeScope.ThisAndFuture);
+
+        (await MonthAmountAsync(2026, 4)).Should().Be(150m);
+        var db = await _context.GetConnectionAsync();
+        (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_AmountAllMonths_DropsMonthOverrides()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        entry.Amount = 120m;
+        await _service.SaveEntryAsync(entry, null, 2026, 5, AmountChangeScope.ThisMonth);
+
+        entry.Amount = 150m;
+        await _service.SaveEntryAsync(entry, null, 2026, 7, AmountChangeScope.All);
+
+        (await MonthAmountAsync(2026, 4)).Should().Be(150m);
+        (await MonthAmountAsync(2026, 5)).Should().Be(150m);
+        (await MonthAmountAsync(2026, 8)).Should().Be(150m);
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_AmountThisMonthOnOneTime_ChangesTheTemplate()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.OneTime);
+
+        entry.Amount = 150m;
+        await _service.SaveEntryAsync(entry, null, 2026, 4, AmountChangeScope.ThisMonth);
+
+        (await _service.GetEntryByIdAsync(entry.Id))!.Amount.Should().Be(150m);
+        var db = await _context.GetConnectionAsync();
+        (await db.Table<FinancialMonthlyEntry>().ToListAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_AmountThisMonthOnPaidMonth_KeepsItPaidWithTheNewAmount()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        await _service.SetEntryStatusAsync(entry.Id, 2026, 5, FinancialMonthlyEntryStatus.Paid);
+
+        entry.Amount = 150m;
+        await _service.SaveEntryAsync(entry, null, 2026, 5, AmountChangeScope.ThisMonth);
+
+        var may = (await _service.GetMergedEntriesForMonthAsync(2026, 5)).Single();
+        may.IsPaid.Should().BeTrue();
+        may.PaidAmount.Should().Be(150m);
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_AmountScopeWithCategories_ReplacesThem()
+    {
+        var (health, children, _) = await SaveThreeCategoriesAsync();
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+
+        entry.Amount = 150m;
+        await _service.SaveEntryAsync(entry, [children.Id, health.Id], 2026, 5, AmountChangeScope.ThisMonth);
+
+        (await _service.GetEntryCategoryIdsAsync(entry.Id)).Should().Equal(children.Id, health.Id);
+    }
+
+    [Fact]
+    public async Task SaveEntryAsync_AmountScopeFailsHalfway_ThrowsAndKeepsEveryRow()
+    {
+        var entry = await SaveTemplateAsync(RecurrenceType.Recurrent);
+        // The earlier months get their amount first, so the template's update fails after they're written.
+        await FailOnAsync("BEFORE UPDATE ON FinancialEntry");
+
+        entry.Amount = 150m;
+        var act = () => _service.SaveEntryAsync(entry, null, 2026, 7, AmountChangeScope.ThisAndFuture);
+
+        await act.Should().ThrowAsync<SQLiteException>();
+        var db = await _context.GetConnectionAsync();
+        (await db.Table<FinancialMonthlyEntry>().CountAsync()).Should().Be(0);
+        (await MonthAmountAsync(2026, 8)).Should().Be(100m);
+    }
+
     // --- Failed writes ---
 
     [Fact]
@@ -1949,6 +2111,10 @@ public class FinanceServiceTests
         await _categoryService.SaveAsync(leisure);
         return (health, children, leisure);
     }
+
+    // The planned amount of the only entry in the month.
+    private async Task<decimal> MonthAmountAsync(int year, int month) =>
+        (await _service.GetMergedEntriesForMonthAsync(year, month)).Single().PlannedOrEffectiveAmount;
 
     private async Task<FinancialEntry> SaveTemplateAsync(RecurrenceType recurrence, int? totalInstallments = null, int? dueDay = null, int? paymentSourceId = null)
     {

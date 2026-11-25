@@ -13,6 +13,7 @@ public class AddEntryViewModelTests
     private readonly IFinanceService _service;
     private readonly ICategoryService _categoryService;
     private readonly IPaymentSourceService _paymentSourceService;
+    private readonly IAlertService _alertService = Substitute.For<IAlertService>();
     private readonly AddEntryViewModel _vm;
 
     private static readonly FinancialCategory Housing = new() { Id = 1, Name = "Moradia", Icon = "🏠", Color = "#1E88E5" };
@@ -33,7 +34,7 @@ public class AddEntryViewModelTests
         _service.GetEntryCategoryIdsAsync(Arg.Any<int>()).Returns([Housing.Id]);
         _paymentSourceService = Substitute.For<IPaymentSourceService>();
         _paymentSourceService.GetAllAsync().Returns(Task.FromResult<IReadOnlyList<PaymentSource>>([Checking, Card]));
-        _vm = new AddEntryViewModel(_service, _categoryService, _paymentSourceService, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance));
+        _vm = new AddEntryViewModel(_service, _categoryService, _paymentSourceService, new WriteGuard(Substitute.For<IAlertService>(), NullLogger<WriteGuard>.Instance), _alertService);
         _vm.PrepareAsync(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local)).GetAwaiter().GetResult();
     }
 
@@ -557,6 +558,190 @@ public class AddEntryViewModelTests
 
         await _service.Received(1).SaveEntryAsync(Arg.Any<FinancialEntry>(),
             Arg.Is<IReadOnlyList<int>?>(ids => ids != null && ids.SequenceEqual(new[] { Education.Id, Housing.Id })));
+    }
+
+    // --- Amount change scope ---
+
+    [Fact]
+    public async Task PrepareForEdit_WithMonthAmount_ShowsTheMonthAmount()
+    {
+        await _vm.PrepareForEditAsync(MakeEntry(), June, monthAmount: 950m);
+
+        _vm.Amount.Should().Be(950m);
+    }
+
+    [Fact]
+    public async Task Save_EditingAmountOfRecurrent_AsksForTheMonths()
+    {
+        await _vm.PrepareForEditAsync(MakeEntry(), June);
+        _vm.Amount = 900m;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _alertService.Received(1).ChooseAsync("Alterar o valor de \"Rent\"", AddEntryViewModel.CancelOption,
+            AddEntryViewModel.ThisMonthOption, AddEntryViewModel.ThisAndFutureOption, AddEntryViewModel.AllMonthsOption);
+    }
+
+    [Theory]
+    [InlineData(AddEntryViewModel.ThisMonthOption, AmountChangeScope.ThisMonth)]
+    [InlineData(AddEntryViewModel.ThisAndFutureOption, AmountChangeScope.ThisAndFuture)]
+    [InlineData(AddEntryViewModel.AllMonthsOption, AmountChangeScope.All)]
+    public async Task Save_EditingAmountOfRecurrent_SavesWithTheChosenScope(string option, AmountChangeScope scope)
+    {
+        _alertService.ChooseAsync(default!, default!, default!).ReturnsForAnyArgs(option);
+        await _vm.PrepareForEditAsync(MakeEntry(), June);
+        _vm.Amount = 900m;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Amount == 900m), Arg.Any<IReadOnlyList<int>?>(), 2026, 6, scope);
+    }
+
+    [Fact]
+    public async Task Save_EditingAmountCancelled_SavesNothing()
+    {
+        _alertService.ChooseAsync(default!, default!, default!).ReturnsForAnyArgs((string?)null);
+        var saved = false;
+        _vm.SetSaveCallback(_ => { saved = true; return Task.CompletedTask; });
+        await _vm.PrepareForEditAsync(MakeEntry(), June);
+        _vm.Amount = 900m;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.DidNotReceiveWithAnyArgs().SaveEntryAsync(default!, default);
+        await _service.DidNotReceiveWithAnyArgs().SaveEntryAsync(default!, default, default, default, default);
+        saved.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Save_EditingAmountOfOneTime_DoesNotAskAndChangesEveryMonth()
+    {
+        var entry = MakeEntry();
+        entry.Recurrence = RecurrenceType.OneTime;
+        await _vm.PrepareForEditAsync(entry, June);
+        _vm.Amount = 900m;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _alertService.DidNotReceiveWithAnyArgs().ChooseAsync(default!, default!, default!);
+        await _service.Received(1).SaveEntryAsync(Arg.Any<FinancialEntry>(), Arg.Any<IReadOnlyList<int>?>(), 2026, 6, AmountChangeScope.All);
+    }
+
+    [Fact]
+    public async Task Save_EditingWithoutChangingTheMonthAmount_KeepsTheTemplateAmountWithoutAsking()
+    {
+        await _vm.PrepareForEditAsync(MakeEntry(), June, monthAmount: 950m);
+        _vm.Description = "Aluguel";
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _alertService.DidNotReceiveWithAnyArgs().ChooseAsync(default!, default!, default!);
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.Amount == 800m && e.Description == "Aluguel"), Arg.Any<IReadOnlyList<int>?>());
+    }
+
+    // --- Current installment ---
+
+    [Fact]
+    public void CurrentInstallment_NewInstallments_IsShown()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Installments;
+
+        _vm.ShowsCurrentInstallment.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CurrentInstallment_EditingInstallments_IsHidden()
+    {
+        var entry = MakeEntry();
+        entry.Recurrence = RecurrenceType.Installments;
+        entry.TotalInstallments = 10;
+
+        await _vm.PrepareForEditAsync(entry);
+
+        _vm.ShowsCurrentInstallment.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CurrentInstallment_OtherRecurrence_IsHiddenAndCleared()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Installments;
+        _vm.CurrentInstallment = 3;
+
+        _vm.SelectedRecurrence = RecurrenceType.Recurrent;
+
+        _vm.ShowsCurrentInstallment.Should().BeFalse();
+        _vm.CurrentInstallment.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Save_CurrentInstallment_StartsThePurchaseThatManyMonthsEarlier()
+    {
+        await _vm.PrepareAsync(June);
+        _vm.SelectedRecurrence = RecurrenceType.Installments;
+        _vm.TotalInstallments = 10;
+        _vm.CurrentInstallment = 3;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(
+            Arg.Is<FinancialEntry>(e => e.StartDate == new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local) && e.TotalInstallments == 10),
+            Arg.Any<IReadOnlyList<int>?>());
+    }
+
+    [Fact]
+    public async Task Save_NoCurrentInstallment_StartsInTheMonthItIsAddedIn()
+    {
+        await _vm.PrepareAsync(June);
+        _vm.SelectedRecurrence = RecurrenceType.Installments;
+        _vm.TotalInstallments = 10;
+
+        await _vm.SaveCommand.ExecuteAsync(null);
+
+        await _service.Received(1).SaveEntryAsync(Arg.Is<FinancialEntry>(e => e.StartDate == June), Arg.Any<IReadOnlyList<int>?>());
+    }
+
+    [Fact]
+    public void FirstInstallmentMonth_CurrentInstallmentAboveOne_IsThatManyMonthsEarlier()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Installments;
+        _vm.TotalInstallments = 10;
+        _vm.CurrentInstallment = 5;
+
+        _vm.FirstInstallmentMonth.Should().Be(new DateTime(2025, 12, 1));
+        _vm.CurrentInstallmentHint.Should().StartWith("A 1ª parcela foi em ");
+    }
+
+    [Fact]
+    public void FirstInstallmentMonth_FirstInstallment_IsNull()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Installments;
+        _vm.CurrentInstallment = 1;
+
+        _vm.FirstInstallmentMonth.Should().BeNull();
+        _vm.CurrentInstallmentHint.Should().Be("A parcela que cai neste mês. Deixe vazio se a compra começa agora.");
+    }
+
+    [Theory]
+    [InlineData(11)]
+    [InlineData(0)]
+    public void SaveCommand_CurrentInstallmentOutOfRange_CannotExecute(int current)
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Installments;
+        _vm.TotalInstallments = 10;
+        _vm.CurrentInstallment = current;
+
+        _vm.SaveCommand.CanExecute(null).Should().BeFalse();
+        _vm.CurrentInstallmentHint.Should().Be("A parcela atual não pode passar do nº de parcelas.");
+    }
+
+    [Fact]
+    public void SaveCommand_CurrentInstallmentWithinTotal_CanExecute()
+    {
+        _vm.SelectedRecurrence = RecurrenceType.Installments;
+        _vm.TotalInstallments = 10;
+        _vm.CurrentInstallment = 10;
+
+        _vm.SaveCommand.CanExecute(null).Should().BeTrue();
     }
 
     // --- ToggleCategory ---

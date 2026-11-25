@@ -100,6 +100,18 @@
                        Keyboard="Numeric" />
             </VerticalStackLayout>
 
+            <!-- A purchase that started in an earlier month: the installment that falls in this one sets its first month -->
+            <VerticalStackLayout Spacing="0" IsVisible="{Binding ShowsCurrentInstallment}">
+                <Label Text="Parcela atual" Style="{StaticResource FieldCaption}" />
+                <Entry AutomationId="CurrentInstallmentEntry"
+                       Placeholder="1"
+                       Text="{Binding CurrentInstallment}"
+                       Keyboard="Numeric" />
+                <Label AutomationId="CurrentInstallmentHintLabel"
+                       Text="{Binding CurrentInstallmentHint}"
+                       Style="{StaticResource Hint}" />
+            </VerticalStackLayout>
+
             <!-- Annual (e.g. IPVA, IPTU): falls in this month every year, or in N consecutive months from it -->
             <VerticalStackLayout Spacing="0" IsVisible="{Binding IsAnnual}">
                 <Label Text="Parcelas no ano" Style="{StaticResource FieldCaption}" />
