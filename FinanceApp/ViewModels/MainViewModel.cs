@@ -68,7 +68,13 @@ public partial class MainViewModel : ObservableObject,
     private readonly IWriteGuard _writeGuard;
     private readonly TimeProvider _timeProvider;
     private CancellationTokenSource? _neighboursLoad;
-    private readonly Dictionary<MonthViewModel, Task> _monthLoads = [];
+    private readonly Dictionary<MonthViewModel, (int Version, Task Load)> _monthLoads = [];
+
+    /// <summary>
+    /// Bumped by every refresh: a load started before it may have read the data before the change, so it is neither
+    /// reused nor allowed to fill its month in.
+    /// </summary>
+    private int _dataVersion;
     private bool _isSyncing;
     private bool _isInitialized;
 
@@ -108,6 +114,7 @@ public partial class MainViewModel : ObservableObject,
     [RelayCommand]
     public async Task RefreshAllAsync()
     {
+        _dataVersion++;
         foreach (var month in Months)
         {
             month.IsLoaded = false;
@@ -235,34 +242,39 @@ public partial class MainViewModel : ObservableObject,
         }
     }
 
-    // A month already being loaded (e.g. by the swipe that brought it on screen) is awaited, not fetched again.
+    // A month already being loaded (e.g. by the swipe that brought it on screen) is awaited, not fetched again, unless
+    // that load started before the last refresh.
     private Task LoadMonthAsync(int index)
     {
         if (index < 0 || index >= Months.Count || Months[index] is not { IsLoaded: false } month)
             return Task.CompletedTask;
 
-        if (_monthLoads.TryGetValue(month, out var inFlight))
-            return inFlight;
+        if (_monthLoads.TryGetValue(month, out var inFlight) && inFlight.Version == _dataVersion)
+            return inFlight.Load;
 
-        var load = FetchMonthAsync(month);
-        _monthLoads[month] = load;
+        var load = FetchMonthAsync(month, _dataVersion);
+        _monthLoads[month] = (_dataVersion, load);
         return load;
     }
 
-    // The month's lists are built off the UI thread, then swapped in at once.
-    private async Task FetchMonthAsync(MonthViewModel month)
+    // The month's lists are built off the UI thread, then swapped in at once. A load outdated by a refresh while it
+    // ran is dropped: the newer one fills the month in.
+    private async Task FetchMonthAsync(MonthViewModel month, int version)
     {
         try
         {
             var entries = await _financeService.GetMergedEntriesForMonthAsync(month.Date.Year, month.Date.Month);
             var content = await Task.Run(() => MonthContent.Build(entries));
+            if (version != _dataVersion)
+                return;
 
             month.ReplaceEntries(content);
             month.IsLoaded = true;
         }
         finally
         {
-            _monthLoads.Remove(month);
+            if (_monthLoads.TryGetValue(month, out var current) && current.Version == version)
+                _monthLoads.Remove(month);
         }
     }
 
