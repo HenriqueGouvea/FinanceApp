@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using FinanceApp.Models;
 using FinanceApp.Services;
 using System.Collections.ObjectModel;
+using System.Globalization;
 
 namespace FinanceApp.ViewModels;
 
@@ -12,11 +13,14 @@ public partial class AddEntryViewModel : ObservableObject
     private readonly ICategoryService _categoryService;
     private readonly IPaymentSourceService _paymentSourceService;
     private readonly IWriteGuard _writeGuard;
+    private readonly IAlertService _alertService;
     private Func<FinancialEntry, Task>? _onSaved;
     private DateTime _targetMonth;
     private int _editingEntryId;
     private DateTime? _editingEndDate;
     private DateTime _editingMonth;
+    private decimal _editingTemplateAmount;
+    private decimal _editingMonthAmount;
     private decimal _initialPaidAmount;
     private readonly List<PaymentItem> _deletedPayments = [];
     private IReadOnlyList<int> _editingCategoryIds = [];
@@ -35,6 +39,11 @@ public partial class AddEntryViewModel : ObservableObject
     [ObservableProperty] FinancialEntryType entryType = FinancialEntryType.Outcome;
     [ObservableProperty] RecurrenceType? selectedRecurrence;
     [ObservableProperty] int? totalInstallments;
+    /// <summary>
+    /// For a new purchase in installments, the one that falls in the month it is added in (1 when empty): the
+    /// purchase started that many months earlier.
+    /// </summary>
+    [ObservableProperty] int? currentInstallment;
     [ObservableProperty] bool isEstimated;
     [ObservableProperty] bool allowsPartialPayment;
     [ObservableProperty] decimal paidAmount;
@@ -45,8 +54,29 @@ public partial class AddEntryViewModel : ObservableObject
 
     public const int NoDueDay = 0;
 
+    public const string ThisMonthOption = "Somente este mês";
+    public const string ThisAndFutureOption = "Este e os próximos meses";
+    public const string AllMonthsOption = "Todos os meses";
+    public const string CancelOption = "Cancelar";
+
     public bool HasRecurrence => SelectedRecurrence is not null;
     public bool IsInstallments => SelectedRecurrence == RecurrenceType.Installments;
+    /// <summary>
+    /// "Parcela atual" is only asked when adding a purchase in installments: an edited one keeps its months.
+    /// </summary>
+    public bool ShowsCurrentInstallment => IsInstallments && !IsEditing;
+    private bool IsCurrentInstallmentValid =>
+        CurrentInstallment is null || (CurrentInstallment >= 1 && (TotalInstallments is null || CurrentInstallment <= TotalInstallments));
+    /// <summary>
+    /// The month of the first installment of a purchase that started before the month it is added in, or null.
+    /// </summary>
+    public DateTime? FirstInstallmentMonth =>
+        ShowsCurrentInstallment && IsCurrentInstallmentValid && CurrentInstallment > 1 ? _targetMonth.AddMonths(1 - CurrentInstallment.Value) : null;
+    public string CurrentInstallmentHint =>
+        !ShowsCurrentInstallment ? string.Empty
+        : !IsCurrentInstallmentValid ? "A parcela atual não pode passar do nº de parcelas."
+        : FirstInstallmentMonth is { } first ? $"A 1ª parcela foi em {first.ToString("MMMM 'de' yyyy", CultureInfo.CurrentCulture)}."
+        : "A parcela que cai neste mês. Deixe vazio se a compra começa agora.";
     public bool IsAnnual => SelectedRecurrence == RecurrenceType.Annual;
     /// <summary>
     /// The installment purchase's total, or the yearly total of an annual entry paid in installments.
@@ -111,12 +141,13 @@ public partial class AddEntryViewModel : ObservableObject
         [RecurrenceType.OneTime, RecurrenceType.Recurrent, RecurrenceType.Installments, RecurrenceType.Annual];
     public List<int> DueDays { get; } = [NoDueDay, .. Enumerable.Range(1, 31)];
 
-    public AddEntryViewModel(IFinanceService financeService, ICategoryService categoryService, IPaymentSourceService paymentSourceService, IWriteGuard writeGuard)
+    public AddEntryViewModel(IFinanceService financeService, ICategoryService categoryService, IPaymentSourceService paymentSourceService, IWriteGuard writeGuard, IAlertService alertService)
     {
         _financeService = financeService;
         _categoryService = categoryService;
         _paymentSourceService = paymentSourceService;
         _writeGuard = writeGuard;
+        _alertService = alertService;
         Payments.CollectionChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(HasPayments));
@@ -130,9 +161,11 @@ public partial class AddEntryViewModel : ObservableObject
         OnPropertyChanged(nameof(IsInstallments));
         OnPropertyChanged(nameof(IsAnnual));
         OnPropertyChanged(nameof(InstallmentsTotal));
-        SaveCommand.NotifyCanExecuteChanged();
         if (value is not (RecurrenceType.Installments or RecurrenceType.Annual))
             TotalInstallments = null;
+        if (value != RecurrenceType.Installments)
+            CurrentInstallment = null;
+        NotifyCurrentInstallmentChanged();
     }
 
     partial void OnAmountChanged(decimal value)
@@ -148,6 +181,20 @@ public partial class AddEntryViewModel : ObservableObject
     partial void OnTotalInstallmentsChanged(int? value)
     {
         OnPropertyChanged(nameof(InstallmentsTotal));
+        NotifyCurrentInstallmentChanged();
+    }
+
+    partial void OnCurrentInstallmentChanged(int? value)
+    {
+        NotifyCurrentInstallmentChanged();
+    }
+
+    private void NotifyCurrentInstallmentChanged()
+    {
+        OnPropertyChanged(nameof(ShowsCurrentInstallment));
+        OnPropertyChanged(nameof(FirstInstallmentMonth));
+        OnPropertyChanged(nameof(CurrentInstallmentHint));
+        SaveCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnEntryTypeChanged(FinancialEntryType value)
@@ -185,6 +232,7 @@ public partial class AddEntryViewModel : ObservableObject
         FilterCategories();
         SelectedRecurrence = null;
         TotalInstallments = null;
+        CurrentInstallment = null;
         IsEstimated = false;
         AllowsPartialPayment = false;
         SelectedDueDay = NoDueDay;
@@ -192,12 +240,14 @@ public partial class AddEntryViewModel : ObservableObject
         _initialPaidAmount = 0;
         Payments.Clear();
         _deletedPayments.Clear();
+        NotifyCurrentInstallmentChanged();
     }
 
     /// <summary>
     /// Edits the template, plus the amount already paid in <paramref name="month"/> (defaults to the start month).
+    /// The amount shown is <paramref name="monthAmount"/>, the one planned for that month (the template's by default).
     /// </summary>
-    public async Task PrepareForEditAsync(FinancialEntry entry, DateTime? month = null, decimal paidAmount = 0)
+    public async Task PrepareForEditAsync(FinancialEntry entry, DateTime? month = null, decimal paidAmount = 0, decimal? monthAmount = null)
     {
         _editingEntryId = entry.Id;
         _editingEndDate = entry.EndDate;
@@ -213,16 +263,20 @@ public partial class AddEntryViewModel : ObservableObject
         _targetMonth = new DateTime(entry.StartDate.Year, entry.StartDate.Month, 1);
         PageTitle = "Editar Lançamento";
         Description = entry.Description;
-        Amount = entry.Amount;
+        Amount = monthAmount ?? entry.Amount;
+        _editingTemplateAmount = entry.Amount;
+        _editingMonthAmount = Amount;
         EntryType = entry.EntryType;
         FilterCategories();
         SelectedPaymentSource = PaymentSources.FirstOrDefault(s => s.Id == entry.PaymentSourceId);
         SelectedRecurrence = entry.Recurrence;
         TotalInstallments = entry.TotalInstallments;
+        CurrentInstallment = null;
         IsEstimated = entry.IsEstimated;
         AllowsPartialPayment = entry.AllowsPartialPayment;
         SelectedDueDay = entry.DueDay ?? NoDueDay;
         _editingMonth = month ?? _targetMonth;
+        NotifyCurrentInstallmentChanged();
         PaidAmount = paidAmount;
         _initialPaidAmount = paidAmount;
 
@@ -252,13 +306,22 @@ public partial class AddEntryViewModel : ObservableObject
         if (SelectedRecurrence is not { } recurrence)
             return;
 
+        // A new amount for a repeating entry applies to the months the user picks.
+        AmountChangeScope? amountScope = null;
+        if (IsEditing && Amount != _editingMonthAmount)
+        {
+            amountScope = recurrence == RecurrenceType.OneTime ? AmountChangeScope.All : await AskAmountScopeAsync();
+            if (amountScope is null)
+                return;
+        }
+
         var entry = new FinancialEntry
         {
             Id = _editingEntryId,
             Description = Description,
-            Amount = Amount,
+            Amount = IsEditing && amountScope is null ? _editingTemplateAmount : Amount,
             PaymentSourceId = SelectedPaymentSource?.Id,
-            StartDate = new DateTime(_targetMonth.Year, _targetMonth.Month, 1),
+            StartDate = ShowsCurrentInstallment ? _targetMonth.AddMonths(1 - (CurrentInstallment ?? 1)) : _targetMonth,
             EndDate = _editingEndDate,
             EntryType = EntryType,
             Recurrence = recurrence,
@@ -276,7 +339,10 @@ public partial class AddEntryViewModel : ObservableObject
 
         var saved = await _writeGuard.TryAsync(async () =>
         {
-            await _financeService.SaveEntryAsync(entry, [.. _selectedCategoryIds]);
+            if (amountScope is { } scope)
+                await _financeService.SaveEntryAsync(entry, [.. _selectedCategoryIds], _editingMonth.Year, _editingMonth.Month, scope);
+            else
+                await _financeService.SaveEntryAsync(entry, [.. _selectedCategoryIds]);
 
             if (IsEditing)
             {
@@ -294,7 +360,20 @@ public partial class AddEntryViewModel : ObservableObject
             await _onSaved(entry);
     }
 
-    private bool CanSave() => SelectedRecurrence is not null;
+    private bool CanSave() => SelectedRecurrence is not null && (!ShowsCurrentInstallment || IsCurrentInstallmentValid);
+
+    private async Task<AmountChangeScope?> AskAmountScopeAsync()
+    {
+        var choice = await _alertService.ChooseAsync($"Alterar o valor de \"{Description}\"", CancelOption,
+            ThisMonthOption, ThisAndFutureOption, AllMonthsOption);
+        return choice switch
+        {
+            ThisMonthOption => AmountChangeScope.ThisMonth,
+            ThisAndFutureOption => AmountChangeScope.ThisAndFuture,
+            AllMonthsOption => AmountChangeScope.All,
+            _ => null
+        };
+    }
 
     public void SetSaveCallback(Func<FinancialEntry, Task> onSaved)
     {

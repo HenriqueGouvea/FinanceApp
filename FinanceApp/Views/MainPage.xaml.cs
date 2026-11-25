@@ -79,7 +79,7 @@ public partial class MainPage : ContentPage
         var entry = await _financeService.GetEntryByIdAsync(projection.FinancialEntryId);
         if (entry is null) return;
 
-        await OpenEntryPageAsync(mainVm, vm => vm.PrepareForEditAsync(entry, mainVm.SelectedMonth?.Date, projection.PaidAmount));
+        await OpenEntryPageAsync(mainVm, vm => vm.PrepareForEditAsync(entry, mainVm.SelectedMonth?.Date, projection.PaidAmount, projection.PlannedOrEffectiveAmount));
     }
 
     private async Task OpenEntryPageAsync(MainViewModel mainVm, Func<AddEntryViewModel, Task> prepare)

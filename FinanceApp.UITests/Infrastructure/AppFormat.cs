@@ -110,6 +110,11 @@ public static class AppFormat
     }
 
     /// <summary>
+    /// A month within a sentence (e.g. "março de 2026").
+    /// </summary>
+    public static string MonthName(DateTime month) => month.ToString("MMMM 'de' yyyy", Culture);
+
+    /// <summary>
     /// Month label used by the month picker grid (e.g. "Out").
     /// </summary>
     public static string MonthAbbreviation(DateTime month)

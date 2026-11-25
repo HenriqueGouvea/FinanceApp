@@ -139,6 +139,73 @@ public class FinanceService : IFinanceService
                 SetCategories(conn, entry.Id, categoryIds);
         });
 
+    public Task SaveEntryAsync(FinancialEntry entry, IReadOnlyList<int>? categoryIds, int year, int month, AmountChangeScope scope) =>
+        InTransactionAsync(conn =>
+        {
+            var stored = conn.Table<FinancialEntry>().Where(e => e.Id == entry.Id).FirstOrDefault()
+                ?? throw new InvalidOperationException($"Entry {entry.Id} not found.");
+
+            var targetDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Local);
+            var firstOfStart = new DateTime(stored.StartDate.Year, stored.StartDate.Month, 1, 0, 0, 0, DateTimeKind.Local);
+
+            // A single month is every month of a one-time entry, and from its first month on is all of them.
+            if (stored.Recurrence == RecurrenceType.OneTime ||
+                (scope == AmountChangeScope.ThisAndFuture && targetDate <= firstOfStart))
+                scope = AmountChangeScope.All;
+
+            var records = conn.Table<FinancialMonthlyEntry>().Where(r => r.FinancialEntryId == entry.Id).ToList();
+            var newAmount = entry.Amount;
+
+            switch (scope)
+            {
+                case AmountChangeScope.ThisMonth:
+                    var record = records.FirstOrDefault(r => r.Year == year && r.Month == month)
+                        ?? new FinancialMonthlyEntry { FinancialEntryId = entry.Id, Year = year, Month = month };
+                    record.OverrideAmount = newAmount == stored.Amount ? null : newAmount;
+                    Upsert(conn, record);
+                    entry.Amount = stored.Amount;
+                    break;
+
+                case AmountChangeScope.ThisAndFuture:
+                    // Earlier months keep the amount they had: the stored one, unless they had their own.
+                    var recordLookup = records.ToDictionary(r => (r.Year, r.Month));
+                    for (var past = firstOfStart; past < targetDate; past = past.AddMonths(1))
+                    {
+                        if (!IsActiveForMonth(stored, past))
+                            continue;
+
+                        var pastRecord = recordLookup.GetValueOrDefault((past.Year, past.Month))
+                            ?? new FinancialMonthlyEntry { FinancialEntryId = entry.Id, Year = past.Year, Month = past.Month };
+                        if (pastRecord.OverrideAmount is not null)
+                            continue;
+
+                        pastRecord.OverrideAmount = stored.Amount;
+                        Upsert(conn, pastRecord);
+                    }
+
+                    ClearOverrides(conn, records.Where(r => r.Year * 12 + r.Month >= year * 12 + month));
+                    break;
+
+                case AmountChangeScope.All:
+                    ClearOverrides(conn, records);
+                    break;
+            }
+
+            conn.Update(entry);
+
+            if (categoryIds is not null)
+                SetCategories(conn, entry.Id, categoryIds);
+        });
+
+    private static void ClearOverrides(SQLiteConnection conn, IEnumerable<FinancialMonthlyEntry> records)
+    {
+        foreach (var record in records.Where(r => r.OverrideAmount is not null))
+        {
+            record.OverrideAmount = null;
+            conn.Update(record);
+        }
+    }
+
     /// <summary>
     /// Replaces the entry's categories with <paramref name="categoryIds"/>, in their order (the first is the main one).
     /// </summary>

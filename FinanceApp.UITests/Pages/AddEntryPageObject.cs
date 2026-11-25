@@ -16,6 +16,8 @@ public class AddEntryPageObject
     private const string RecurrencePickerId = "RecurrencePicker";
     private static readonly By RecurrencePicker = AppSession.AutomationId(RecurrencePickerId);
     private static readonly By InstallmentsEntry = AppSession.AutomationId("InstallmentsEntry");
+    private static readonly By CurrentInstallmentEntry = AppSession.AutomationId("CurrentInstallmentEntry");
+    private static readonly By CurrentInstallmentHint = AppSession.AutomationId("CurrentInstallmentHintLabel");
     private static readonly By AnnualInstallmentsEntry = AppSession.AutomationId("AnnualInstallmentsEntry");
     private static readonly By AmountEntry = AppSession.AutomationId("AmountEntry");
     private static readonly By InstallmentsTotal = AppSession.AutomationId("InstallmentsTotalLabel");
@@ -119,6 +121,19 @@ public class AddEntryPageObject
         Type(InstallmentsEntry, installments);
         return this;
     }
+
+    /// <summary>
+    /// "Parcela atual" of a new purchase in installments: the one that falls in the month it is added in.
+    /// </summary>
+    public AddEntryPageObject EnterCurrentInstallment(string installment)
+    {
+        Type(CurrentInstallmentEntry, installment);
+        return this;
+    }
+
+    public string CurrentInstallmentHintText => _session.WaitForVisible(CurrentInstallmentHint).Text;
+
+    public bool IsCurrentInstallmentVisible => _session.IsVisible(CurrentInstallmentEntry);
 
     /// <summary>
     /// The amount field is masked as currency and reads typed digits as cents, so 1500 is typed as "150000".
@@ -348,6 +363,18 @@ public class AddEntryPageObject
     {
         _session.HideKeyboardIfShown();
         _session.ScrollToAndTap(SaveButtonId);
+        _session.WaitForGone(AppSession.AutomationId(SaveButtonId));
+    }
+
+    /// <summary>
+    /// Saves an edited repeating entry whose amount changed, picking the months the new amount applies to
+    /// (e.g. <see cref="AppLabels.AmountThisMonth"/>) in the native action sheet.
+    /// </summary>
+    public void Save(string amountScopeOption)
+    {
+        _session.HideKeyboardIfShown();
+        _session.ScrollToAndTap(SaveButtonId);
+        _session.Tap(AppSession.DialogOption(amountScopeOption));
         _session.WaitForGone(AppSession.AutomationId(SaveButtonId));
     }
 

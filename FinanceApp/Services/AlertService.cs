@@ -18,6 +18,16 @@ public class AlertService : IAlertService
             : MainThread.InvokeOnMainThreadAsync(() => topPage.DisplayAlertAsync(title, message, accept, cancel));
     }
 
+    public async Task<string?> ChooseAsync(string title, string cancel, params string[] options)
+    {
+        var topPage = GetTopPage();
+        if (topPage is null)
+            return null;
+
+        var choice = await MainThread.InvokeOnMainThreadAsync(() => topPage.DisplayActionSheetAsync(title, cancel, null, options));
+        return options.Contains(choice) ? choice : null;
+    }
+
     // Modal pages (the setup wizard, the PIN, popups) sit above the window's page.
     private static Page? GetTopPage()
     {

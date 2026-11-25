@@ -9,13 +9,17 @@ namespace FinanceApp.UITests.Tests;
 [Trait("Category", "E2E")]
 public sealed class EditEntryTests : E2ETestBase
 {
-    public EditEntryTests(AppiumServerFixture server) : base(server, data => data.AddEntry("Academia E2E", 90m))
+    // Started last month, so a new amount can apply to the months before the one edited or not.
+    private static readonly DateTime LastMonth = AppFormat.CurrentMonth.AddMonths(-1);
+
+    public EditEntryTests(AppiumServerFixture server)
+        : base(server, data => data.AddEntry("Academia E2E", 90m, startMonth: LastMonth))
     {
     }
 
     [Fact]
     [Trait("Smoke", "true")]
-    public async Task EditEntry_ChangeDescriptionAndAmount_UpdatesListInEveryMonthAndDatabase()
+    public async Task EditEntry_ChangeDescriptionAndAmountInAllMonths_UpdatesListInEveryMonthAndDatabase()
     {
         var page = MainPage.OpenEntry("Academia E2E");
         using (new AssertionScope())
@@ -30,7 +34,7 @@ public sealed class EditEntryTests : E2ETestBase
 
         page.EnterDescription("Academia Premium E2E")
             .EnterAmount(150)
-            .Save();
+            .Save(AppLabels.AmountAllMonths);
 
         MainPage.WaitForEntry("Academia Premium E2E");
         MainPage.IsEntryVisible("Academia E2E").Should().BeFalse();
@@ -38,12 +42,55 @@ public sealed class EditEntryTests : E2ETestBase
 
         MainPage.GoToNextMonth().WaitForEntry("Academia Premium E2E");
         MainPage.VisibleEntryAmounts.Should().ContainSingle().Which.Should().Be(AppFormat.Money(150));
+        MainPage.GoToPreviousMonth().GoToPreviousMonth().WaitForEntry("Academia Premium E2E");
+        MainPage.VisibleEntryAmounts.Should().ContainSingle().Which.Should().Be(AppFormat.Money(150));
 
         var row = (await GetEntryRowsAsync()).Should().ContainSingle().Subject;
         row.Description.Should().Be("Academia Premium E2E");
         row.Amount.Should().Be(150m);
         row.Recurrence.Should().Be(AppFormat.Recurrent);
-        row.StartDate.Date.Should().Be(AppFormat.CurrentMonth);
+        row.StartDate.Date.Should().Be(LastMonth);
+        (await GetMonthlyEntryRowsAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task EditEntry_ChangeAmountInThisMonthOnly_KeepsTheOtherMonths()
+    {
+        MainPage.OpenEntry("Academia E2E")
+            .EnterAmount(150)
+            .Save(AppLabels.AmountThisMonth);
+
+        MainPage.WaitForEntry("Academia E2E");
+        MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(150));
+        MainPage.GoToNextMonth().WaitForEntry("Academia E2E");
+        MainPage.VisibleEntryAmounts.Should().ContainSingle().Which.Should().Be(AppFormat.Money(90));
+        MainPage.GoToPreviousMonth().GoToPreviousMonth().WaitForEntry("Academia E2E");
+        MainPage.VisibleEntryAmounts.Should().ContainSingle().Which.Should().Be(AppFormat.Money(90));
+
+        (await GetEntryRowsAsync()).Should().ContainSingle().Which.Amount.Should().Be(90m);
+        var month = (await GetMonthlyEntryRowsAsync()).Should().ContainSingle().Subject;
+        month.Month.Should().Be(AppFormat.CurrentMonth.Month);
+        month.OverrideAmount.Should().Be(150m);
+    }
+
+    [Fact]
+    public async Task EditEntry_ChangeAmountInThisAndFutureMonths_KeepsEarlierMonths()
+    {
+        MainPage.OpenEntry("Academia E2E")
+            .EnterAmount(150)
+            .Save(AppLabels.AmountThisAndFuture);
+
+        MainPage.WaitForEntry("Academia E2E");
+        MainPage.OutcomeTotalText.Should().Be(AppFormat.Money(150));
+        MainPage.GoToNextMonth().WaitForEntry("Academia E2E");
+        MainPage.VisibleEntryAmounts.Should().ContainSingle().Which.Should().Be(AppFormat.Money(150));
+        MainPage.GoToPreviousMonth().GoToPreviousMonth().WaitForEntry("Academia E2E");
+        MainPage.VisibleEntryAmounts.Should().ContainSingle().Which.Should().Be(AppFormat.Money(90));
+
+        (await GetEntryRowsAsync()).Should().ContainSingle().Which.Amount.Should().Be(150m);
+        var month = (await GetMonthlyEntryRowsAsync()).Should().ContainSingle().Subject;
+        month.Month.Should().Be(LastMonth.Month);
+        month.OverrideAmount.Should().Be(90m);
     }
 
     [Fact]
