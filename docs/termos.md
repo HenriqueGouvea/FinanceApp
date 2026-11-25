@@ -6,7 +6,7 @@ permalink: /termos/
 
 # Termos de uso do Mensal
 
-<p class="updated">Última atualização: 9 de novembro de 2026</p>
+<p class="updated">Última atualização: 25 de novembro de 2026</p>
 
 Estes termos regem o uso do app **Mensal** para Android. Ao instalar e usar o app, você concorda com eles. Se não
 concordar, não use o app.
@@ -32,11 +32,19 @@ pagamentos, não se conecta a bancos e não oferece crédito, investimentos ou r
 ## 3. Uso permitido
 
 Você pode usar o Mensal para organizar suas finanças pessoais ou da sua família. Não é permitido usar o app para
-atividades ilegais, nem copiar, modificar, redistribuir ou vender o app ou partes dele, sua marca, nome ou ícone,
-exceto quando uma licença de código aberto permitir isso para o componente em questão (veja "Licenças de código
-aberto" na tela "Sobre o Mensal").
+atividades ilegais.
 
-## 4. Disponibilidade e atualizações
+## 4. Código aberto, nome e marca
+
+O código-fonte do Mensal é aberto e está publicado no [GitHub](https://github.com/HenriqueGouvea/FinanceApp) sob a
+[licença MIT](https://github.com/HenriqueGouvea/FinanceApp/blob/master/LICENSE): você pode copiá-lo, modificá-lo e
+redistribuí-lo nas condições dessa licença, que incluem manter o aviso de direitos autorais e o texto da licença.
+
+A licença vale para o código, não para o nome "Mensal", a marca e o ícone do app. Um app ou serviço feito a partir do
+código não pode usá-los, nem se apresentar como o Mensal ou como oferecido pelo desenvolvedor. Os componentes de
+terceiros usados pelo app seguem as próprias licenças (veja "Licenças de código aberto" na tela "Sobre o Mensal").
+
+## 5. Disponibilidade e atualizações
 
 O app é oferecido "no estado em que se encontra". O desenvolvedor se esforça para que ele funcione bem, mas não garante
 que ele esteja livre de erros ou que funcione em todos os aparelhos. O app pode receber atualizações que mudem, incluam
@@ -45,22 +53,22 @@ ou retirem funções, e pode deixar de ser oferecido no Google Play.
 Se, no futuro, o Mensal passar a ter anúncios ou funções pagas, estes termos e a política de privacidade serão
 atualizados antes, e as condições de qualquer compra serão informadas no momento dela, pelo Google Play.
 
-## 5. Responsabilidade
+## 6. Responsabilidade
 
 Na medida permitida pela lei, o desenvolvedor não se responsabiliza por prejuízos decorrentes de valores registrados de
 forma errada, de pagamentos feitos ou deixados de fazer com base nas informações do app, ou da perda de dados que não
 tenham cópia de segurança. Nada nestes termos limita os direitos que o Código de Defesa do Consumidor garante a você.
 
-## 6. Mudanças nestes termos
+## 7. Mudanças nestes termos
 
 Estes termos podem ser atualizados. A versão em vigor é sempre a publicada nesta página, com a data da última
 atualização no topo. Mudanças importantes também serão avisadas nas notas de versão do app.
 
-## 7. Lei aplicável
+## 8. Lei aplicável
 
 Estes termos seguem as leis do Brasil. Fica eleito o foro do domicílio do usuário para resolver qualquer questão
 relacionada a eles.
 
-## 8. Contato
+## 9. Contato
 
 Henrique Gouvêa · [henriquegouvea90@gmail.com](mailto:henriquegouvea90@gmail.com)

@@ -78,6 +78,10 @@ The project maintains a high-quality bar through automated testing, ensuring tha
 To run tests locally:
 ```bash
 dotnet test FinanceApp.Tests/FinanceApp.Tests.csproj
+```
+
+## License
+The source code is released under the [MIT License](LICENSE). The "Mensal" name, mark and icon are not covered by it.
 
 ---
 *Developed with focus on architecture and performance.*

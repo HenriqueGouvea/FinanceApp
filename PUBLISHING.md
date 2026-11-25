@@ -242,10 +242,12 @@ big enough to show all 8, so it only failed in the full post-merge run.
    **For now: without.** The privacy policy, terms and the Data safety answers say so; the owner wants to
    monetize later, and the AdMob task updates them before ads ship.
 3. **Individual or company** for the Play account and the income (section 7, ask an accountant).
-4. **Public repository?** It's public with no license, which means "all rights reserved", but anyone can read
-   and copy the code, including how premium is unlocked. Making it private costs GitHub Actions minutes (free
-   on public repos; 2,000 a month on a free private plan, Windows minutes count double). Alternatively, keep it
-   public and add a license that allows reading but not reuse.
+4. **Public repository?** **Decided: public, under the MIT license** (`LICENSE` at the root, 2026-11-25).
+   Anyone may copy, change and redistribute the code, as long as the copyright notice and license text go with
+   it. The license covers the code only: the "Mensal" name, mark and icon aren't licensed, and the terms of use
+   (section 4) say so. Since the code is open, a premium tier can't rely on its unlock logic staying hidden: its
+   check must go through Google Play Billing (purchase state from Play, not a flag only the app knows about).
+   Keeping the repository public also keeps GitHub Actions minutes free.
 5. **Trademark:** file "Mensal" (mixed mark), or look for a more distinctive name before the store listing
    makes it public.
 
